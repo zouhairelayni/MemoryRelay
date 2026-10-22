@@ -27,6 +27,7 @@ const now = () => new Date().toISOString().slice(0, 16).replace("T", " ");
 const newId = () => crypto.randomUUID().replace(/-/g, "").slice(0, 8);
 const toHex = (buf) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
 const fromHex = (h) => Uint8Array.from(h.match(/../g).map((x) => parseInt(x, 16)));
+const randomHex = (n) => toHex(crypto.getRandomValues(new Uint8Array(n)));
 const norm = (t) => t.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
 
 function similar(a, b) {
@@ -40,6 +41,7 @@ function similar(a, b) {
 }
 
 const brief = (m) => ({ id: m.id, text: m.text.slice(0, 300), tags: m.tags || "", time: m.created });
+const isProtected = (tags) => String(tags || "").split(",").map((t) => t.trim().toLowerCase()).includes("rules");
 
 async function runAll(env, stmts) {
   for (let i = 0; i < stmts.length; i += 50) await env.DB.batch(stmts.slice(i, i + 50));
@@ -56,13 +58,30 @@ async function setConfig(env, key, value) {
   ).bind(key, value).run();
 }
 
-async function connectorSecret(env) {
-  let s = await getConfig(env, "connector_secret");
-  if (!s) {
-    s = toHex(crypto.getRandomValues(new Uint8Array(24)));
-    await setConfig(env, "connector_secret", s);
+// Schema check runs once per Worker instance. It creates the services table and,
+// on first run, a default "Claude" service that keeps your current connector address.
+let schemaReady = false;
+async function ensureSchema(env) {
+  if (schemaReady) return;
+  await env.DB.prepare(
+    "CREATE TABLE IF NOT EXISTS services (id TEXT PRIMARY KEY, name TEXT NOT NULL, secret TEXT NOT NULL UNIQUE, created TEXT NOT NULL, last_seen TEXT NOT NULL DEFAULT '', revoked INTEGER NOT NULL DEFAULT 0)"
+  ).run();
+  const count = await env.DB.prepare("SELECT COUNT(*) AS n FROM services").first();
+  if (!count.n) {
+    const legacy = await getConfig(env, "connector_secret");
+    await env.DB.prepare("INSERT INTO services (id, name, secret, created) VALUES (?, ?, ?, ?)")
+      .bind(newId(), "Claude", legacy || randomHex(24), now()).run();
   }
-  return s;
+  schemaReady = true;
+}
+
+async function serviceBySecret(env, secret) {
+  return env.DB.prepare("SELECT * FROM services WHERE secret = ? AND revoked = 0").bind(secret).first();
+}
+
+async function activeServices(env) {
+  const { results } = await env.DB.prepare("SELECT * FROM services WHERE revoked = 0 ORDER BY created").all();
+  return results;
 }
 
 async function hashPassword(pw, saltHex) {
@@ -95,7 +114,7 @@ const sessionCookie = (token, maxAge) =>
   "sid=" + token + "; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=" + maxAge;
 
 async function startSession(env, userId) {
-  const token = toHex(crypto.getRandomValues(new Uint8Array(32)));
+  const token = randomHex(32);
   await env.DB.prepare("INSERT INTO sessions (token, user_id, expires) VALUES (?, ?, ?)")
     .bind(token, userId, Date.now() + SESSION_DAYS * 86400000).run();
   return token;
@@ -152,6 +171,7 @@ async function remember(env, a) {
   const text = String(a.text || "").trim();
   if (!text) return "nothing saved: empty text";
   if (text.length > MAX_LEN) return `not saved: over ${MAX_LEN} chars, split it into smaller facts`;
+  if (isProtected(a.tags)) return "not saved: the tag rules is reserved for owner rules";
   const { results } = await env.DB.prepare("SELECT id, text FROM memories").all();
   const dup = results.find((m) => similar(m.text, text));
   if (dup) return `duplicate of ${dup.id}, not saved`;
@@ -186,6 +206,7 @@ async function recent(env, a) {
 async function updateMemory(env, a) {
   const row = await env.DB.prepare("SELECT * FROM memories WHERE id = ?").bind(String(a.memory_id)).first();
   if (!row) return "not found";
+  if (isProtected(row.tags)) return "protected: rules memories cannot be changed through the connector";
   let text = row.text, tags = row.tags;
   const history = JSON.parse(row.history || "[]");
   const newText = String(a.text || "").trim();
@@ -201,8 +222,11 @@ async function updateMemory(env, a) {
 }
 
 async function forget(env, a) {
-  const r = await env.DB.prepare("DELETE FROM memories WHERE id = ?").bind(String(a.memory_id)).run();
-  return r.meta.changes ? "deleted" : "not found";
+  const row = await env.DB.prepare("SELECT tags FROM memories WHERE id = ?").bind(String(a.memory_id)).first();
+  if (!row) return "not found";
+  if (isProtected(row.tags)) return "protected: rules memories cannot be deleted through the connector";
+  await env.DB.prepare("DELETE FROM memories WHERE id = ?").bind(String(a.memory_id)).run();
+  return "deleted";
 }
 
 async function listGeminiModels(key) {
@@ -241,7 +265,7 @@ async function gemini(env, prompt) {
 
 async function housekeep(env, a) {
   const { results } = await env.DB.prepare(
-    "SELECT id, text FROM memories ORDER BY created DESC, rowid DESC LIMIT 200"
+    "SELECT id, text FROM memories WHERE tags NOT LIKE '%rules%' ORDER BY created DESC, rowid DESC LIMIT 200"
   ).all();
   if (!results.length) return { message: "no memories" };
   const prompt = 'You maintain a list of memories. Find groups that duplicate or contradict each other. Reply ONLY with JSON: {"groups":[{"keep":"id","drop":["id"],"merged_text":"...","reason":"..."}]}. If none, reply {"groups":[]}.\n\nMEMORIES:\n' + JSON.stringify(results);
@@ -283,15 +307,18 @@ function classify(ua) {
   return ua.slice(0, 40) || "unknown";
 }
 
-async function meter(env, request, res) {
+async function meter(env, request, res, serviceId) {
   const client = classify(request.headers.get("user-agent") || "");
   const bin = Number(request.headers.get("content-length") || 0);
   const bout = (await res.clone().arrayBuffer()).byteLength;
-  await env.DB.prepare(
-    `INSERT INTO client_stats (client, requests, bytes_in, bytes_out, last) VALUES (?, 1, ?, ?, ?)
-     ON CONFLICT(client) DO UPDATE SET requests = requests + 1, bytes_in = bytes_in + excluded.bytes_in,
-     bytes_out = bytes_out + excluded.bytes_out, last = excluded.last`
-  ).bind(client, bin, bout, now()).run();
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO client_stats (client, requests, bytes_in, bytes_out, last) VALUES (?, 1, ?, ?, ?)
+       ON CONFLICT(client) DO UPDATE SET requests = requests + 1, bytes_in = bytes_in + excluded.bytes_in,
+       bytes_out = bytes_out + excluded.bytes_out, last = excluded.last`
+    ).bind(client, bin, bout, now()),
+    env.DB.prepare("UPDATE services SET last_seen = ? WHERE id = ?").bind(now(), serviceId),
+  ]);
 }
 
 async function callTool(env, name, a) {
@@ -331,12 +358,10 @@ async function handleMcp(request, env) {
 }
 
 async function settings(env) {
-  const secret = await connectorSecret(env);
   const key = await getConfig(env, "gemini_key");
   const model = await getConfig(env, "gemini_model");
   const last = await env.DB.prepare("SELECT MAX(last) AS last FROM client_stats").first();
   return {
-    connector_path: "/mcp/" + secret,
     gemini_key_set: !!key,
     gemini_key_tail: key ? key.slice(-4) : "",
     gemini_model: model || "",
@@ -344,10 +369,19 @@ async function settings(env) {
   };
 }
 
+async function listServices(env) {
+  const { results } = await env.DB.prepare("SELECT * FROM services ORDER BY created").all();
+  return results.map((s) => ({
+    id: s.id, name: s.name, created: s.created, last_seen: s.last_seen,
+    revoked: !!s.revoked, url: "/mcp/" + s.secret,
+  }));
+}
+
 async function testConnector(env, request) {
-  const secret = await connectorSecret(env);
-  const url = new URL("/mcp/" + secret, request.url);
-  const req = new Request(url, {
+  const list = await activeServices(env);
+  if (!list.length) return { live: false, http: 0, ms: 0, message: "no active services" };
+  const svc = list[0];
+  const req = new Request(new URL("/mcp/" + svc.secret, request.url), {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize",
@@ -356,7 +390,8 @@ async function testConnector(env, request) {
   const t0 = Date.now();
   const res = await handleMcp(req, env);
   const text = await res.text();
-  return { live: res.status === 200 && text.includes("my-memory"), http: res.status, ms: Date.now() - t0 };
+  return { live: res.status === 200 && text.includes("my-memory"), http: res.status, ms: Date.now() - t0,
+    service: svc.name, checked: now() };
 }
 
 async function api(request, env, url) {
@@ -371,10 +406,20 @@ async function api(request, env, url) {
     if (typeof b.gemini_model === "string" && b.gemini_model.trim()) await setConfig(env, "gemini_model", b.gemini_model.trim());
     return json(await settings(env));
   }
-  if (p === "/api/connector/regenerate" && m === "POST") {
-    const s = toHex(crypto.getRandomValues(new Uint8Array(24)));
-    await setConfig(env, "connector_secret", s);
-    return json({ connector_path: "/mcp/" + s });
+  if (p === "/api/services" && m === "GET") return json({ services: await listServices(env) });
+  if (p === "/api/services" && m === "POST") {
+    const b = await request.json().catch(() => ({}));
+    const name = String(b.name || "").trim().slice(0, 60);
+    if (!name) return json({ error: "give the service a name" }, 400);
+    const id = newId(), secret = randomHex(24);
+    await env.DB.prepare("INSERT INTO services (id, name, secret, created) VALUES (?, ?, ?, ?)")
+      .bind(id, name, secret, now()).run();
+    return json({ id, name, url: "/mcp/" + secret });
+  }
+  const revoke = p.match(/^\/api\/services\/([^/]+)\/revoke$/);
+  if (revoke && m === "POST") {
+    const r = await env.DB.prepare("UPDATE services SET revoked = 1 WHERE id = ? AND revoked = 0").bind(revoke[1]).run();
+    return json({ revoked: r.meta.changes });
   }
   if (p === "/api/connector/test" && m === "POST") return json(await testConnector(env, request));
   if (p === "/api/gemini/models" && m === "GET") {
@@ -391,7 +436,7 @@ async function api(request, env, url) {
     return json({ count: results.length, items: results });
   }
   if (p.startsWith("/api/memories/") && m === "DELETE") {
-    const r = await env.DB.prepare("DELETE FROM memories WHERE id = ?").bind(p.split("/").pop()).run();
+    const r = await env.DB.prepare("DELETE FROM memories WHERE id = ? AND tags NOT LIKE '%rules%'").bind(p.split("/").pop()).run();
     return json({ deleted: r.meta.changes });
   }
   if (p === "/api/export" && m === "GET") {
@@ -406,7 +451,7 @@ async function api(request, env, url) {
     let incoming;
     try { incoming = await request.json(); } catch { return json({ error: "invalid JSON" }, 400); }
     if (!Array.isArray(incoming)) return json({ error: "expected a list of memories" }, 400);
-    const rows = incoming.filter((x) => x && typeof x.text === "string" && x.text.trim()).map((x) => ({
+    const rows = incoming.filter((x) => x && typeof x.text === "string" && x.text.trim() && !isProtected(x.tags)).map((x) => ({
       id: String(x.id || newId()),
       text: x.text.trim().slice(0, MAX_LEN),
       tags: String(x.tags || "").toLowerCase(),
@@ -416,7 +461,7 @@ async function api(request, env, url) {
       history: typeof x.history === "string" ? x.history : JSON.stringify(Array.isArray(x.history) ? x.history : []),
     }));
     const stmts = [];
-    if (mode === "replace") stmts.push(env.DB.prepare("DELETE FROM memories"));
+    if (mode === "replace") stmts.push(env.DB.prepare("DELETE FROM memories WHERE tags NOT LIKE '%rules%'"));
     for (const r of rows) {
       stmts.push(env.DB.prepare(
         "INSERT OR IGNORE INTO memories (id, text, tags, source, created, updated, history) VALUES (?, ?, ?, ?, ?, ?, ?)"
@@ -441,12 +486,13 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     try {
+      await ensureSchema(env);
       if (url.pathname.startsWith("/mcp/")) {
-        const secret = await connectorSecret(env);
-        if (url.pathname !== "/mcp/" + secret) return new Response("not found", { status: 404 });
+        const svc = await serviceBySecret(env, url.pathname.slice(5));
+        if (!svc) return new Response("not found", { status: 404 });
         if (request.method !== "POST") return new Response("method not allowed", { status: 405, headers: { allow: "POST" } });
         const res = await handleMcp(request, env);
-        ctx.waitUntil(meter(env, request, res));
+        ctx.waitUntil(meter(env, request, res, svc.id));
         return res;
       }
       if (url.pathname === "/") return Response.redirect(url.origin + "/dashboard", 302);
@@ -476,8 +522,10 @@ button{cursor:pointer}
 .muted{color:#9aa3b5;font-size:13px}
 .ok{color:#8fd3a8}.bad{color:#e38b81}
 table{width:100%;border-collapse:collapse;font-size:14px}
-td,th{padding:6px;text-align:left;border-bottom:1px solid #333a49}
+td,th{padding:6px;text-align:left;border-bottom:1px solid #333a49;vertical-align:top}
 .del{background:none;border:0;color:#e38b81;padding:0 4px}
+.svc{border-top:1px solid #333a49;padding:12px 0}
+.svc small{display:block;color:#9aa3b5;font-size:12px;word-break:break-all}
 pre{white-space:pre-wrap;font-size:13px;color:#c9d1df}
 .wide{flex:1;min-width:0}
 #gate{max-width:420px;margin:40px auto}
@@ -495,18 +543,19 @@ pre{white-space:pre-wrap;font-size:13px;color:#c9d1df}
 
 <div id="app" style="display:none">
 <section>
-  <div class="row" style="justify-content:space-between"><h2 style="margin:0">Connector status</h2><button id="logout">Log out</button></div>
-  <div class="row"><span id="status-dot" class="bad">&#9679;</span><span id="status-text">Not tested yet</span></div>
+  <div class="row" style="justify-content:space-between"><h2 style="margin:0">Live status</h2><button id="logout">Log out</button></div>
+  <div class="row"><span id="status-dot" class="bad">&#9679;</span><span id="status-text">Checking...</span></div>
+  <p class="muted" id="status-meta"></p>
   <p class="muted" id="last-call"></p>
-  <div class="row"><button id="test">Test connection</button></div>
+  <div class="row"><button id="test">Check now</button></div>
 </section>
 
 <section>
-  <h2>Claude connector address</h2>
-  <p class="muted">Add this in claude.ai: Customize → Connectors → Add custom connector. Paste the full address.</p>
-  <div class="row"><input id="conn-url" readonly class="wide"><button id="conn-copy">Copy</button></div>
-  <div class="row"><button id="conn-regen">Regenerate address</button></div>
-  <p class="muted" id="conn-msg"></p>
+  <h2>Connected services</h2>
+  <p class="muted">Each service has its own address. Revoking one stops only that service.</p>
+  <div class="row"><input id="svc-name" placeholder="Service name, e.g. Claude" class="wide"><button id="svc-add">Add service</button></div>
+  <p class="muted" id="svc-msg"></p>
+  <div id="services" style="margin-top:8px"></div>
 </section>
 
 <section>
@@ -530,7 +579,7 @@ pre{white-space:pre-wrap;font-size:13px;color:#c9d1df}
 </section>
 
 <section>
-  <h2>Connectors and transfers</h2>
+  <h2>Transfers by client</h2>
   <div id="stats" class="muted">Loading...</div>
 </section>
 
@@ -544,6 +593,7 @@ pre{white-space:pre-wrap;font-size:13px;color:#c9d1df}
 
 <script>
 var gateMode = "login";
+var refreshTimer = null;
 function $(id) { return document.getElementById(id); }
 function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return {"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]; }); }
 function fmt(n) { return n < 1024 ? n + " B" : n < 1048576 ? (n / 1024).toFixed(1) + " KB" : (n / 1048576).toFixed(2) + " MB"; }
@@ -558,7 +608,17 @@ function api(path, opts) {
     });
   });
 }
+function copyText(text) {
+  var t = document.createElement("textarea");
+  t.value = text; t.setAttribute("readonly", ""); t.style.position = "fixed"; t.style.opacity = "0";
+  document.body.appendChild(t); t.select();
+  var ok = false;
+  try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+  document.body.removeChild(t);
+  return ok;
+}
 function showGate(setup) {
+  stopAutoRefresh();
   gateMode = setup ? "setup" : "login";
   $("app").style.display = "none";
   $("gate").style.display = "";
@@ -569,8 +629,17 @@ function showGate(setup) {
 function showApp() {
   $("gate").style.display = "none";
   $("app").style.display = "";
-  loadSettings(); loadItems(); loadStats();
+  refreshAll();
+  loadItems();
+  startAutoRefresh();
 }
+function refreshAll() { loadStatus(); loadServices(); loadSettings(); loadStats(); }
+function startAutoRefresh() {
+  stopAutoRefresh();
+  refreshTimer = setInterval(function () { loadStatus(); loadServices(); loadSettings(); }, 20000);
+}
+function stopAutoRefresh() { if (refreshTimer) clearInterval(refreshTimer); refreshTimer = null; }
+
 $("gate-btn").onclick = function () {
   $("gate-err").textContent = "";
   fetch("/auth/" + gateMode, {method: "POST", headers: {"content-type": "application/json"},
@@ -583,6 +652,69 @@ $("logout").onclick = function () {
   fetch("/auth/logout", {method: "POST"}).then(function () { return fetch("/auth/status"); })
     .then(function (r) { return r.json(); }).then(function (s) { showGate(s.setup); });
 };
+
+function loadStatus() {
+  return api("/api/connector/test", {method: "POST"}).then(function (d) {
+    $("status-dot").className = d.live ? "ok" : "bad";
+    if (d.message) {
+      $("status-text").textContent = "Not live: " + d.message;
+    } else {
+      $("status-text").textContent = d.live ? "Live" : "Not responding (HTTP " + d.http + ")";
+    }
+    $("status-meta").textContent = (d.service ? "Tested via " + d.service + ". " : "") +
+      (d.checked ? "Checked " + d.checked + " (auto-refresh every 20 s)." : "");
+  }).catch(function (e) { $("status-text").textContent = e.message; });
+}
+
+function loadServices() {
+  return api("/api/services").then(function (d) {
+    var base = location.origin;
+    if (!d.services.length) { $("services").innerHTML = '<p class="muted">No services yet.</p>'; return; }
+    $("services").innerHTML = d.services.map(function (s) {
+      var state = s.revoked ? '<span class="bad">Revoked</span>' : '<span class="ok">Active</span>';
+      var seen = s.last_seen ? "Last seen " + esc(s.last_seen) : "Never used";
+      var controls = s.revoked ? "" :
+        '<div class="row"><button data-copy="' + esc(base + s.url) + '">Copy address</button>' +
+        '<button class="del" data-revoke="' + esc(s.id) + '" data-name="' + esc(s.name) + '">Revoke</button></div>';
+      return '<div class="svc"><div><b>' + esc(s.name) + '</b> &middot; ' + state + '</div>' +
+        '<small>ID: ' + esc(s.id) + ' &middot; ' + seen + ' &middot; Created ' + esc(s.created) + '</small>' + controls + '</div>';
+    }).join("");
+  }).catch(function (e) { $("services").textContent = "Error: " + e.message; });
+}
+$("services").addEventListener("click", function (e) {
+  var copy = e.target.getAttribute("data-copy");
+  var rev = e.target.getAttribute("data-revoke");
+  if (copy) {
+    $("svc-msg").textContent = copyText(copy) ? "Address copied." : "Could not copy. Long-press the address to copy it manually.";
+    return;
+  }
+  if (rev) {
+    if (!confirm("Revoke " + e.target.getAttribute("data-name") + "? Its address will stop working.")) return;
+    api("/api/services/" + rev + "/revoke", {method: "POST"}).then(function () {
+      $("svc-msg").textContent = "Revoked.";
+      loadServices(); loadStatus();
+    }).catch(function (err) { $("svc-msg").textContent = err.message; });
+  }
+});
+$("svc-add").onclick = function () {
+  var name = $("svc-name").value.trim();
+  if (!name) { $("svc-msg").textContent = "Type a name first."; return; }
+  api("/api/services", {method: "POST", body: JSON.stringify({name: name})}).then(function (d) {
+    $("svc-name").value = "";
+    var addr = location.origin + d.url;
+    var ok = copyText(addr);
+    $("svc-msg").textContent = "Added " + d.name + " (ID " + d.id + "). Address " + (ok ? "copied" : "shown below") + ": " + addr;
+    loadServices(); loadStatus();
+  }).catch(function (e) { $("svc-msg").textContent = e.message; });
+};
+
+function loadSettings() {
+  return api("/api/settings").then(function (s) {
+    $("gem-state").textContent = s.gemini_key_set ? "Saved key ends in " + s.gemini_key_tail : "No Gemini key saved yet";
+    setModelOption(s.gemini_model);
+    $("last-call").textContent = s.last_call ? "Last request from a client: " + s.last_call : "No client has connected yet";
+  }).catch(function (e) { $("gem-msg").textContent = e.message; });
+}
 function setModelOption(name) {
   var sel = $("model");
   if (!name) return;
@@ -591,37 +723,7 @@ function setModelOption(name) {
   }
   sel.value = name;
 }
-function loadSettings() {
-  return api("/api/settings").then(function (s) {
-    $("conn-url").value = location.origin + s.connector_path;
-    $("gem-state").textContent = s.gemini_key_set ? "Saved key ends in " + s.gemini_key_tail : "No Gemini key saved yet";
-    setModelOption(s.gemini_model);
-    $("last-call").textContent = s.last_call ? "Last request from a client: " + s.last_call : "No client has connected yet";
-  }).catch(function (e) { $("gem-msg").textContent = e.message; });
-}
-$("conn-copy").onclick = function () {
-  var el = $("conn-url");
-  el.select();
-  if (navigator.clipboard) {
-    navigator.clipboard.writeText(el.value).then(function () { $("conn-msg").textContent = "Copied."; },
-      function () { document.execCommand("copy"); $("conn-msg").textContent = "Copied."; });
-  } else { document.execCommand("copy"); $("conn-msg").textContent = "Copied."; }
-};
-$("conn-regen").onclick = function () {
-  if (!confirm("Create a new address? The old connector in Claude will stop working until you add the new one.")) return;
-  api("/api/connector/regenerate", {method: "POST"}).then(function (d) {
-    $("conn-url").value = location.origin + d.connector_path;
-    $("conn-msg").textContent = "New address created. Update the connector in Claude.";
-  }).catch(function (e) { $("conn-msg").textContent = e.message; });
-};
-$("test").onclick = function () {
-  $("status-text").textContent = "Testing...";
-  api("/api/connector/test", {method: "POST"}).then(function (d) {
-    $("status-dot").className = d.live ? "ok" : "bad";
-    $("status-text").textContent = d.live ? "Live (answered in " + d.ms + " ms)" : "Not responding (HTTP " + d.http + ")";
-    loadSettings();
-  }).catch(function (e) { $("status-text").textContent = e.message; });
-};
+$("test").onclick = function () { loadStatus(); };
 $("gem-save").onclick = function () {
   var k = $("gem-key").value.trim();
   if (!k) { $("gem-msg").textContent = "Paste a key first."; return; }
