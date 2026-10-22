@@ -2,6 +2,9 @@ const MAX_LEN = 500;
 const FALLBACK_MODELS = ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash"];
 const SESSION_DAYS = 30;
 const PBKDF2_ITER = 100000;
+const MAX_CALLS = 8; // Workers subrequest budget per request
+const RETRYABLE = new Set([500, 502, 503, 504]);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const TOOLS = [
   { name: "remember", description: "Save ONE short, self-contained fact, preference, or decision (max 500 chars). Never paste whole conversations. Skips duplicates.",
@@ -60,6 +63,7 @@ async function setConfig(env, key, value) {
 
 // Schema check runs once per Worker instance. It creates the services table and,
 // on first run, a default "Claude" service that keeps your current connector address.
+// It also creates the Gemini key/model pool and migrates the old single key and model.
 let schemaReady = false;
 async function ensureSchema(env) {
   if (schemaReady) return;
@@ -71,6 +75,31 @@ async function ensureSchema(env) {
     const legacy = await getConfig(env, "connector_secret");
     await env.DB.prepare("INSERT INTO services (id, name, secret, created) VALUES (?, ?, ?, ?)")
       .bind(newId(), "Claude", legacy || randomHex(24), now()).run();
+  }
+
+  await env.DB.prepare(
+    "CREATE TABLE IF NOT EXISTS gemini_keys (id TEXT PRIMARY KEY, label TEXT NOT NULL, key TEXT NOT NULL UNIQUE, enabled INTEGER NOT NULL DEFAULT 1, created TEXT NOT NULL)"
+  ).run();
+  await env.DB.prepare(
+    "CREATE TABLE IF NOT EXISTS gemini_models (name TEXT PRIMARY KEY, enabled INTEGER NOT NULL DEFAULT 1, pos INTEGER NOT NULL DEFAULT 0)"
+  ).run();
+  await env.DB.prepare(
+    "CREATE TABLE IF NOT EXISTS gemini_cooldowns (key_id TEXT NOT NULL, model TEXT NOT NULL, until INTEGER NOT NULL, PRIMARY KEY (key_id, model))"
+  ).run();
+
+  const kc = await env.DB.prepare("SELECT COUNT(*) AS n FROM gemini_keys").first();
+  if (!kc.n) {
+    const old = await getConfig(env, "gemini_key");
+    if (old) {
+      await env.DB.prepare("INSERT INTO gemini_keys (id, label, key, created) VALUES (?, ?, ?, ?)")
+        .bind(newId(), "main", old, now()).run();
+    }
+  }
+  const mc = await env.DB.prepare("SELECT COUNT(*) AS n FROM gemini_models").first();
+  if (!mc.n) {
+    const seed = [...new Set([await getConfig(env, "gemini_model"), ...FALLBACK_MODELS].filter(Boolean))];
+    await runAll(env, seed.map((name, i) =>
+      env.DB.prepare("INSERT OR IGNORE INTO gemini_models (name, enabled, pos) VALUES (?, 1, ?)").bind(name, i)));
   }
   schemaReady = true;
 }
@@ -241,33 +270,84 @@ async function listGeminiModels(key) {
   return { models };
 }
 
+async function callGemini(key, model, prompt) {
+  return fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-goog-api-key": key },
+    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json" } }),
+  });
+}
+
+async function setCooldown(env, keyId, model, ms) {
+  await env.DB.prepare(
+    "INSERT INTO gemini_cooldowns (key_id, model, until) VALUES (?, ?, ?) ON CONFLICT(key_id, model) DO UPDATE SET until = excluded.until"
+  ).bind(keyId, model, Date.now() + ms).run();
+}
+
+// Tries every enabled model in order; for each model, tries every enabled key
+// (starting from a round-robin position). Handles 429 (cooldown), 503/5xx (one retry),
+// and 401/403 (disables the key).
 async function gemini(env, prompt) {
-  const key = await getConfig(env, "gemini_key");
-  if (!key) return { error: "no Gemini key saved yet (Settings)" };
-  const selected = await getConfig(env, "gemini_model");
-  const order = [...new Set([selected, ...FALLBACK_MODELS].filter(Boolean))];
-  let last = "no model tried";
-  for (const model of order) {
-    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-goog-api-key": key },
-      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json" } }),
-    });
-    if (r.ok) {
-      const d = await r.json();
-      const text = d?.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (text) return { text, model };
+  const keys = (await env.DB.prepare("SELECT id, label, key FROM gemini_keys WHERE enabled = 1 ORDER BY created").all()).results;
+  const models = (await env.DB.prepare("SELECT name FROM gemini_models WHERE enabled = 1 ORDER BY pos, name").all()).results.map((m) => m.name);
+  if (!keys.length) return { error: "no enabled Gemini key (add one in the dashboard)" };
+  if (!models.length) return { error: "no enabled Gemini model (add one in the dashboard)" };
+
+  const cool = await env.DB.prepare("SELECT key_id, model FROM gemini_cooldowns WHERE until > ?").bind(Date.now()).all();
+  const cooling = new Set(cool.results.map((c) => c.key_id + "|" + c.model));
+
+  const rr = Number(await getConfig(env, "gemini_rr")) || 0;
+  await setConfig(env, "gemini_rr", String(rr + 1));
+  const rotated = keys.map((_, i) => keys[(rr + i) % keys.length]);
+
+  const log = [];
+  let calls = 0;
+  for (const model of models) {
+    for (const k of rotated) {
+      const tag = `${k.label}/${model}`;
+      if (cooling.has(k.id + "|" + model)) { log.push(`${tag}: cooling down`); continue; }
+      if (calls >= MAX_CALLS) { log.push("attempt limit reached"); return { error: log.join("; ") }; }
+
+      calls++;
+      let r = await callGemini(k.key, model, prompt);
+      if (RETRYABLE.has(r.status) && calls < MAX_CALLS) {
+        await sleep(1500);
+        calls++;
+        r = await callGemini(k.key, model, prompt);
+      }
+
+      if (r.ok) {
+        const d = await r.json();
+        const text = d?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text) return { text, model, key: k.label };
+        log.push(`${tag}: empty reply`);
+        continue;
+      }
+
+      const body = await r.text();
+      if (r.status === 429) {
+        const daily = /PerDay|per.?day|daily/i.test(body);
+        await setCooldown(env, k.id, model, daily ? 6 * 3600e3 : 60e3);
+        log.push(`${tag}: 429 rate limited${daily ? " (daily quota, cooling 6h)" : ""}`);
+      } else if (r.status === 401 || r.status === 403 || /API_KEY_INVALID/.test(body)) {
+        await env.DB.prepare("UPDATE gemini_keys SET enabled = 0 WHERE id = ?").bind(k.id).run();
+        log.push(`${tag}: key rejected, disabled`);
+      } else {
+        log.push(`${tag}: HTTP ${r.status}${RETRYABLE.has(r.status) ? " (after retry)" : ""}`);
+      }
     }
-    last = `${model}: HTTP ${r.status}`;
   }
-  return { error: last };
+  return { error: log.join("; ") || "no attempt made" };
 }
 
 async function housekeep(env, a) {
   const { results } = await env.DB.prepare(
     "SELECT id, text FROM memories WHERE tags NOT LIKE '%rules%' ORDER BY created DESC, rowid DESC LIMIT 200"
   ).all();
-  if (!results.length) return { message: "no memories" };
+  if (!results.length) {
+    const rules = await env.DB.prepare("SELECT COUNT(*) AS n FROM memories WHERE tags LIKE '%rules%'").first();
+    return { message: "no editable memories: housekeeping skips rules-tagged memories", rules_memories: rules.n };
+  }
   const prompt = 'You maintain a list of memories. Find groups that duplicate or contradict each other. Reply ONLY with JSON: {"groups":[{"keep":"id","drop":["id"],"merged_text":"...","reason":"..."}]}. If none, reply {"groups":[]}.\n\nMEMORIES:\n' + JSON.stringify(results);
   const g = await gemini(env, prompt);
   if (g.error) return { error: g.error };
@@ -278,7 +358,7 @@ async function housekeep(env, a) {
   } catch {
     return { error: "model returned invalid JSON", model: g.model };
   }
-  if (!a.apply) return { model: g.model, proposed: groups };
+  if (!a.apply) return { model: g.model, key: g.key, proposed: groups };
   const byId = new Map(results.map((m) => [m.id, m]));
   const drop = new Set();
   const stmts = [];
@@ -294,7 +374,66 @@ async function housekeep(env, a) {
   }
   for (const d of drop) stmts.push(env.DB.prepare("DELETE FROM memories WHERE id = ?").bind(d));
   await runAll(env, stmts);
-  return { model: g.model, removed: drop.size };
+  return { model: g.model, key: g.key, removed: drop.size };
+}
+
+async function geminiState(env) {
+  const keys = (await env.DB.prepare("SELECT id, label, key, enabled FROM gemini_keys ORDER BY created").all()).results;
+  const models = (await env.DB.prepare("SELECT name, enabled FROM gemini_models ORDER BY pos, name").all()).results;
+  const cool = (await env.DB.prepare("SELECT key_id, model FROM gemini_cooldowns WHERE until > ?").bind(Date.now()).all()).results;
+  return {
+    keys: keys.map((k) => ({
+      id: k.id, label: k.label, tail: k.key.slice(-4), enabled: !!k.enabled,
+      cooling: cool.filter((c) => c.key_id === k.id).map((c) => c.model),
+    })),
+    models: models.map((m) => ({ name: m.name, enabled: !!m.enabled })),
+  };
+}
+
+async function geminiOp(env, request) {
+  const b = await request.json().catch(() => ({}));
+  switch (b.op) {
+    case "add_key": {
+      const key = String(b.key || "").trim();
+      if (!key) return { error: "paste a key" };
+      await env.DB.prepare("INSERT OR IGNORE INTO gemini_keys (id, label, key, created) VALUES (?, ?, ?, ?)")
+        .bind(newId(), String(b.label || "key").trim().slice(0, 40) || "key", key, now()).run();
+      break;
+    }
+    case "delete_key":
+      await env.DB.prepare("DELETE FROM gemini_keys WHERE id = ?").bind(String(b.id)).run();
+      break;
+    case "toggle_key":
+      await env.DB.prepare("UPDATE gemini_keys SET enabled = 1 - enabled WHERE id = ?").bind(String(b.id)).run();
+      break;
+    case "add_model": {
+      const name = String(b.name || "").trim();
+      if (!name) return { error: "type a model name" };
+      await env.DB.prepare(
+        "INSERT OR IGNORE INTO gemini_models (name, enabled, pos) VALUES (?, 1, (SELECT COALESCE(MAX(pos), 0) + 1 FROM gemini_models))"
+      ).bind(name).run();
+      break;
+    }
+    case "delete_model":
+      await env.DB.prepare("DELETE FROM gemini_models WHERE name = ?").bind(String(b.name)).run();
+      break;
+    case "toggle_model":
+      await env.DB.prepare("UPDATE gemini_models SET enabled = 1 - enabled WHERE name = ?").bind(String(b.name)).run();
+      break;
+    case "move_model": {
+      const { results } = await env.DB.prepare("SELECT name FROM gemini_models ORDER BY pos, name").all();
+      const names = results.map((r) => r.name);
+      const i = names.indexOf(String(b.name)), j = i + Number(b.dir);
+      if (i < 0 || j < 0 || j >= names.length) break;
+      [names[i], names[j]] = [names[j], names[i]];
+      await runAll(env, names.map((n, pos) =>
+        env.DB.prepare("UPDATE gemini_models SET pos = ? WHERE name = ?").bind(pos, n)));
+      break;
+    }
+    default:
+      return { error: "unknown op" };
+  }
+  return geminiState(env);
 }
 
 function classify(ua) {
@@ -342,7 +481,7 @@ async function handleMcp(request, env) {
   const ok = (result) => json({ jsonrpc: "2.0", id, result });
   if (method === "initialize") {
     return ok({ protocolVersion: params.protocolVersion || "2025-06-18", capabilities: { tools: {} },
-      serverInfo: { name: "my-memory", version: "2.0.0" } });
+      serverInfo: { name: "my-memory", version: "2.1.0" } });
   }
   if (method === "ping") return ok({});
   if (method === "tools/list") return ok({ tools: TOOLS });
@@ -358,15 +497,8 @@ async function handleMcp(request, env) {
 }
 
 async function settings(env) {
-  const key = await getConfig(env, "gemini_key");
-  const model = await getConfig(env, "gemini_model");
   const last = await env.DB.prepare("SELECT MAX(last) AS last FROM client_stats").first();
-  return {
-    gemini_key_set: !!key,
-    gemini_key_tail: key ? key.slice(-4) : "",
-    gemini_model: model || "",
-    last_call: last && last.last ? last.last : "",
-  };
+  return { last_call: last && last.last ? last.last : "" };
 }
 
 async function listServices(env) {
@@ -400,12 +532,6 @@ async function api(request, env, url) {
   const p = url.pathname, m = request.method;
 
   if (p === "/api/settings" && m === "GET") return json(await settings(env));
-  if (p === "/api/settings" && m === "POST") {
-    const b = await request.json().catch(() => ({}));
-    if (typeof b.gemini_key === "string" && b.gemini_key.trim()) await setConfig(env, "gemini_key", b.gemini_key.trim());
-    if (typeof b.gemini_model === "string" && b.gemini_model.trim()) await setConfig(env, "gemini_model", b.gemini_model.trim());
-    return json(await settings(env));
-  }
   if (p === "/api/services" && m === "GET") return json({ services: await listServices(env) });
   if (p === "/api/services" && m === "POST") {
     const b = await request.json().catch(() => ({}));
@@ -422,11 +548,18 @@ async function api(request, env, url) {
     return json({ revoked: r.meta.changes });
   }
   if (p === "/api/connector/test" && m === "POST") return json(await testConnector(env, request));
-  if (p === "/api/gemini/models" && m === "GET") {
-    const key = await getConfig(env, "gemini_key");
-    if (!key) return json({ error: "save your Gemini key first" }, 400);
-    return json(await listGeminiModels(key));
+
+  if (p === "/api/gemini" && m === "GET") return json(await geminiState(env));
+  if (p === "/api/gemini" && m === "POST") {
+    const out = await geminiOp(env, request);
+    return json(out, out.error ? 400 : 200);
   }
+  if (p === "/api/gemini/models" && m === "GET") {
+    const row = await env.DB.prepare("SELECT key FROM gemini_keys WHERE enabled = 1 LIMIT 1").first();
+    if (!row) return json({ error: "add an enabled key first" }, 400);
+    return json(await listGeminiModels(row.key));
+  }
+
   if (p === "/api/memories" && m === "GET") {
     const words = (url.searchParams.get("q") || "").toLowerCase().split(" ").filter(Boolean);
     const where = words.length ? "WHERE " + words.map(() => "(text || ' ' || tags) LIKE ?").join(" AND ") : "";
@@ -559,11 +692,17 @@ pre{white-space:pre-wrap;font-size:13px;color:#c9d1df}
 </section>
 
 <section>
-  <h2>Gemini</h2>
-  <div class="row"><input id="gem-key" type="password" placeholder="Paste Gemini API key" class="wide"><button id="gem-save">Save key</button></div>
-  <p class="muted" id="gem-state"></p>
-  <div class="row"><select id="model" class="wide"><option value="">(load models first)</option></select><button id="gem-models">Load models</button><button id="gem-model-save">Save model</button></div>
-  <p class="muted" id="gem-msg"></p>
+  <h2>Gemini keys (rotated)</h2>
+  <p class="muted">Each request starts from the next key. A key that hits 429 cools down; a rejected key is disabled.</p>
+  <div class="row"><input id="gk-label" placeholder="Label" style="width:90px"><input id="gk-key" type="password" placeholder="API key" class="wide"><button id="gk-add">Add key</button></div>
+  <div id="gk-list"></div>
+</section>
+
+<section>
+  <h2>Gemini models (tried in order)</h2>
+  <div class="row"><input id="gm-name" list="gm-opts" placeholder="Model name" class="wide"><datalist id="gm-opts"></datalist><button id="gm-add">Add</button><button id="gm-load">Browse</button></div>
+  <div id="gm-list"></div>
+  <p class="muted" id="gm-msg"></p>
 </section>
 
 <section>
@@ -633,10 +772,10 @@ function showApp() {
   loadItems();
   startAutoRefresh();
 }
-function refreshAll() { loadStatus(); loadServices(); loadSettings(); loadStats(); }
+function refreshAll() { loadStatus(); loadServices(); loadSettings(); loadGemini(); loadStats(); }
 function startAutoRefresh() {
   stopAutoRefresh();
-  refreshTimer = setInterval(function () { loadStatus(); loadServices(); loadSettings(); }, 20000);
+  refreshTimer = setInterval(function () { loadStatus(); loadServices(); loadSettings(); loadGemini(); }, 20000);
 }
 function stopAutoRefresh() { if (refreshTimer) clearInterval(refreshTimer); refreshTimer = null; }
 
@@ -710,44 +849,56 @@ $("svc-add").onclick = function () {
 
 function loadSettings() {
   return api("/api/settings").then(function (s) {
-    $("gem-state").textContent = s.gemini_key_set ? "Saved key ends in " + s.gemini_key_tail : "No Gemini key saved yet";
-    setModelOption(s.gemini_model);
     $("last-call").textContent = s.last_call ? "Last request from a client: " + s.last_call : "No client has connected yet";
-  }).catch(function (e) { $("gem-msg").textContent = e.message; });
-}
-function setModelOption(name) {
-  var sel = $("model");
-  if (!name) return;
-  if (!sel.querySelector('option[value="' + name + '"]')) {
-    var o = document.createElement("option"); o.value = name; o.textContent = name; sel.appendChild(o);
-  }
-  sel.value = name;
+  }).catch(function () {});
 }
 $("test").onclick = function () { loadStatus(); };
-$("gem-save").onclick = function () {
-  var k = $("gem-key").value.trim();
-  if (!k) { $("gem-msg").textContent = "Paste a key first."; return; }
-  api("/api/settings", {method: "POST", body: JSON.stringify({gemini_key: k})}).then(function () {
-    $("gem-key").value = ""; $("gem-msg").textContent = "Key saved."; loadSettings();
-  }).catch(function (e) { $("gem-msg").textContent = e.message; });
+
+function renderGemini(s) {
+  $("gk-list").innerHTML = s.keys.map(function (k) {
+    return '<div class="item">' + esc(k.label) + ' ....' + esc(k.tail) + ' <span class="' + (k.enabled ? "ok" : "bad") + '">' + (k.enabled ? "enabled" : "disabled") + '</span> ' +
+      '<div class="row"><button data-op="toggle_key" data-id="' + esc(k.id) + '">Toggle</button>' +
+      '<button class="del" data-op="delete_key" data-id="' + esc(k.id) + '">Delete</button></div>' +
+      (k.cooling.length ? '<div class="muted">cooling: ' + k.cooling.map(esc).join(", ") + '</div>' : "") + "</div>";
+  }).join("") || '<p class="muted">No keys yet.</p>';
+  $("gm-list").innerHTML = s.models.map(function (m, i) {
+    var n = esc(m.name);
+    return '<div class="item">' + (i + 1) + '. ' + n + ' <span class="' + (m.enabled ? "ok" : "bad") + '">' + (m.enabled ? "on" : "off") + '</span>' +
+      '<div class="row"><button data-op="move_model" data-name="' + n + '" data-dir="-1">Up</button>' +
+      '<button data-op="move_model" data-name="' + n + '" data-dir="1">Down</button>' +
+      '<button data-op="toggle_model" data-name="' + n + '">Toggle</button>' +
+      '<button class="del" data-op="delete_model" data-name="' + n + '">Delete</button></div></div>';
+  }).join("") || '<p class="muted">No models yet.</p>';
+}
+function loadGemini() {
+  return api("/api/gemini").then(renderGemini).catch(function (e) { $("gm-msg").textContent = e.message; });
+}
+function gop(body) {
+  return api("/api/gemini", {method: "POST", body: JSON.stringify(body)}).then(function (s) {
+    $("gm-msg").textContent = "";
+    renderGemini(s);
+  }).catch(function (e) { $("gm-msg").textContent = e.message; });
+}
+document.addEventListener("click", function (e) {
+  var op = e.target.getAttribute("data-op");
+  if (!op) return;
+  if (op.indexOf("delete") === 0 && !confirm("Delete this?")) return;
+  gop({op: op, id: e.target.getAttribute("data-id"), name: e.target.getAttribute("data-name"), dir: e.target.getAttribute("data-dir")});
+});
+$("gk-add").onclick = function () {
+  gop({op: "add_key", label: $("gk-label").value, key: $("gk-key").value}).then(function () { $("gk-key").value = ""; });
 };
-$("gem-models").onclick = function () {
-  $("gem-msg").textContent = "Loading models...";
+$("gm-add").onclick = function () {
+  gop({op: "add_model", name: $("gm-name").value.trim()}).then(function () { $("gm-name").value = ""; });
+};
+$("gm-load").onclick = function () {
+  $("gm-msg").textContent = "Loading models...";
   api("/api/gemini/models").then(function (d) {
-    var sel = $("model"), cur = sel.value;
-    sel.innerHTML = "";
-    d.models.forEach(function (n) { var o = document.createElement("option"); o.value = n; o.textContent = n; sel.appendChild(o); });
-    if (cur) sel.value = cur;
-    $("gem-msg").textContent = d.models.length + " models loaded.";
-  }).catch(function (e) { $("gem-msg").textContent = e.message; });
+    $("gm-opts").innerHTML = d.models.map(function (n) { return '<option value="' + esc(n) + '">'; }).join("");
+    $("gm-msg").textContent = d.models.length + " models available. Type or pick one, then Add.";
+  }).catch(function (e) { $("gm-msg").textContent = e.message; });
 };
-$("gem-model-save").onclick = function () {
-  var v = $("model").value;
-  if (!v) { $("gem-msg").textContent = "Load models and pick one first."; return; }
-  api("/api/settings", {method: "POST", body: JSON.stringify({gemini_model: v})}).then(function () {
-    $("gem-msg").textContent = "Model saved: " + v;
-  }).catch(function (e) { $("gem-msg").textContent = e.message; });
-};
+
 function loadItems() {
   api("/api/memories?q=" + encodeURIComponent($("q").value)).then(function (d) {
     $("count").textContent = d.count + " memories";
@@ -769,7 +920,7 @@ function loadStats() {
 function hk(apply) {
   $("hk").textContent = "Working...";
   api("/api/housekeep", {method: "POST", body: JSON.stringify({apply: apply})})
-    .then(function (d) { $("hk").textContent = JSON.stringify(d, null, 2); loadItems(); loadStats(); })
+    .then(function (d) { $("hk").textContent = JSON.stringify(d, null, 2); loadItems(); loadStats(); loadGemini(); })
     .catch(function (e) { $("hk").textContent = "Error: " + e.message; });
 }
 $("items").addEventListener("click", function (e) {
