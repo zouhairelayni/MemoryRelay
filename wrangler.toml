@@ -6,3 +6,4 @@ compatibility_date = "2026-10-22"
 binding = "DB"
 database_name = "memory-db"
 database_id = "d174349a-58ac-4603-8196-16ec19dec2db"
+
