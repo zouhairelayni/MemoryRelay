@@ -349,17 +349,43 @@ async function housekeep(env, a) {
     return { message: "no editable memories: housekeeping skips rules-tagged memories", rules_memories: rules.n };
   }
   const prompt = 'You maintain a list of memories. Find groups that duplicate or contradict each other. Reply ONLY with JSON: {"groups":[{"keep":"id","drop":["id"],"merged_text":"...","reason":"..."}]}. If none, reply {"groups":[]}.\n\nMEMORIES:\n' + JSON.stringify(results);
-  const g = await gemini(env, prompt);
-  if (g.error) return { error: g.error };
-  let groups;
-  try {
-    const s = g.text;
-    groups = JSON.parse(s.slice(s.indexOf("{"), s.lastIndexOf("}") + 1)).groups || [];
-  } catch {
-    return { error: "model returned invalid JSON", model: g.model };
-  }
-  if (!a.apply) return { model: g.model, key: g.key, proposed: groups };
   const byId = new Map(results.map((m) => [m.id, m]));
+  let groups, model = "", keyLabel = "";
+  if (a.apply && Array.isArray(a.groups)) {
+    groups = a.groups; // dashboard: apply exactly what the user saw in the preview
+  } else {
+    const g = await gemini(env, prompt);
+    if (g.error) return { error: g.error };
+    try {
+      const s = g.text;
+      groups = JSON.parse(s.slice(s.indexOf("{"), s.lastIndexOf("}") + 1)).groups || [];
+    } catch {
+      return { error: "model returned invalid JSON", model: g.model };
+    }
+    model = g.model;
+    keyLabel = g.key;
+  }
+  // Keep only valid groups: ids must exist and must not be rules memories.
+  groups = groups.map((grp) => {
+    const keep = String(grp && grp.keep || "");
+    return {
+      keep,
+      drop: (Array.isArray(grp && grp.drop) ? grp.drop : []).map(String).filter((d) => d !== keep && byId.has(d)),
+      merged_text: String(grp && grp.merged_text || "").trim(),
+      reason: String(grp && grp.reason || ""),
+    };
+  }).filter((grp) => byId.has(grp.keep) && grp.drop.length);
+  if (!a.apply) {
+    if (!groups.length) return { model, key: keyLabel, proposed: [], message: "No duplicates found." };
+    return {
+      model, key: keyLabel,
+      proposed: groups.map((grp) => ({
+        ...grp,
+        keep_text: byId.get(grp.keep).text,
+        drop_texts: grp.drop.map((d) => byId.get(d).text),
+      })),
+    };
+  }
   const drop = new Set();
   const stmts = [];
   for (const grp of groups) {
@@ -374,7 +400,7 @@ async function housekeep(env, a) {
   }
   for (const d of drop) stmts.push(env.DB.prepare("DELETE FROM memories WHERE id = ?").bind(d));
   await runAll(env, stmts);
-  return { model: g.model, key: g.key, removed: drop.size };
+  return { model, key: keyLabel, removed: drop.size };
 }
 
 async function geminiState(env) {
@@ -467,7 +493,7 @@ async function callTool(env, name, a) {
     case "recent": return recent(env, a);
     case "update_memory": return updateMemory(env, a);
     case "forget": return forget(env, a);
-    case "housekeep": return housekeep(env, a);
+    case "housekeep": return housekeep(env, { apply: !!a.apply }); // agents cannot inject groups
     default: throw new Error("unknown tool " + name);
   }
 }
@@ -610,7 +636,7 @@ async function api(request, env, url) {
   }
   if (p === "/api/housekeep" && m === "POST") {
     const body = await request.json().catch(() => ({}));
-    return json(await housekeep(env, { apply: !!body.apply }));
+    return json(await housekeep(env, { apply: !!body.apply, groups: body.groups }));
   }
   return json({ error: "no such api route" }, 404);
 }
@@ -713,8 +739,8 @@ pre{white-space:pre-wrap;font-size:13px;color:#c9d1df}
 
 <section>
   <h2>Housekeeping (Gemini)</h2>
-  <div class="row"><button id="check">Check duplicates</button><button id="apply">Apply proposed changes</button></div>
-  <pre id="hk" class="muted"></pre>
+  <div class="row"><button id="check">Check duplicates</button></div>
+  <div id="hk"></div>
 </section>
 
 <section>
@@ -917,20 +943,42 @@ function loadStats() {
       }).join("") + "</table>";
   }).catch(function (e) { $("stats").textContent = "Error: " + e.message; });
 }
-function hk(apply) {
-  $("hk").textContent = "Working...";
-  api("/api/housekeep", {method: "POST", body: JSON.stringify({apply: apply})})
-    .then(function (d) { $("hk").textContent = JSON.stringify(d, null, 2); loadItems(); loadStats(); loadGemini(); })
-    .catch(function (e) { $("hk").textContent = "Error: " + e.message; });
+var hkGroups = [];
+function hkBox(html) { $("hk").innerHTML = html; }
+function hkCheck() {
+  hkGroups = [];
+  hkBox('<p class="muted">Checking...</p>');
+  api("/api/housekeep", {method: "POST", body: JSON.stringify({apply: false})}).then(function (d) {
+    loadStats(); loadGemini();
+    if (d.error) { hkBox('<p class="bad">' + esc(d.error) + '</p>'); return; }
+    if (!d.proposed || !d.proposed.length) { hkBox('<p class="muted">' + esc(d.message || "No duplicates found.") + '</p>'); return; }
+    hkGroups = d.proposed;
+    hkBox(d.proposed.map(function (g) {
+      var text = g.merged_text || g.keep_text;
+      return '<div class="item"><div>' + esc(text) + '</div><small class="muted">Merges ' + (g.drop.length + 1) + ' memories into this one</small></div>';
+    }).join("") +
+    '<div class="row"><button id="hk-fix">Fix Duplicate</button><button id="hk-cancel">Cancel</button></div>');
+  }).catch(function (e) { hkBox('<p class="bad">Error: ' + esc(e.message) + '</p>'); });
 }
+$("hk").addEventListener("click", function (e) {
+  if (e.target.id === "hk-cancel") { hkGroups = []; hkBox(""); return; }
+  if (e.target.id === "hk-fix") {
+    e.target.disabled = true;
+    api("/api/housekeep", {method: "POST", body: JSON.stringify({apply: true, groups: hkGroups})}).then(function (d) {
+      hkGroups = [];
+      if (d.error) { hkBox('<p class="bad">' + esc(d.error) + '</p>'); return; }
+      hkBox('<p class="ok">Fixed. Removed ' + d.removed + ' duplicate' + (d.removed === 1 ? "" : "s") + '.</p>');
+      loadItems(); loadStats();
+    }).catch(function (err) { hkBox('<p class="bad">Error: ' + esc(err.message) + '</p>'); });
+  }
+});
 $("items").addEventListener("click", function (e) {
   var id = e.target.getAttribute("data-id");
   if (!id || !confirm("Delete this memory?")) return;
   api("/api/memories/" + id, {method: "DELETE"}).then(loadItems).then(loadStats);
 });
 $("go").onclick = loadItems;
-$("check").onclick = function () { hk(false); };
-$("apply").onclick = function () { if (confirm("Apply the proposed changes? This edits and deletes memories.")) hk(true); };
+$("check").onclick = hkCheck;
 $("exp").onclick = function () {
   fetch("/api/export").then(function (r) {
     if (!r.ok) throw new Error(r.status);
