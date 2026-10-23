@@ -5,7 +5,7 @@ const PBKDF2_ITER = 100000;
 const MAX_CALLS = 8; // Workers subrequest budget per request
 const RETRYABLE = new Set([0, 500, 502, 503, 504]); // 0 = could not reach Gemini at all
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const BUILD = "2026-10-23.5";
+const BUILD = "2026-10-23.6";
 
 const TOOLS = [
   { name: "remember", description: "Save ONE short, self-contained fact, preference, or decision (max 500 chars). Never paste whole conversations. Skips duplicates.",
@@ -616,7 +616,7 @@ async function settings(env) {
 
 async function listServices(env) {
   const { results } = await env.DB.prepare(
-    "SELECT s.id, s.name, s.secret, s.created, s.last_seen, s.revoked, COALESCE(t.requests, 0) AS requests, COALESCE(t.n_read, 0) AS n_read, COALESCE(t.n_write, 0) AS n_write, COALESCE(t.n_delete, 0) AS n_delete, COALESCE(t.bytes_in, 0) AS bytes_in, COALESCE(t.bytes_out, 0) AS bytes_out, COALESCE(t.last, '') AS last, COALESCE(t.app, '') AS app FROM services s LEFT JOIN service_stats t ON t.service_id = s.id ORDER BY s.created"
+    "SELECT s.id, s.name, s.secret, s.created, s.last_seen, s.revoked, COALESCE(t.requests, 0) AS requests, COALESCE(t.n_read, 0) AS n_read, COALESCE(t.n_write, 0) AS n_write, COALESCE(t.n_delete, 0) AS n_delete, COALESCE(t.bytes_in, 0) AS bytes_in, COALESCE(t.bytes_out, 0) AS bytes_out, COALESCE(t.last, '') AS last, COALESCE(t.app, '') AS app FROM services s LEFT JOIN service_stats t ON t.service_id = s.id ORDER BY s.created, s.rowid"
   ).all();
   return results.map((s) => ({
     id: s.id, name: s.name, created: s.created, last_seen: s.last_seen, revoked: !!s.revoked, url: "/mcp/" + s.secret,
@@ -740,7 +740,7 @@ async function api(request, env, url) {
   }
   if (p === "/api/stats" && m === "GET") {
     const { results } = await env.DB.prepare(
-      "SELECT s.id, s.name, s.revoked, s.created, COALESCE(t.requests, 0) AS requests, COALESCE(t.n_read, 0) AS n_read, COALESCE(t.n_write, 0) AS n_write, COALESCE(t.n_delete, 0) AS n_delete, COALESCE(t.bytes_in, 0) AS bytes_in, COALESCE(t.bytes_out, 0) AS bytes_out, COALESCE(t.last, '') AS last, COALESCE(t.app, '') AS app FROM services s LEFT JOIN service_stats t ON t.service_id = s.id ORDER BY s.created"
+      "SELECT s.id, s.name, s.revoked, s.created, COALESCE(t.requests, 0) AS requests, COALESCE(t.n_read, 0) AS n_read, COALESCE(t.n_write, 0) AS n_write, COALESCE(t.n_delete, 0) AS n_delete, COALESCE(t.bytes_in, 0) AS bytes_in, COALESCE(t.bytes_out, 0) AS bytes_out, COALESCE(t.last, '') AS last, COALESCE(t.app, '') AS app FROM services s LEFT JOIN service_stats t ON t.service_id = s.id ORDER BY s.created, s.rowid"
     ).all();
     return json({ services: results.map((r) => ({ ...r, revoked: !!r.revoked })) });
   }
@@ -902,6 +902,7 @@ code,.mono{font-family:var(--mono);font-size:.88em}
 .lede{color:var(--ink2);font-size:16px;max-width:62ch;margin:10px 0 0}
 .muted{color:var(--muted)}
 .small{font-size:14px}
+#svc-msg{overflow-wrap:anywhere;word-break:break-all}
 .ok{color:var(--teal)}
 .bad{color:var(--rose)}
 
@@ -1042,6 +1043,25 @@ dl.kv dd{margin:0;color:var(--ink2);overflow-wrap:anywhere}
 .conn .acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:4px 18px 16px}
 .ask{font-size:14px;color:var(--ink2);flex:1 1 100%}
 
+/* swipeable connection cards (animation from the Memory Atlas) */
+.agent-card-wrap{touch-action:pan-y;margin-top:14px;outline:none;transition:transform .26s cubic-bezier(.2,.8,.2,1),opacity .26s ease}
+.agent-card-wrap.swipeable{cursor:grab}
+.agent-card-wrap.swipeable:active{cursor:grabbing}
+.agent-card-wrap.dragging{user-select:none;-webkit-user-select:none}
+.agent-card-wrap:focus-visible{outline:2px solid var(--ink2);outline-offset:4px;border-radius:var(--r)}
+.agent-card-wrap.exit-left{transform:translateX(-48px);opacity:0}
+.agent-card-wrap.exit-right{transform:translateX(48px);opacity:0}
+.agent-card-wrap.enter-from-right{transform:translateX(48px);opacity:0;transition:none}
+.agent-card-wrap.enter-from-left{transform:translateX(-48px);opacity:0;transition:none}
+.agent-card-wrap .conn{max-width:720px;margin:0 auto;box-shadow:var(--shadow)}
+.agent-card-wrap .empty{text-align:center;padding:24px 6px}
+.agent-dots{display:flex;gap:8px;justify-content:center;margin-top:20px}
+.dot-i{position:relative;width:8px;height:8px;padding:0;border:0;border-radius:999px;background:var(--line);cursor:pointer;transition:width .35s ease,background .35s ease}
+.dot-i::before{content:"";position:absolute;inset:-12px -4px}
+.dot-i.on{width:24px;background:var(--teal)}
+.dot-i:focus-visible{outline:2px solid var(--ink2);outline-offset:3px}
+.agent-hint{text-align:center;color:var(--muted);font-size:14px;margin:12px 0 0}
+
 /* memories */
 .mem{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;transition:border-color .2s}
 .mem:hover{border-color:var(--ink2)}
@@ -1145,13 +1165,15 @@ footer{padding:34px 0 60px;border-top:1px solid var(--line);color:var(--muted);f
     <div class="head reveal">
       <div class="eyebrow">01 &middot; Connections</div>
       <h2>Every agent, its own address</h2>
-      <p class="lede">Revoking one connection stops only that agent. Each card shows what it read, wrote and deleted.</p>
+      <p class="lede">Swipe through your agents. Revoking one connection stops only that agent, and each card shows what it read, wrote and deleted.</p>
     </div>
     <div class="card reveal">
       <div class="row" style="margin-top:0"><input id="svc-name" class="fld grow" placeholder="Connection name, e.g. Claude"><button class="btn" id="svc-add">Add connection</button></div>
       <p class="muted small" id="svc-msg" style="margin:10px 0 0"></p>
     </div>
-    <div id="services" class="tray grid"></div>
+    <div id="services" class="agent-card-wrap" tabindex="0" aria-live="polite"></div>
+    <div class="agent-dots" id="conn-dots"></div>
+    <p class="agent-hint" id="conn-hint" hidden>Swipe left or right to browse</p>
   </div>
 </section>
 
@@ -1258,6 +1280,10 @@ var memItems = [];
 var editingId = null;
 var installEvt = null;
 var addToken = 0;
+var conns = [];
+var connIdx = 0;
+var connBusy = false;
+var connDragging = false;
 
 function $(id) { return document.getElementById(id); }
 function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return {"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]; }); }
@@ -1430,12 +1456,100 @@ function connCard(s) {
       '<dt>Created</dt><dd>' + esc(s.created) + '</dd></dl></div></div></div>' +
     '<div class="acts">' + acts + '</div></article>';
 }
-function loadServices() {
+function renderConn() {
+  var wrap = $("services");
+  if (!conns.length) {
+    wrap.innerHTML = '<p class="empty">No connections yet. Add one above.</p>';
+    wrap.classList.remove("swipeable");
+  } else {
+    wrap.innerHTML = connCard(conns[connIdx]);
+    wrap.classList.toggle("swipeable", conns.length > 1);
+  }
+  $("conn-dots").innerHTML = conns.length > 1 ? conns.map(function (c, i) {
+    return '<button class="dot-i' + (i === connIdx ? " on" : "") + '" data-go="' + i + '" aria-label="Show ' + esc(c.name) + '"></button>';
+  }).join("") : "";
+  $("conn-hint").hidden = conns.length < 2;
+}
+function loadServices(focusId) {
   return api("/api/services").then(function (d) {
-    if (!d.services.length) { $("services").innerHTML = '<p class="empty">No connections yet. Add one above.</p>'; return; }
-    $("services").innerHTML = d.services.map(connCard).join("");
+    conns = d.services;
+    if (focusId) {
+      var k = conns.map(function (c) { return c.id; }).indexOf(focusId);
+      if (k >= 0) connIdx = k;
+    }
+    if (connIdx >= conns.length) connIdx = Math.max(0, conns.length - 1);
+    if (!connBusy && !connDragging) renderConn();
   }).catch(function (e) { $("services").textContent = "Error: " + e.message; });
 }
+/* the same exit / enter animation as the Memory Atlas agent cards */
+function showConn(i, dir) {
+  var n = conns.length;
+  if (n < 2) return;
+  var next = ((i % n) + n) % n;
+  if (connBusy || next === connIdx) return;
+  var wrap = $("services");
+  connBusy = true;
+  wrap.classList.add(dir > 0 ? "exit-left" : "exit-right");
+  setTimeout(function () {
+    connIdx = next;
+    renderConn();
+    wrap.classList.remove("exit-left", "exit-right");
+    wrap.classList.add(dir > 0 ? "enter-from-right" : "enter-from-left");
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        wrap.classList.remove("enter-from-right", "enter-from-left");
+        setTimeout(function () { connBusy = false; }, 280);
+      });
+    });
+  }, 240);
+}
+$("conn-dots").addEventListener("click", function (e) {
+  var b = e.target.closest ? e.target.closest("[data-go]") : null;
+  if (!b) return;
+  var i = Number(b.getAttribute("data-go"));
+  showConn(i, i > connIdx ? 1 : -1);
+});
+(function () {
+  var wrap = $("services");
+  var sx = 0, dx = 0, drag = false, captured = false;
+  wrap.addEventListener("pointerdown", function (e) {
+    if (connBusy || conns.length < 2 || wrap.querySelector(".confirming")) return;
+    drag = true; captured = false; sx = e.clientX; dx = 0;
+    wrap.style.transition = "none";
+  });
+  wrap.addEventListener("pointermove", function (e) {
+    if (!drag) return;
+    dx = e.clientX - sx;
+    if (!captured && Math.abs(dx) > 6) {
+      try { wrap.setPointerCapture(e.pointerId); } catch (x) {}
+      captured = true;
+      connDragging = true;
+      wrap.classList.add("dragging");
+    }
+    if (captured) {
+      wrap.style.transform = "translateX(" + dx + "px)";
+      wrap.style.opacity = String(1 - Math.min(Math.abs(dx) / 400, 0.5));
+    }
+  });
+  function endDrag() {
+    if (!drag) return;
+    drag = false;
+    connDragging = false;
+    wrap.classList.remove("dragging");
+    wrap.style.transition = ""; wrap.style.transform = ""; wrap.style.opacity = "";
+    var d = dx;
+    dx = 0;
+    if (d < -50) showConn(connIdx + 1, 1);
+    else if (d > 50) showConn(connIdx - 1, -1);
+  }
+  wrap.addEventListener("pointerup", endDrag);
+  wrap.addEventListener("pointercancel", endDrag);
+  wrap.addEventListener("keydown", function (e) {
+    if (wrap.querySelector(".confirming")) return;
+    if (e.key === "ArrowRight") showConn(connIdx + 1, 1);
+    if (e.key === "ArrowLeft") showConn(connIdx - 1, -1);
+  });
+})();
 $("services").addEventListener("click", function (e) {
   var b = e.target.closest ? e.target.closest("button") : null;
   if (!b) return;
@@ -1470,7 +1584,7 @@ $("svc-add").onclick = function () {
     var addr = location.origin + d.url;
     var ok = copyText(addr);
     $("svc-msg").textContent = "Added " + d.name + " (ID " + d.id + "). Address " + (ok ? "copied" : "shown below") + ": " + addr;
-    loadServices(); loadStatus(); loadSettings();
+    loadServices(d.id); loadStatus(); loadSettings();
   }).catch(function (e) { $("svc-msg").textContent = e.message; });
 };
 
@@ -1841,4 +1955,3 @@ fetch("/auth/status").then(function (r) { return r.json(); }).then(function (s) 
 </body>
 </html>
 `;
-
