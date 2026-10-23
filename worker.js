@@ -1635,4 +1635,210 @@ function memCard(m) {
 function renderItems() {
   var list = memItems.filter(function (m) { return memFilter === "all" || (memFilter === "rules") === hasRule(m.tags); });
   $("count").textContent = memFilter === "all" ? memItems.length + " memories" : list.length + " of " + memItems.length + " memories";
-  $("items
+  $("items").innerHTML = list.length ? list.map(memCard).join("") : '<p class="empty">Nothing to show here.</p>';
+  if (editingId) updateCount("edit");
+}
+function loadItems() {
+  return api("/api/memories?q=" + encodeURIComponent($("q").value)).then(function (d) {
+    memItems = d.items;
+    if (!memItems.some(function (m) { return m.id === editingId; })) editingId = null;
+    renderItems();
+  }).catch(function (e) { $("items").textContent = "Error: " + e.message; });
+}
+$("items").addEventListener("click", function (e) {
+  var t = e.target.closest ? e.target.closest("button") : null;
+  if (!t) return;
+  var ed = t.getAttribute("data-edit"), sv = t.getAttribute("data-save"), del = t.getAttribute("data-del");
+  if (ed) {
+    var cur = memItems.filter(function (x) { return x.id === ed; })[0];
+    editingId = ed;
+    savedTags.edit = cur && !hasRule(cur.tags) ? cur.tags : "";
+    renderItems();
+    var ta = $("edit-text");
+    if (ta) ta.focus();
+    return;
+  }
+  if (t.getAttribute("data-cancel")) { editingId = null; renderItems(); return; }
+  if (sv) {
+    t.disabled = true;
+    api("/api/memories/" + sv, {method: "PUT", body: JSON.stringify({text: $("edit-text").value, tags: $("edit-tags").value, rule: $("edit-rule").checked})}).then(function () {
+      editingId = null;
+      loadItems().then(loadSettings);
+    }).catch(function (err) { t.disabled = false; $("edit-err").textContent = err.message; });
+    return;
+  }
+  if (del) {
+    var m = memItems.filter(function (x) { return x.id === del; })[0];
+    askInline(t, m && hasRule(m.tags) ? "Delete this rule?" : "Delete this memory?", "Yes, delete", function () {
+      api("/api/memories/" + del, {method: "DELETE"}).then(function () { return loadItems(); }).then(loadSettings)
+        .catch(function (err) { $("count").textContent = err.message; });
+    });
+  }
+});
+$("go").onclick = loadItems;
+$("q").addEventListener("keydown", function (e) { if (e.key === "Enter") loadItems(); });
+document.querySelectorAll("[data-filter]").forEach(function (b) {
+  b.onclick = function () {
+    memFilter = b.getAttribute("data-filter");
+    document.querySelectorAll("[data-filter]").forEach(function (x) { x.setAttribute("aria-pressed", String(x === b)); });
+    renderItems();
+  };
+});
+
+/* memories: add (animated drawer) */
+function openAdd() {
+  addToken++;
+  savedTags.add = "";
+  $("add-box").innerHTML = editorHtml("add", {text: "", tags: "", rule: false}) +
+    '<div class="row"><button class="btn" id="add-save">Save memory</button><button class="btn ghost" id="add-cancel">Cancel</button></div><div class="bad small" id="add-err" style="margin-top:8px"></div>';
+  updateCount("add");
+  requestAnimationFrame(function () { requestAnimationFrame(function () { $("add-drawer").classList.add("open"); }); });
+  setTimeout(function () { var t = $("add-text"); if (t) t.focus(); }, 160);
+}
+function closeAdd() {
+  var tok = ++addToken;
+  $("add-drawer").classList.remove("open");
+  setTimeout(function () { if (tok === addToken) $("add-box").innerHTML = ""; }, 500);
+}
+$("add-open").onclick = function () {
+  if ($("add-drawer").classList.contains("open")) { var t = $("add-text"); if (t) t.focus(); } else { openAdd(); }
+};
+$("add-box").addEventListener("click", function (e) {
+  var b = e.target.closest ? e.target.closest("button") : null;
+  if (!b) return;
+  if (b.id === "add-cancel") { closeAdd(); return; }
+  if (b.id === "add-save") {
+    b.disabled = true;
+    api("/api/memories", {method: "POST", body: JSON.stringify({text: $("add-text").value, tags: $("add-tags").value, rule: $("add-rule").checked})}).then(function () {
+      closeAdd();
+      loadItems().then(loadSettings);
+    }).catch(function (err) { b.disabled = false; $("add-err").textContent = err.message; });
+  }
+});
+
+/* housekeeping */
+var hkGroups = [];
+function hkBox(html) { $("hk").innerHTML = html; }
+function hkCheck() {
+  hkGroups = [];
+  hkBox('<p class="muted small" style="margin:14px 0 0">Checking...</p>');
+  api("/api/housekeep", {method: "POST", body: JSON.stringify({apply: false})}).then(function (d) {
+    loadGemini();
+    if (d.error) { hkBox('<p class="bad small" style="margin:14px 0 0">' + esc(d.error) + '</p>'); return; }
+    if (!d.proposed || !d.proposed.length) { hkBox('<p class="muted small" style="margin:14px 0 0">' + esc(d.message || "No duplicates found.") + '</p>'); return; }
+    hkGroups = d.proposed;
+    hkBox(d.proposed.map(function (g) {
+      var text = g.merged_text || g.keep_text;
+      return '<div class="suggest"><b>' + esc(text) + '</b><small>Merges ' + (g.drop.length + 1) + ' memories into this one</small></div>';
+    }).join("") +
+    '<div class="row"><button class="btn" id="hk-fix">Fix Duplicate</button><button class="btn ghost" id="hk-cancel">Cancel</button></div>');
+  }).catch(function (e) { hkBox('<p class="bad small" style="margin:14px 0 0">Error: ' + esc(e.message) + '</p>'); });
+}
+$("hk").addEventListener("click", function (e) {
+  var b = e.target.closest ? e.target.closest("button") : null;
+  if (!b) return;
+  if (b.id === "hk-cancel") { hkGroups = []; hkBox(""); return; }
+  if (b.id === "hk-fix") {
+    b.disabled = true;
+    api("/api/housekeep", {method: "POST", body: JSON.stringify({apply: true, groups: hkGroups})}).then(function (d) {
+      hkGroups = [];
+      if (d.error) { hkBox('<p class="bad small" style="margin:14px 0 0">' + esc(d.error) + '</p>'); return; }
+      hkBox('<p class="ok small" style="margin:14px 0 0">Fixed. Removed ' + d.removed + ' duplicate' + (d.removed === 1 ? "" : "s") + '.</p>');
+      loadItems().then(loadSettings);
+    }).catch(function (err) { hkBox('<p class="bad small" style="margin:14px 0 0">Error: ' + esc(err.message) + '</p>'); });
+  }
+});
+$("check").onclick = hkCheck;
+
+/* backup */
+document.querySelectorAll("[data-mode]").forEach(function (b) {
+  b.onclick = function () {
+    importMode = b.getAttribute("data-mode");
+    document.querySelectorAll("[data-mode]").forEach(function (x) { x.setAttribute("aria-pressed", String(x === b)); });
+  };
+});
+$("exp").onclick = function () {
+  fetch("/api/export").then(function (r) {
+    if (!r.ok) throw new Error(r.status);
+    return r.blob();
+  }).then(function (b) {
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(b); a.download = "memories-backup.json"; a.click();
+  }).catch(function (e) { $("msg").textContent = "Export failed: " + e.message; });
+};
+function doImport() {
+  var f = $("file").files[0];
+  if (!f) { $("msg").textContent = "Choose a JSON file first"; return; }
+  f.text().then(function (t) {
+    return fetch("/api/import?mode=" + importMode, {method: "POST", headers: {"content-type": "application/json"}, body: t});
+  }).then(function (r) { return r.json(); }).then(function (d) {
+    if (d.error) throw new Error(d.error);
+    $("msg").textContent = "Imported " + d.imported + ". Total " + d.total + ".";
+    loadItems().then(loadSettings);
+  }).catch(function (e) { $("msg").textContent = "Import failed: " + e.message; });
+}
+/* delegated: the inline confirmation rebuilds the button, so a direct handler would be lost */
+$("imp-wrap").addEventListener("click", function (e) {
+  var b = e.target.closest ? e.target.closest("button") : null;
+  if (!b || b.id !== "imp") return;
+  if (!$("file").files[0]) { $("msg").textContent = "Choose a JSON file first"; return; }
+  if (importMode === "replace") {
+    askInline(b, "Replace all memories with this file? Rules are kept.", "Yes, replace", doImport);
+  } else {
+    doImport();
+  }
+});
+
+/* install and service worker */
+if (navigator.brave && /Android/i.test(navigator.userAgent)) { $("install-note").hidden = false; }
+window.addEventListener("beforeinstallprompt", function (e) {
+  e.preventDefault();
+  installEvt = e;
+  $("install").hidden = false;
+});
+window.addEventListener("appinstalled", function () {
+  installEvt = null;
+  $("install").hidden = true;
+});
+$("install").onclick = function () {
+  if (!installEvt) return;
+  installEvt.prompt();
+  installEvt.userChoice.then(function () {}, function () {}).then(function () {
+    installEvt = null;
+    $("install").hidden = true;
+  });
+};
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", function () {
+    navigator.serviceWorker.register("/sw.js").catch(function () {});
+  });
+}
+
+/* reveal on scroll and nav highlight */
+var io = null;
+if ("IntersectionObserver" in window) {
+  io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (en) { if (en.isIntersecting) { en.target.classList.add("in"); io.unobserve(en.target); } });
+  }, {threshold: 0.12});
+  document.querySelectorAll(".reveal").forEach(function (el) { io.observe(el); });
+} else {
+  document.querySelectorAll(".reveal").forEach(function (el) { el.classList.add("in"); });
+}
+var navLinks = Array.prototype.slice.call(document.querySelectorAll("nav.top a"));
+if ("IntersectionObserver" in window) {
+  var spy = new IntersectionObserver(function (entries) {
+    entries.forEach(function (en) {
+      if (en.isIntersecting) navLinks.forEach(function (a) { a.classList.toggle("active", a.getAttribute("href") === "#" + en.target.id); });
+    });
+  }, {rootMargin: "-45% 0px -50% 0px"});
+  document.querySelectorAll("#app header[id], #app section[id]").forEach(function (s) { spy.observe(s); });
+}
+
+fetch("/auth/status").then(function (r) { return r.json(); }).then(function (s) {
+  if (s.loggedIn) showApp(); else showGate(s.setup);
+});
+</script>
+</body>
+</html>
+`;
+
