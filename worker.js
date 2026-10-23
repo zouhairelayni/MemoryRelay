@@ -3,8 +3,9 @@ const FALLBACK_MODELS = ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-fla
 const SESSION_DAYS = 30;
 const PBKDF2_ITER = 100000;
 const MAX_CALLS = 8; // Workers subrequest budget per request
-const RETRYABLE = new Set([500, 502, 503, 504]);
+const RETRYABLE = new Set([0, 500, 502, 503, 504]); // 0 = could not reach Gemini at all
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const BUILD = "2026-10-23.5";
 
 const TOOLS = [
   { name: "remember", description: "Save ONE short, self-contained fact, preference, or decision (max 500 chars). Never paste whole conversations. Skips duplicates.",
@@ -70,11 +71,15 @@ async function ensureSchema(env) {
   await env.DB.prepare(
     "CREATE TABLE IF NOT EXISTS services (id TEXT PRIMARY KEY, name TEXT NOT NULL, secret TEXT NOT NULL UNIQUE, created TEXT NOT NULL, last_seen TEXT NOT NULL DEFAULT '', revoked INTEGER NOT NULL DEFAULT 0)"
   ).run();
-  const count = await env.DB.prepare("SELECT COUNT(*) AS n FROM services").first();
-  if (!count.n) {
-    const legacy = await getConfig(env, "connector_secret");
-    await env.DB.prepare("INSERT INTO services (id, name, secret, created) VALUES (?, ?, ?, ?)")
-      .bind(newId(), "Claude", legacy || randomHex(24), now()).run();
+  // Seed the default service only once, so deleting every service never brings one back.
+  if (!(await getConfig(env, "services_seeded"))) {
+    const count = await env.DB.prepare("SELECT COUNT(*) AS n FROM services").first();
+    if (!count.n) {
+      const legacy = await getConfig(env, "connector_secret");
+      await env.DB.prepare("INSERT INTO services (id, name, secret, created) VALUES (?, ?, ?, ?)")
+        .bind(newId(), "Claude", legacy || randomHex(24), now()).run();
+    }
+    await setConfig(env, "services_seeded", "1");
   }
 
   await env.DB.prepare(
@@ -85,6 +90,10 @@ async function ensureSchema(env) {
   ).run();
   await env.DB.prepare(
     "CREATE TABLE IF NOT EXISTS gemini_cooldowns (key_id TEXT NOT NULL, model TEXT NOT NULL, until INTEGER NOT NULL, PRIMARY KEY (key_id, model))"
+  ).run();
+
+  await env.DB.prepare(
+    "CREATE TABLE IF NOT EXISTS service_stats (service_id TEXT PRIMARY KEY, requests INTEGER NOT NULL DEFAULT 0, n_read INTEGER NOT NULL DEFAULT 0, n_write INTEGER NOT NULL DEFAULT 0, n_delete INTEGER NOT NULL DEFAULT 0, bytes_in INTEGER NOT NULL DEFAULT 0, bytes_out INTEGER NOT NULL DEFAULT 0, last TEXT NOT NULL DEFAULT '', app TEXT NOT NULL DEFAULT '')"
   ).run();
 
   const kc = await env.DB.prepare("SELECT COUNT(*) AS n FROM gemini_keys").first();
@@ -250,6 +259,56 @@ async function updateMemory(env, a) {
   return `updated ${row.id}`;
 }
 
+const cleanTags = (s) => String(s || "").split(",").map((x) => x.trim().toLowerCase()).filter(Boolean).join(",");
+
+// Dashboard only (the owner). Rule toggle on: the tag is exactly "rules", which agents can never
+// change or delete. Rule toggle off: free tags, never "rules", at most 3.
+function ownerTags(rule, rawTags) {
+  if (rule) return { tags: "rules" };
+  const tags = cleanTags(rawTags);
+  if (isProtected(tags)) return { error: "the tag rules is only set with the Rule toggle" };
+  if (tags && tags.split(",").length > 3) return { error: "use at most 3 tags" };
+  return { tags };
+}
+
+async function addMemory(env, b) {
+  const text = String(b.text || "").trim();
+  if (!text) return { error: "write the memory first" };
+  if (text.length > MAX_LEN) return { error: `over ${MAX_LEN} characters` };
+  const rule = b.rule === true;
+  const t = ownerTags(rule, b.tags);
+  if (t.error) return t;
+  const { results } = await env.DB.prepare("SELECT id, text FROM memories").all();
+  const dup = results.find((m) => similar(m.text, text));
+  if (dup) return { error: `a similar memory already exists (${dup.id})` };
+  const id = newId(), when = now();
+  await env.DB.prepare(
+    "INSERT INTO memories (id, text, tags, source, created, updated, history) VALUES (?, ?, ?, ?, ?, ?, '[]')"
+  ).bind(id, text, t.tags, rule ? "owner" : "dashboard", when, when).run();
+  return { ok: true, id, rule };
+}
+
+async function editMemory(env, id, b) {
+  const row = await env.DB.prepare("SELECT * FROM memories WHERE id = ?").bind(String(id)).first();
+  if (!row) return { error: "memory not found" };
+  const text = String(b.text || "").trim();
+  if (!text) return { error: "text cannot be empty" };
+  if (text.length > MAX_LEN) return { error: `over ${MAX_LEN} characters` };
+  const rule = typeof b.rule === "boolean" ? b.rule : isProtected(row.tags);
+  let tags = row.tags;
+  if (rule || typeof b.tags === "string") {
+    const t = ownerTags(rule, b.tags);
+    if (t.error) return t;
+    tags = t.tags;
+  }
+  if (!rule && isProtected(tags)) tags = "";
+  const history = JSON.parse(row.history || "[]");
+  if (text !== row.text) history.push({ text: row.text, time: row.updated });
+  await env.DB.prepare("UPDATE memories SET text = ?, tags = ?, updated = ?, history = ? WHERE id = ?")
+    .bind(text, tags, now(), JSON.stringify(history), row.id).run();
+  return { ok: true, id: row.id, rule };
+}
+
 async function forget(env, a) {
   const row = await env.DB.prepare("SELECT tags FROM memories WHERE id = ?").bind(String(a.memory_id)).first();
   if (!row) return "not found";
@@ -259,9 +318,14 @@ async function forget(env, a) {
 }
 
 async function listGeminiModels(key) {
-  const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=100", {
-    headers: { "x-goog-api-key": key },
-  });
+  let r;
+  try {
+    r = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=100", {
+      headers: { "x-goog-api-key": key },
+    });
+  } catch {
+    return { error: "could not reach Gemini (network error)" };
+  }
   if (!r.ok) return { error: "Gemini returned HTTP " + r.status + " (check the key)" };
   const d = await r.json();
   const models = (d.models || [])
@@ -271,11 +335,16 @@ async function listGeminiModels(key) {
 }
 
 async function callGemini(key, model, prompt) {
-  return fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-    method: "POST",
-    headers: { "content-type": "application/json", "x-goog-api-key": key },
-    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json" } }),
-  });
+  try {
+    return await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-goog-api-key": key },
+      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json" } }),
+    });
+  } catch (e) {
+    // Network failure: report it like a failed response so rotation carries on to the next key or model.
+    return { ok: false, status: 0, json: async () => ({}), text: async () => String((e && e.message) || e) };
+  }
 }
 
 async function setCooldown(env, keyId, model, ms) {
@@ -333,7 +402,7 @@ async function gemini(env, prompt) {
         await env.DB.prepare("UPDATE gemini_keys SET enabled = 0 WHERE id = ?").bind(k.id).run();
         log.push(`${tag}: key rejected, disabled`);
       } else {
-        log.push(`${tag}: HTTP ${r.status}${RETRYABLE.has(r.status) ? " (after retry)" : ""}`);
+        log.push(`${tag}: ${r.status ? "HTTP " + r.status : "network error"}${RETRYABLE.has(r.status) ? " (after retry)" : ""}`);
       }
     }
   }
@@ -388,11 +457,13 @@ async function housekeep(env, a) {
   }
   const drop = new Set();
   const stmts = [];
+  let updated = 0;
   for (const grp of groups) {
     if (!byId.has(grp.keep)) continue;
     for (const d of grp.drop || []) if (d !== grp.keep && byId.has(d)) drop.add(d);
     const merged = String(grp.merged_text || "").trim();
     if (merged && merged.length <= MAX_LEN) {
+      updated++;
       stmts.push(env.DB.prepare(
         "UPDATE memories SET history = json_insert(history, '$[#]', json_object('text', text, 'time', updated)), text = ?, updated = ? WHERE id = ?"
       ).bind(merged, now(), grp.keep));
@@ -400,7 +471,7 @@ async function housekeep(env, a) {
   }
   for (const d of drop) stmts.push(env.DB.prepare("DELETE FROM memories WHERE id = ?").bind(d));
   await runAll(env, stmts);
-  return { model, key: keyLabel, removed: drop.size };
+  return { model, key: keyLabel, removed: drop.size, merged: updated };
 }
 
 async function geminiState(env) {
@@ -462,26 +533,31 @@ async function geminiOp(env, request) {
   return geminiState(env);
 }
 
-function classify(ua) {
-  const u = ua.toLowerCase();
-  if (u.includes("claude") || u.includes("anthropic")) return "Claude";
-  if (u.includes("openai") || u.includes("chatgpt")) return "ChatGPT";
-  if (u.includes("cursor")) return "Cursor";
-  if (u.includes("opencode")) return "OpenCode";
-  if (u.includes("curl")) return "curl";
-  return ua.slice(0, 40) || "unknown";
+// Counts what an agent did, by outcome, for the per-connection stats.
+function tally(stats, name, out) {
+  const s = typeof out === "string" ? out : "";
+  if (name === "search" || name === "recent") stats.n_read++;
+  else if (name === "remember") { if (s.startsWith("saved")) stats.n_write++; }
+  else if (name === "update_memory") { if (s.startsWith("updated")) stats.n_write++; }
+  else if (name === "forget") { if (s === "deleted") stats.n_delete++; }
+  else if (name === "housekeep") {
+    if (out && typeof out.removed === "number") { stats.n_delete += out.removed; stats.n_write += out.merged || 0; }
+    else stats.n_read++;
+  }
 }
 
-async function meter(env, request, res, serviceId) {
-  const client = classify(request.headers.get("user-agent") || "");
+async function meter(env, request, res, serviceId, stats) {
   const bin = Number(request.headers.get("content-length") || 0);
   const bout = (await res.clone().arrayBuffer()).byteLength;
   await env.DB.batch([
     env.DB.prepare(
-      `INSERT INTO client_stats (client, requests, bytes_in, bytes_out, last) VALUES (?, 1, ?, ?, ?)
-       ON CONFLICT(client) DO UPDATE SET requests = requests + 1, bytes_in = bytes_in + excluded.bytes_in,
-       bytes_out = bytes_out + excluded.bytes_out, last = excluded.last`
-    ).bind(client, bin, bout, now()),
+      `INSERT INTO service_stats (service_id, requests, n_read, n_write, n_delete, bytes_in, bytes_out, last, app)
+       VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(service_id) DO UPDATE SET requests = requests + 1, n_read = n_read + excluded.n_read,
+       n_write = n_write + excluded.n_write, n_delete = n_delete + excluded.n_delete,
+       bytes_in = bytes_in + excluded.bytes_in, bytes_out = bytes_out + excluded.bytes_out, last = excluded.last,
+       app = CASE WHEN excluded.app <> '' THEN excluded.app ELSE app END`
+    ).bind(serviceId, stats.n_read, stats.n_write, stats.n_delete, bin, bout, now(), stats.app || ""),
     env.DB.prepare("UPDATE services SET last_seen = ? WHERE id = ?").bind(now(), serviceId),
   ]);
 }
@@ -498,7 +574,7 @@ async function callTool(env, name, a) {
   }
 }
 
-async function handleMcp(request, env) {
+async function handleMcp(request, env, stats) {
   const msg = await request.json();
   const { id, method } = msg;
   const params = msg.params || {};
@@ -506,6 +582,8 @@ async function handleMcp(request, env) {
   if (id === undefined) return new Response(null, { status: 202 });
   const ok = (result) => json({ jsonrpc: "2.0", id, result });
   if (method === "initialize") {
+    const ci = params.clientInfo || {};
+    if (stats) stats.app = [ci.name, ci.version].filter(Boolean).map(String).join(" ").slice(0, 60);
     return ok({ protocolVersion: params.protocolVersion || "2025-06-18", capabilities: { tools: {} },
       serverInfo: { name: "my-memory", version: "2.1.0" } });
   }
@@ -514,6 +592,7 @@ async function handleMcp(request, env) {
   if (method === "tools/call") {
     try {
       const out = await callTool(env, params.name, params.arguments || {});
+      if (stats) tally(stats, params.name, out);
       return ok({ content: [{ type: "text", text: typeof out === "string" ? out : JSON.stringify(out, null, 2) }] });
     } catch (e) {
       return ok({ content: [{ type: "text", text: "error: " + e.message }], isError: true });
@@ -523,15 +602,26 @@ async function handleMcp(request, env) {
 }
 
 async function settings(env) {
-  const last = await env.DB.prepare("SELECT MAX(last) AS last FROM client_stats").first();
-  return { last_call: last && last.last ? last.last : "" };
+  const last = await env.DB.prepare("SELECT MAX(last_seen) AS last FROM services").first();
+  const mem = await env.DB.prepare(
+    "SELECT COUNT(*) AS n, COALESCE(SUM(CASE WHEN tags LIKE '%rules%' THEN 1 ELSE 0 END), 0) AS rules FROM memories"
+  ).first();
+  const svc = await env.DB.prepare("SELECT COUNT(*) AS n FROM services WHERE revoked = 0").first();
+  const keys = await env.DB.prepare("SELECT COUNT(*) AS n FROM gemini_keys WHERE enabled = 1").first();
+  return {
+    last_call: last && last.last ? last.last : "",
+    memories: mem.n, rules: mem.rules, connections: svc.n, keys: keys.n,
+  };
 }
 
 async function listServices(env) {
-  const { results } = await env.DB.prepare("SELECT * FROM services ORDER BY created").all();
+  const { results } = await env.DB.prepare(
+    "SELECT s.id, s.name, s.secret, s.created, s.last_seen, s.revoked, COALESCE(t.requests, 0) AS requests, COALESCE(t.n_read, 0) AS n_read, COALESCE(t.n_write, 0) AS n_write, COALESCE(t.n_delete, 0) AS n_delete, COALESCE(t.bytes_in, 0) AS bytes_in, COALESCE(t.bytes_out, 0) AS bytes_out, COALESCE(t.last, '') AS last, COALESCE(t.app, '') AS app FROM services s LEFT JOIN service_stats t ON t.service_id = s.id ORDER BY s.created"
+  ).all();
   return results.map((s) => ({
-    id: s.id, name: s.name, created: s.created, last_seen: s.last_seen,
-    revoked: !!s.revoked, url: "/mcp/" + s.secret,
+    id: s.id, name: s.name, created: s.created, last_seen: s.last_seen, revoked: !!s.revoked, url: "/mcp/" + s.secret,
+    requests: s.requests, n_read: s.n_read, n_write: s.n_write, n_delete: s.n_delete,
+    bytes_in: s.bytes_in, bytes_out: s.bytes_out, last: s.last, app: s.app,
   }));
 }
 
@@ -573,6 +663,13 @@ async function api(request, env, url) {
     const r = await env.DB.prepare("UPDATE services SET revoked = 1 WHERE id = ? AND revoked = 0").bind(revoke[1]).run();
     return json({ revoked: r.meta.changes });
   }
+  const svcDel = p.match(/^\/api\/services\/([^/]+)$/);
+  if (svcDel && m === "DELETE") {
+    const r = await env.DB.prepare("DELETE FROM services WHERE id = ? AND revoked = 1").bind(svcDel[1]).run();
+    if (!r.meta.changes) return json({ error: "only revoked services can be deleted" }, 400);
+    await env.DB.prepare("DELETE FROM service_stats WHERE service_id = ?").bind(svcDel[1]).run();
+    return json({ deleted: r.meta.changes });
+  }
   if (p === "/api/connector/test" && m === "POST") return json(await testConnector(env, request));
 
   if (p === "/api/gemini" && m === "GET") return json(await geminiState(env));
@@ -583,9 +680,15 @@ async function api(request, env, url) {
   if (p === "/api/gemini/models" && m === "GET") {
     const row = await env.DB.prepare("SELECT key FROM gemini_keys WHERE enabled = 1 LIMIT 1").first();
     if (!row) return json({ error: "add an enabled key first" }, 400);
-    return json(await listGeminiModels(row.key));
+    const out = await listGeminiModels(row.key);
+    return json(out, out.error ? 400 : 200);
   }
 
+  if (p === "/api/memories" && m === "POST") {
+    const b = await request.json().catch(() => ({}));
+    const out = await addMemory(env, b);
+    return json(out, out.error ? 400 : 200);
+  }
   if (p === "/api/memories" && m === "GET") {
     const words = (url.searchParams.get("q") || "").toLowerCase().split(" ").filter(Boolean);
     const where = words.length ? "WHERE " + words.map(() => "(text || ' ' || tags) LIKE ?").join(" AND ") : "";
@@ -594,8 +697,13 @@ async function api(request, env, url) {
     ).bind(...words.map((w) => `%${w}%`)).all();
     return json({ count: results.length, items: results });
   }
+  if (p.startsWith("/api/memories/") && m === "PUT") {
+    const b = await request.json().catch(() => ({}));
+    const out = await editMemory(env, p.split("/").pop(), b);
+    return json(out, out.error ? 400 : 200);
+  }
   if (p.startsWith("/api/memories/") && m === "DELETE") {
-    const r = await env.DB.prepare("DELETE FROM memories WHERE id = ? AND tags NOT LIKE '%rules%'").bind(p.split("/").pop()).run();
+    const r = await env.DB.prepare("DELETE FROM memories WHERE id = ?").bind(p.split("/").pop()).run();
     return json({ deleted: r.meta.changes });
   }
   if (p === "/api/export" && m === "GET") {
@@ -631,8 +739,10 @@ async function api(request, env, url) {
     return json({ imported: rows.length, total: total.n });
   }
   if (p === "/api/stats" && m === "GET") {
-    const { results } = await env.DB.prepare("SELECT * FROM client_stats ORDER BY requests DESC").all();
-    return json({ clients: results });
+    const { results } = await env.DB.prepare(
+      "SELECT s.id, s.name, s.revoked, s.created, COALESCE(t.requests, 0) AS requests, COALESCE(t.n_read, 0) AS n_read, COALESCE(t.n_write, 0) AS n_write, COALESCE(t.n_delete, 0) AS n_delete, COALESCE(t.bytes_in, 0) AS bytes_in, COALESCE(t.bytes_out, 0) AS bytes_out, COALESCE(t.last, '') AS last, COALESCE(t.app, '') AS app FROM services s LEFT JOIN service_stats t ON t.service_id = s.id ORDER BY s.created"
+    ).all();
+    return json({ services: results.map((r) => ({ ...r, revoked: !!r.revoked })) });
   }
   if (p === "/api/housekeep" && m === "POST") {
     const body = await request.json().catch(() => ({}));
@@ -652,13 +762,14 @@ export default {
         const svc = await serviceBySecret(env, url.pathname.slice(5));
         if (!svc) return new Response("not found", { status: 404 });
         if (request.method !== "POST") return new Response("method not allowed", { status: 405, headers: { allow: "POST" } });
-        const res = await handleMcp(request, env);
-        ctx.waitUntil(meter(env, request, res, svc.id));
+        const stats = { n_read: 0, n_write: 0, n_delete: 0, app: "" };
+        const res = await handleMcp(request, env, stats);
+        ctx.waitUntil(meter(env, request, res, svc.id, stats));
         return res;
       }
       if (url.pathname === "/") return Response.redirect(url.origin + "/dashboard", 302);
       if (url.pathname === "/dashboard") {
-        return new Response(DASHBOARD, { headers: { "content-type": "text/html; charset=utf-8" } });
+        return new Response(DASHBOARD.replace("__BUILD__", BUILD), { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-cache" } });
       }
       if (url.pathname.startsWith("/auth/")) return await auth(request, env, url);
       if (url.pathname.startsWith("/api/")) return await api(request, env, url);
@@ -682,6 +793,10 @@ const MANIFEST = JSON.stringify({
   display: "standalone",
   background_color: "#13161e",
   theme_color: "#13161e",
+  orientation: "any",
+  lang: "en",
+  categories: ["productivity", "utilities"],
+  prefer_related_applications: false,
   icons: [
     { src: "/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
     { src: "/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
@@ -691,7 +806,7 @@ const MANIFEST = JSON.stringify({
 });
 // Service worker: network-first for pages, cache fallback when offline.
 // API, auth and MCP requests are never cached.
-const SW_JS = `const CACHE = "memory-relay-v1";
+const SW_JS = `const CACHE = "memory-relay-v2";
 const SHELL = ["/dashboard", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png"];
 self.addEventListener("install", function (e) {
   e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(SHELL); }).then(function () { return self.skipWaiting(); }));
@@ -739,109 +854,430 @@ function pwaResponse(p) {
   return null;
 }
 
-const DASHBOARD = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Memory dashboard</title>
+const DASHBOARD = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Memory Relay</title>
 <link rel="manifest" href="/manifest.webmanifest">
-<meta name="theme-color" content="#13161e">
+<meta name="theme-color" content="#F5F1EA" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#13161E" media="(prefers-color-scheme: dark)">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Memory">
 <link rel="icon" type="image/png" href="/icon-192.png">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <style>
-body{margin:0;font:15px system-ui,sans-serif;background:#13161e;color:#ece7dc;padding:18px}
-h1{font:400 26px Georgia,serif;margin:0 0 14px}
-section{background:#1d2230;border:1px solid #333a49;border-radius:14px;padding:16px;margin-bottom:14px}
-h2{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#d9b26e;margin:0 0 10px}
-input,select,button{font:inherit;border-radius:10px;border:1px solid #333a49;background:#262d3d;color:#ece7dc;padding:9px 12px}
-button{cursor:pointer}
-.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
-.item{border-top:1px solid #333a49;padding:10px 0}
-.muted{color:#9aa3b5;font-size:13px}
-.ok{color:#8fd3a8}.bad{color:#e38b81}
-table{width:100%;border-collapse:collapse;font-size:14px}
-td,th{padding:6px;text-align:left;border-bottom:1px solid #333a49;vertical-align:top}
-.del{background:none;border:0;color:#e38b81;padding:0 4px}
-.svc{border-top:1px solid #333a49;padding:12px 0}
-.svc small{display:block;color:#9aa3b5;font-size:12px;word-break:break-all}
-pre{white-space:pre-wrap;font-size:13px;color:#c9d1df}
-.wide{flex:1;min-width:0}
-#gate{max-width:420px;margin:40px auto}
-</style></head><body>
-<h1>Memory dashboard</h1>
-<div id="install-row" class="row" style="display:none;margin:0 0 14px"><button id="install">Install app</button></div>
+:root{
+  --paper:#F5F1EA; --paper2:#EDE7DC; --card:#FBF9F5; --ink:#1B2230; --ink2:#4A5263; --muted:#838896;
+  --line:#DCD5C8; --teal:#1E6F68; --teal-soft:#D6EAE6; --brass:#A97E36; --brass-soft:#F2E7D2;
+  --rose:#A4493F; --rose-soft:#F5DFDB; --info:#E6EDF3; --info-line:#C6D3DF; --info-ink:#40566B;
+  --shadow:0 1px 2px rgba(27,34,48,.05),0 12px 32px -18px rgba(27,34,48,.25);
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --r:18px;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --paper:#13161E; --paper2:#1A1E28; --card:#1E2330; --ink:#EDE8DE; --ink2:#BDB8AD; --muted:#7E8594;
+    --line:#333A49; --teal:#5FC2B8; --teal-soft:#1B3B39; --brass:#D9B26E; --brass-soft:#362C1C;
+    --rose:#E38B81; --rose-soft:#3A221F; --info:#1D2935; --info-line:#324457; --info-ink:#B7C8D9;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 16px 40px -20px rgba(0,0,0,.6);
+  }
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{scroll-behavior:smooth}
+[hidden]{display:none!important}
+svg{pointer-events:none}
+body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.6 var(--sans);-webkit-font-smoothing:antialiased}
+.wrap{max-width:1060px;margin:0 auto;padding:0 20px}
+h1,h2,h3{font-family:var(--serif);font-weight:400;margin:0;letter-spacing:-.01em}
+h2{font-size:clamp(26px,4vw,34px);margin-top:10px}
+h3{font-size:20px}
+p{margin:0 0 12px}
+code,.mono{font-family:var(--mono);font-size:.88em}
+.eyebrow{font:600 12px/1 var(--sans);letter-spacing:.18em;text-transform:uppercase;color:var(--brass)}
+.lede{color:var(--ink2);font-size:16px;max-width:62ch;margin:10px 0 0}
+.muted{color:var(--muted)}
+.small{font-size:14px}
+.ok{color:var(--teal)}
+.bad{color:var(--rose)}
 
-<section id="gate" style="display:none">
-  <h2 id="gate-title">Log in</h2>
-  <div class="row"><input id="email" type="email" placeholder="Email" class="wide"></div>
-  <div class="row"><input id="password" type="password" placeholder="Password (8+ characters)" class="wide"></div>
-  <div class="row"><button id="gate-btn">Log in</button></div>
-  <p class="muted" id="gate-hint"></p>
-  <p class="bad" id="gate-err"></p>
-</section>
+/* nav */
+nav.top{position:sticky;top:0;z-index:20;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);background:color-mix(in srgb,var(--paper) 85%,transparent);border-bottom:1px solid var(--line)}
+nav.top .wrap{display:flex;gap:8px;align-items:center;overflow-x:auto;height:66px;scrollbar-width:none}
+nav.top .wrap::-webkit-scrollbar{display:none}
+nav.top a{color:var(--ink2);text-decoration:none;font-size:14px;font-weight:500;padding:8px 14px;border-radius:999px;white-space:nowrap;border:1px solid var(--line);background:var(--card);transition:background .2s,color .2s,border-color .2s}
+nav.top a:hover{border-color:var(--teal);color:var(--ink)}
+nav.top a:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+nav.top a.active{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+nav.top .brand{font-family:var(--serif);font-size:19px;color:var(--ink);margin-right:14px;white-space:nowrap;flex:none}
+nav.top .grow{flex:1;min-width:8px}
+nav.top .btn{flex:none}
+
+/* buttons */
+.btn{font:600 14px/1.2 var(--sans);border:1px solid var(--ink);background:var(--ink);color:var(--paper);padding:10px 18px;border-radius:999px;cursor:pointer;transition:opacity .2s,transform .15s,border-color .2s,background .2s;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.btn:hover{opacity:.85}
+.btn:active{transform:scale(.97)}
+.btn:disabled{opacity:.35;cursor:default}
+.btn:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+.btn.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
+.btn.ghost:hover{border-color:var(--teal);opacity:1}
+.btn.danger{background:transparent;color:var(--rose);border-color:color-mix(in srgb,var(--rose) 45%,transparent)}
+.btn.danger:hover{background:var(--rose-soft);opacity:1}
+.btn.sdanger{background:var(--rose);border-color:var(--rose);color:#fff}
+.btn.sm{padding:7px 13px;font-size:13px}
+
+/* forms */
+.fld{font:15px var(--sans);width:100%;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 14px;transition:border-color .2s,box-shadow .2s}
+.fld:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-soft)}
+.fld::placeholder{color:var(--muted)}
+.fld:disabled{opacity:.6;background:var(--paper2)}
+textarea.fld{min-height:96px;resize:vertical;line-height:1.5}
+input[type=file].fld{padding:8px 10px}
+input[type=file]::file-selector-button{font:600 13px var(--sans);border:1px solid var(--line);background:var(--paper2);color:var(--ink);padding:6px 12px;border-radius:999px;margin-right:10px;cursor:pointer}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px}
+.row .grow{flex:1;min-width:140px}
+.sw{display:inline-flex;align-items:center;gap:10px;cursor:pointer;font-size:15px;color:var(--ink2);user-select:none}
+.sw input{-webkit-appearance:none;appearance:none;width:46px;height:26px;border-radius:13px;background:var(--line);border:0;padding:0;margin:0;position:relative;cursor:pointer;flex:none;transition:background .25s}
+.sw input::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:var(--card);box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .25s cubic-bezier(.2,.8,.2,1)}
+.sw input:checked{background:var(--teal)}
+.sw input:checked::after{transform:translateX(20px)}
+.sw input:disabled{opacity:.5;cursor:default}
+.sw input:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+
+/* segmented control */
+.seg{display:inline-flex;background:var(--paper2);border-radius:999px;padding:5px;border:1px solid var(--line);max-width:100%}
+.seg button{border:0;background:transparent;color:var(--ink2);font:600 14px var(--sans);padding:9px 18px;border-radius:999px;cursor:pointer;transition:background .25s,color .25s;white-space:nowrap}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.seg button:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+.seg .n{opacity:.6;font-weight:500;margin-left:4px}
+
+/* hero */
+.hero{padding:56px 0 34px;position:relative;overflow:hidden}
+.hero::before{content:"";position:absolute;inset:-40% -10% auto auto;width:640px;height:640px;border-radius:50%;background:radial-gradient(closest-side,var(--teal-soft),transparent);opacity:.7;z-index:-1}
+.hero h1{font-size:clamp(40px,7vw,68px);line-height:1;margin:16px 0 18px;max-width:14ch}
+.hero h1 em{font-style:italic;color:var(--teal)}
+.chips{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px}
+.chip{background:var(--card);border:1px solid var(--line);border-radius:999px;padding:8px 16px;font-size:14px;color:var(--ink2);box-shadow:var(--shadow)}
+.chip b{color:var(--ink);font-weight:600}
+.live{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-top:28px}
+.live-main{display:flex;align-items:center;gap:16px;min-width:0}
+.live-t{font:400 22px var(--serif)}
+.pulse{width:12px;height:12px;border-radius:50%;background:var(--muted);flex:none;position:relative}
+.pulse.ok{background:var(--teal)}
+.pulse.bad{background:var(--rose)}
+.pulse.ok::after{content:"";position:absolute;inset:0;border-radius:50%;background:var(--teal);animation:ping 1.8s ease-out infinite}
+@keyframes ping{from{transform:scale(1);opacity:.5}to{transform:scale(2.8);opacity:0}}
+.risk{margin-top:22px;display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:start;background:var(--info);border:1px solid var(--info-line);border-radius:var(--r);padding:18px 20px;font-size:15px;color:var(--ink2)}
+.risk .ico{width:30px;height:30px;border-radius:50%;background:var(--info-ink);color:var(--info);display:grid;place-items:center;font:700 16px var(--serif)}
+
+/* sections */
+section.block{padding:56px 0;border-top:1px solid var(--line);scroll-margin-top:66px}
+.head{margin-bottom:24px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:22px;box-shadow:var(--shadow)}
+.card+.card,.card+.tray{margin-top:14px}
+.tray{background:var(--paper2);border:1px solid var(--line);border-radius:var(--r);padding:12px;max-height:440px;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;margin-top:14px;scrollbar-width:thin}
+.tray:empty{display:none}
+#items.tray{max-height:520px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.stack{display:flex;flex-direction:column;gap:10px}
+.badge{font:600 11px var(--sans);text-transform:uppercase;letter-spacing:.1em;padding:4px 9px;border-radius:999px;white-space:nowrap}
+.badge.ok{background:var(--teal-soft);color:var(--teal)}
+.badge.bad{background:var(--rose-soft);color:var(--rose)}
+.badge.rule{background:var(--brass-soft);color:var(--brass)}
+.badge.tag{background:var(--paper2);color:var(--ink2);border:1px solid var(--line);text-transform:none;letter-spacing:0;font-weight:500}
+
+/* drawer cards */
+.dcard{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;transition:border-color .25s,transform .25s,box-shadow .25s}
+.dcard:hover{border-color:var(--ink2)}
+.dhead{display:flex;align-items:center;gap:8px;padding-right:14px}
+.dmain{flex:1;min-width:0;display:flex;align-items:center;gap:14px;padding:12px 8px 12px 14px;background:transparent;border:0;color:inherit;font:inherit;text-align:left;cursor:pointer;-webkit-appearance:none;appearance:none}
+.dmain:focus-visible{outline:2px solid var(--ink2);outline-offset:-2px}
+.ic{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;flex:none}
+.ic.ok{background:var(--teal-soft);color:var(--teal)}
+.ic.lock{background:var(--rose-soft);color:var(--rose)}
+.ic.num{background:var(--paper2);color:var(--ink2);font:600 14px var(--sans);border-radius:50%}
+.tt{flex:1;min-width:0}
+.tt code{display:block;font-size:14px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tt small{display:block;color:var(--muted);font-size:13px}
+.chev{color:var(--muted);display:grid;place-items:center;transition:transform .4s cubic-bezier(.2,.8,.2,1)}
+.dcard.open .chev{transform:rotate(180deg)}
+.drawer{display:grid;grid-template-rows:0fr;transition:grid-template-rows .45s cubic-bezier(.2,.8,.2,1)}
+.drawer-inner{min-height:0;overflow:hidden;opacity:0;visibility:hidden;transform:translateY(-8px);transition:opacity .3s ease,transform .45s cubic-bezier(.2,.8,.2,1),visibility 0s linear .45s}
+.dcard.open>.drawer,.drawer.open{grid-template-rows:1fr}
+.dcard.open>.drawer>.drawer-inner,.drawer.open>.drawer-inner{opacity:1;visibility:visible;transform:none;transition:opacity .3s ease,transform .45s cubic-bezier(.2,.8,.2,1),visibility 0s}
+.dcard .pad{padding:2px 16px 16px 64px}
+.pad .row:first-child{margin-top:4px}
+.drawer.open>.drawer-inner{padding:4px}
+
+/* connection cards */
+.conn .cpad{padding:18px 18px 14px}
+.conn .top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.conn h3{font-size:20px;overflow-wrap:anywhere}
+.conn .where{font-size:13px;color:var(--muted);margin:2px 0 14px;overflow-wrap:anywhere}
+.conn.off{opacity:.78}
+.triple{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.triple div{background:var(--paper2);border-radius:12px;padding:10px 8px;text-align:center}
+.triple b{display:block;font:400 24px var(--serif);color:var(--ink)}
+.triple span{font-size:12px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+.split{display:flex;height:8px;border-radius:999px;background:var(--paper2);border:1px solid var(--line);overflow:hidden;margin:12px 0 6px}
+.split i{display:block;height:100%;transition:width .5s cubic-bezier(.2,.8,.2,1)}
+.split .r{background:var(--teal)}
+.split .w{background:var(--brass)}
+.split .d{background:var(--rose)}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--muted)}
+.legend span::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:var(--teal)}
+.legend .w::before{background:var(--brass)}
+.legend .d::before{background:var(--rose)}
+.conn .more{width:100%;display:flex;justify-content:space-between;align-items:center;background:transparent;border:0;border-top:1px solid var(--line);color:var(--ink2);font:600 13px var(--sans);padding:12px 18px;cursor:pointer;-webkit-appearance:none;appearance:none}
+.conn .more:hover{color:var(--ink)}
+.conn .more:focus-visible{outline:2px solid var(--ink2);outline-offset:-2px}
+.conn .pad{padding:2px 18px 6px}
+dl.kv{display:grid;grid-template-columns:auto 1fr;gap:8px 16px;margin:6px 0 0;font-size:14px}
+dl.kv dt{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.08em;padding-top:3px}
+dl.kv dd{margin:0;color:var(--ink2);overflow-wrap:anywhere}
+.conn .acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:4px 18px 16px}
+.ask{font-size:14px;color:var(--ink2);flex:1 1 100%}
+
+/* memories */
+.mem{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;transition:border-color .2s}
+.mem:hover{border-color:var(--ink2)}
+.mem.is-rule{border-left:3px solid var(--brass)}
+.mem .mt{font-size:15px;color:var(--ink);overflow-wrap:anywhere;white-space:pre-wrap}
+.mem .meta{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;margin-top:10px;font-size:12px;color:var(--muted)}
+.mem .acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+.editor .tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+.editor .tools .count{margin-left:auto;font-size:12px;color:var(--muted)}
+.editor textarea{margin-bottom:12px}
+.editor .tagrow{margin-top:12px}
+.editor .note{min-height:20px;font-size:13px;color:var(--muted);margin-top:8px}
+.suggest{background:var(--teal-soft);border-radius:14px;padding:14px 16px;margin-top:10px;color:var(--ink)}
+.suggest small{display:block;color:var(--ink2);margin-top:4px}
+.empty{color:var(--muted);font-size:14px;padding:6px}
+
+footer{padding:34px 0 60px;border-top:1px solid var(--line);color:var(--muted);font-size:14px;text-align:center}
+
+/* gate */
+#gate{min-height:100vh;display:grid;align-items:center;padding:28px 0}
+#gate .card{max-width:440px}
+#gate h1{font-size:clamp(34px,8vw,52px);line-height:1.05;margin:14px 0 14px}
+#gate h1 em{font-style:italic;color:var(--teal)}
+
+.reveal{opacity:0;transform:translateY(14px);transition:opacity .7s ease,transform .7s ease}
+.reveal.in{opacity:1;transform:none}
+
+@media (max-width:860px){
+  .grid{grid-template-columns:1fr}
+  .dcard .pad{padding-left:16px}
+  .hero{padding:40px 0 24px}
+  section.block{padding:44px 0}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.reveal{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+
+<div id="gate" style="display:none">
+  <div class="wrap">
+    <div class="eyebrow">Memory Relay</div>
+    <h1>One memory. <em>Every</em> agent.</h1>
+    <div class="card">
+      <div class="eyebrow" id="gate-title">Log in</div>
+      <div class="row"><input id="email" type="email" class="fld" placeholder="Email" autocomplete="username"></div>
+      <div class="row"><input id="password" type="password" class="fld" placeholder="Password (8+ characters)" autocomplete="current-password"></div>
+      <div class="row"><button class="btn" id="gate-btn">Log in</button></div>
+      <p class="muted small" id="gate-hint" style="margin:12px 0 0"></p>
+      <p class="bad small" id="gate-err" style="margin:8px 0 0"></p>
+    </div>
+  </div>
+</div>
 
 <div id="app" style="display:none">
-<section>
-  <div class="row" style="justify-content:space-between"><h2 style="margin:0">Live status</h2><button id="logout">Log out</button></div>
-  <div class="row"><span id="status-dot" class="bad">&#9679;</span><span id="status-text">Checking...</span></div>
-  <p class="muted" id="status-meta"></p>
-  <p class="muted" id="last-call"></p>
-  <div class="row"><button id="test">Check now</button></div>
+<nav class="top">
+  <div class="wrap">
+    <span class="brand">Memory Relay</span>
+    <a href="#status">Status</a>
+    <a href="#connections">Connections</a>
+    <a href="#gemini">Gemini</a>
+    <a href="#memories">Memories</a>
+    <a href="#housekeeping">Housekeeping</a>
+    <a href="#backup">Backup</a>
+    <span class="grow"></span>
+    <button class="btn sm ghost" id="install" hidden>Install app</button>
+    <button class="btn sm ghost" id="logout">Log out</button>
+  </div>
+</nav>
+
+<header class="hero" id="status">
+  <div class="wrap">
+    <div class="eyebrow">Memory relay &middot; one owner, many agents</div>
+    <h1>One memory. <em>Every</em> agent.</h1>
+    <p class="lede">Your shared memory bank, the agents connected to it, and the Gemini keys that keep it tidy.</p>
+    <div class="chips">
+      <span class="chip"><b id="c-mem">0</b> memories</span>
+      <span class="chip"><b id="c-rules">0</b> rules</span>
+      <span class="chip"><b id="c-conn">0</b> connections</span>
+      <span class="chip"><b id="c-keys">0</b> Gemini keys</span>
+    </div>
+    <div class="card live reveal">
+      <div class="live-main">
+        <span class="pulse" id="status-dot"></span>
+        <div>
+          <div class="live-t" id="status-text">Checking...</div>
+          <div class="muted small" id="status-meta"></div>
+          <div class="muted small" id="last-call"></div>
+        </div>
+      </div>
+      <button class="btn ghost" id="test">Check now</button>
+    </div>
+    <div class="risk" id="install-note" hidden>
+      <div class="ico">i</div>
+      <div>Brave on Android only adds a shortcut. For a real app install, open this page in Chrome and choose Install app.</div>
+    </div>
+  </div>
+</header>
+
+<section class="block" id="connections">
+  <div class="wrap">
+    <div class="head reveal">
+      <div class="eyebrow">01 &middot; Connections</div>
+      <h2>Every agent, its own address</h2>
+      <p class="lede">Revoking one connection stops only that agent. Each card shows what it read, wrote and deleted.</p>
+    </div>
+    <div class="card reveal">
+      <div class="row" style="margin-top:0"><input id="svc-name" class="fld grow" placeholder="Connection name, e.g. Claude"><button class="btn" id="svc-add">Add connection</button></div>
+      <p class="muted small" id="svc-msg" style="margin:10px 0 0"></p>
+    </div>
+    <div id="services" class="tray grid"></div>
+  </div>
 </section>
 
-<section>
-  <h2>Connected services</h2>
-  <p class="muted">Each service has its own address. Revoking one stops only that service.</p>
-  <div class="row"><input id="svc-name" placeholder="Service name, e.g. Claude" class="wide"><button id="svc-add">Add service</button></div>
-  <p class="muted" id="svc-msg"></p>
-  <div id="services" style="margin-top:8px"></div>
+<section class="block" id="gemini">
+  <div class="wrap">
+    <div class="head reveal">
+      <div class="eyebrow">02 &middot; Gemini</div>
+      <h2>Keys rotate, models fall back</h2>
+      <p class="lede">Each request starts from the next key. A key that hits a rate limit cools down, and a rejected key is switched off.</p>
+    </div>
+    <div class="card reveal">
+      <div class="seg" role="group" aria-label="Gemini settings">
+        <button id="g-keys" aria-pressed="true">Keys <span class="n" id="g-keys-n"></span></button>
+        <button id="g-models" aria-pressed="false">Models <span class="n" id="g-models-n"></span></button>
+      </div>
+      <div id="pane-keys">
+        <div class="row"><input id="gk-label" class="fld" placeholder="Label" style="width:120px"><input id="gk-key" type="password" class="fld grow" placeholder="API key" autocomplete="off"><button class="btn" id="gk-add">Add key</button></div>
+        <div id="gk-list" class="tray stack"></div>
+      </div>
+      <div id="pane-models" hidden>
+        <div class="row"><input id="gm-name" list="gm-opts" class="fld grow" placeholder="Model name"><datalist id="gm-opts"></datalist><button class="btn" id="gm-add">Add</button><button class="btn ghost" id="gm-load">Browse</button></div>
+        <div id="gm-list" class="tray stack"></div>
+      </div>
+      <p class="muted small" id="gm-msg" style="margin:12px 0 0"></p>
+    </div>
+  </div>
 </section>
 
-<section>
-  <h2>Gemini keys (rotated)</h2>
-  <p class="muted">Each request starts from the next key. A key that hits 429 cools down; a rejected key is disabled.</p>
-  <div class="row"><input id="gk-label" placeholder="Label" style="width:90px"><input id="gk-key" type="password" placeholder="API key" class="wide"><button id="gk-add">Add key</button></div>
-  <div id="gk-list"></div>
+<section class="block" id="memories">
+  <div class="wrap">
+    <div class="head reveal">
+      <div class="eyebrow">03 &middot; Memories</div>
+      <h2>What your agents remember</h2>
+      <p class="lede">Search, add, edit and delete. Memories you mark as rules stay under your control.</p>
+    </div>
+    <div class="risk reveal" style="margin:0 0 14px">
+      <div class="ico">i</div>
+      <div><strong>Rules are yours alone.</strong> A memory with the Rule switch on can only be edited or deleted here, by you. Agents can read it but never change or remove it.</div>
+    </div>
+    <div class="card reveal">
+      <div class="row" style="margin-top:0"><input id="q" class="fld grow" placeholder="Search memories"><button class="btn ghost" id="go">Search</button></div>
+      <div class="row">
+        <div class="seg" role="group" aria-label="Filter">
+          <button id="f-all" data-filter="all" aria-pressed="true">All</button>
+          <button id="f-rules" data-filter="rules" aria-pressed="false">Rules</button>
+          <button id="f-other" data-filter="other" aria-pressed="false">Other</button>
+        </div>
+        <button class="btn" id="add-open">Add memory</button>
+      </div>
+      <div class="drawer" id="add-drawer"><div class="drawer-inner"><div id="add-box" style="padding-top:14px"></div></div></div>
+      <p class="muted small" id="count" style="margin:14px 0 0"></p>
+    </div>
+    <div id="items" class="tray stack"></div>
+  </div>
 </section>
 
-<section>
-  <h2>Gemini models (tried in order)</h2>
-  <div class="row"><input id="gm-name" list="gm-opts" placeholder="Model name" class="wide"><datalist id="gm-opts"></datalist><button id="gm-add">Add</button><button id="gm-load">Browse</button></div>
-  <div id="gm-list"></div>
-  <p class="muted" id="gm-msg"></p>
+<section class="block" id="housekeeping">
+  <div class="wrap">
+    <div class="head reveal">
+      <div class="eyebrow">04 &middot; Housekeeping</div>
+      <h2>Let Gemini tidy up</h2>
+      <p class="lede">Gemini looks for duplicate or conflicting memories and suggests a fix. Nothing changes until you approve it. Rules are never touched.</p>
+    </div>
+    <div class="card reveal">
+      <div class="row" style="margin-top:0"><button class="btn" id="check">Check duplicates</button></div>
+      <div id="hk"></div>
+    </div>
+  </div>
 </section>
 
-<section>
-  <h2>Memories</h2>
-  <div class="row"><input id="q" placeholder="Search" class="wide"><button id="go">Search</button></div>
-  <p class="muted" id="count"></p><div id="items"></div>
+<section class="block" id="backup">
+  <div class="wrap">
+    <div class="head reveal">
+      <div class="eyebrow">05 &middot; Backup</div>
+      <h2>Keep a way back</h2>
+      <p class="lede">Download everything as a file, or bring a backup in. Rules are never replaced by an import.</p>
+    </div>
+    <div class="card reveal">
+      <div class="row" style="margin-top:0"><button class="btn ghost" id="exp">Download backup</button></div>
+      <div class="row"><input type="file" id="file" accept="application/json" class="fld grow"></div>
+      <div class="row">
+        <div class="seg" role="group" aria-label="Import mode">
+          <button id="m-merge" data-mode="merge" aria-pressed="true">Merge (add new)</button>
+          <button id="m-replace" data-mode="replace" aria-pressed="false">Replace all</button>
+        </div>
+        <span id="imp-wrap"><button class="btn" id="imp">Import</button></span>
+      </div>
+      <p class="muted small" id="msg" style="margin:12px 0 0"></p>
+    </div>
+  </div>
 </section>
 
-<section>
-  <h2>Housekeeping (Gemini)</h2>
-  <div class="row"><button id="check">Check duplicates</button></div>
-  <div id="hk"></div>
-</section>
-
-<section>
-  <h2>Transfers by client</h2>
-  <div id="stats" class="muted">Loading...</div>
-</section>
-
-<section>
-  <h2>Backup and import</h2>
-  <div class="row"><button id="exp">Download backup</button></div>
-  <div class="row"><input type="file" id="file" accept="application/json"><select id="mode"><option value="merge">Merge (add new)</option><option value="replace">Replace all</option></select><button id="imp">Import</button></div>
-  <p class="muted" id="msg"></p>
-</section>
+<footer><div class="wrap">Memory Relay &middot; Build __BUILD__</div></footer>
 </div>
 
 <script>
 var gateMode = "login";
 var refreshTimer = null;
+var openDrawers = {};
+var memFilter = "all";
+var importMode = "merge";
+var savedTags = {};
+var memItems = [];
+var editingId = null;
+var installEvt = null;
+var addToken = 0;
+
 function $(id) { return document.getElementById(id); }
 function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return {"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]; }); }
 function fmt(n) { return n < 1024 ? n + " B" : n < 1048576 ? (n / 1024).toFixed(1) + " KB" : (n / 1048576).toFixed(2) + " MB"; }
+function svgI(p, s) {
+  s = s || 16;
+  return '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + p + '</svg>';
+}
+var ICONS = {
+  check: svgI('<path d="M5 12.5l4.5 4.5L19 7.5"/>'),
+  lock: svgI('<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7.5a4 4 0 0 1 8 0V11"/>'),
+  chev: svgI('<path d="M6 9l6 6 6-6"/>', 18),
+  up: svgI('<path d="M12 19V5M5 12l7-7 7 7"/>', 14),
+  down: svgI('<path d="M12 5v14M19 12l-7 7-7-7"/>', 14),
+  plus: svgI('<path d="M12 5v14M5 12h14"/>', 15),
+  pencil: svgI('<path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/>', 14),
+  trash: svgI('<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>', 14),
+  copy: svgI('<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/>', 14),
+  download: svgI('<path d="M12 4v11M7 11l5 5 5-5M5 20h14"/>', 15)
+};
 function api(path, opts) {
   opts = opts || {};
   opts.headers = Object.assign({"content-type": "application/json"}, opts.headers || {});
@@ -862,6 +1298,48 @@ function copyText(text) {
   document.body.removeChild(t);
   return ok;
 }
+function clip(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    return navigator.clipboard.writeText(text).then(function () { return true; }, function () { return copyText(text); });
+  }
+  return Promise.resolve(copyText(text));
+}
+
+/* inline confirmation: swaps the button row for a question with two buttons */
+function askInline(btn, text, yesLabel, onYes) {
+  var holder = btn.parentNode;
+  var saved = holder.innerHTML;
+  var done = false;
+  holder.classList.add("confirming");
+  holder.innerHTML = '<span class="ask">' + esc(text) + '</span><button class="btn sm sdanger" data-yes="1">' + esc(yesLabel) + '</button><button class="btn sm ghost" data-no="1">Cancel</button>';
+  function finish(restore) {
+    if (done) return;
+    done = true;
+    holder.classList.remove("confirming");
+    holder.onclick = null;
+    if (restore) holder.innerHTML = saved;
+  }
+  holder.onclick = function (e) {
+    var t = e.target.closest ? e.target.closest("button") : null;
+    if (!t) return;
+    if (t.getAttribute("data-no")) { finish(true); }
+    else if (t.getAttribute("data-yes")) { finish(false); onYes(); }
+  };
+}
+
+/* drawers (open state survives re-renders) */
+document.addEventListener("click", function (e) {
+  var b = e.target.closest ? e.target.closest("[data-drawer]") : null;
+  if (!b) return;
+  var card = b.closest(".dcard");
+  var key = b.getAttribute("data-drawer");
+  var on = !card.classList.contains("open");
+  card.classList.toggle("open", on);
+  b.setAttribute("aria-expanded", String(on));
+  if (on) openDrawers[key] = true; else delete openDrawers[key];
+});
+
+/* gate and app shell */
 function showGate(setup) {
   stopAutoRefresh();
   gateMode = setup ? "setup" : "login";
@@ -878,10 +1356,13 @@ function showApp() {
   loadItems();
   startAutoRefresh();
 }
-function refreshAll() { loadStatus(); loadServices(); loadSettings(); loadGemini(); loadStats(); }
+function refreshAll() { loadStatus(); loadServices(); loadSettings(); loadGemini(); }
 function startAutoRefresh() {
   stopAutoRefresh();
-  refreshTimer = setInterval(function () { loadStatus(); loadServices(); loadSettings(); loadGemini(); }, 20000);
+  refreshTimer = setInterval(function () {
+    loadStatus(); loadSettings();
+    if (!document.querySelector(".confirming")) { loadServices(); loadGemini(); }
+  }, 20000);
 }
 function stopAutoRefresh() { if (refreshTimer) clearInterval(refreshTimer); refreshTimer = null; }
 
@@ -898,9 +1379,10 @@ $("logout").onclick = function () {
     .then(function (r) { return r.json(); }).then(function (s) { showGate(s.setup); });
 };
 
+/* status and counts */
 function loadStatus() {
   return api("/api/connector/test", {method: "POST"}).then(function (d) {
-    $("status-dot").className = d.live ? "ok" : "bad";
+    $("status-dot").className = "pulse " + (d.live ? "ok" : "bad");
     if (d.message) {
       $("status-text").textContent = "Not live: " + d.message;
     } else {
@@ -910,35 +1392,74 @@ function loadStatus() {
       (d.checked ? "Checked " + d.checked + " (auto-refresh every 20 s)." : "");
   }).catch(function (e) { $("status-text").textContent = e.message; });
 }
+function loadSettings() {
+  return api("/api/settings").then(function (s) {
+    $("last-call").textContent = s.last_call ? "Last request from a client: " + s.last_call : "No client has connected yet";
+    $("c-mem").textContent = s.memories;
+    $("c-rules").textContent = s.rules;
+    $("c-conn").textContent = s.connections;
+    $("c-keys").textContent = s.keys;
+  }).catch(function () {});
+}
+$("test").onclick = function () { loadStatus(); };
 
+/* connections */
+function pct(n, tot) { return tot ? Math.round(n / tot * 100) : 0; }
+function connCard(s) {
+  var key = "svc:" + s.id;
+  var open = openDrawers[key];
+  var tot = s.n_read + s.n_write + s.n_delete;
+  var acts = s.revoked ?
+    '<button class="btn sm danger" data-delete="' + esc(s.id) + '">' + ICONS.trash + 'Delete</button>' :
+    '<button class="btn sm ghost" data-copy="' + esc(location.origin + s.url) + '">' + ICONS.copy + 'Copy address</button>' +
+    '<button class="btn sm danger" data-revoke="' + esc(s.id) + '" data-name="' + esc(s.name) + '">Revoke</button>';
+  return '<article class="dcard conn' + (s.revoked ? " off" : "") + (open ? " open" : "") + '">' +
+    '<div class="cpad"><div class="top"><h3>' + esc(s.name) + '</h3><span class="badge ' + (s.revoked ? "bad" : "ok") + '">' + (s.revoked ? "Revoked" : "Active") + '</span></div>' +
+    '<div class="where">MCP ID ' + esc(s.id) + (s.app ? " &middot; " + esc(s.app) : "") + '</div>' +
+    '<div class="triple"><div><b>' + s.n_read + '</b><span>Reads</span></div><div><b>' + s.n_write + '</b><span>Writes</span></div><div><b>' + s.n_delete + '</b><span>Deletes</span></div></div>' +
+    '<div class="split" aria-hidden="true"><i class="r" style="width:' + pct(s.n_read, tot) + '%"></i><i class="w" style="width:' + pct(s.n_write, tot) + '%"></i><i class="d" style="width:' + pct(s.n_delete, tot) + '%"></i></div>' +
+    '<div class="legend"><span>Read</span><span class="w">Write</span><span class="d">Delete</span></div></div>' +
+    '<button class="more" data-drawer="' + esc(key) + '" aria-expanded="' + (open ? "true" : "false") + '"><span>Details</span><span class="chev">' + ICONS.chev + '</span></button>' +
+    '<div class="drawer"><div class="drawer-inner"><div class="pad"><dl class="kv">' +
+      '<dt>MCP ID</dt><dd class="mono">' + esc(s.id) + '</dd>' +
+      '<dt>App</dt><dd>' + (s.app ? esc(s.app) : "Not reported yet") + '</dd>' +
+      '<dt>Requests</dt><dd>' + s.requests + '</dd>' +
+      '<dt>Data in</dt><dd>' + fmt(s.bytes_in) + '</dd>' +
+      '<dt>Data out</dt><dd>' + fmt(s.bytes_out) + '</dd>' +
+      '<dt>Last used</dt><dd>' + (s.last ? esc(s.last) : "Never used") + '</dd>' +
+      '<dt>Created</dt><dd>' + esc(s.created) + '</dd></dl></div></div></div>' +
+    '<div class="acts">' + acts + '</div></article>';
+}
 function loadServices() {
   return api("/api/services").then(function (d) {
-    var base = location.origin;
-    if (!d.services.length) { $("services").innerHTML = '<p class="muted">No services yet.</p>'; return; }
-    $("services").innerHTML = d.services.map(function (s) {
-      var state = s.revoked ? '<span class="bad">Revoked</span>' : '<span class="ok">Active</span>';
-      var seen = s.last_seen ? "Last seen " + esc(s.last_seen) : "Never used";
-      var controls = s.revoked ? "" :
-        '<div class="row"><button data-copy="' + esc(base + s.url) + '">Copy address</button>' +
-        '<button class="del" data-revoke="' + esc(s.id) + '" data-name="' + esc(s.name) + '">Revoke</button></div>';
-      return '<div class="svc"><div><b>' + esc(s.name) + '</b> &middot; ' + state + '</div>' +
-        '<small>ID: ' + esc(s.id) + ' &middot; ' + seen + ' &middot; Created ' + esc(s.created) + '</small>' + controls + '</div>';
-    }).join("");
+    if (!d.services.length) { $("services").innerHTML = '<p class="empty">No connections yet. Add one above.</p>'; return; }
+    $("services").innerHTML = d.services.map(connCard).join("");
   }).catch(function (e) { $("services").textContent = "Error: " + e.message; });
 }
 $("services").addEventListener("click", function (e) {
-  var copy = e.target.getAttribute("data-copy");
-  var rev = e.target.getAttribute("data-revoke");
+  var b = e.target.closest ? e.target.closest("button") : null;
+  if (!b) return;
+  var copy = b.getAttribute("data-copy"), rev = b.getAttribute("data-revoke"), del = b.getAttribute("data-delete");
   if (copy) {
     $("svc-msg").textContent = copyText(copy) ? "Address copied." : "Could not copy. Long-press the address to copy it manually.";
     return;
   }
   if (rev) {
-    if (!confirm("Revoke " + e.target.getAttribute("data-name") + "? Its address will stop working.")) return;
-    api("/api/services/" + rev + "/revoke", {method: "POST"}).then(function () {
-      $("svc-msg").textContent = "Revoked.";
-      loadServices(); loadStatus();
-    }).catch(function (err) { $("svc-msg").textContent = err.message; });
+    askInline(b, "Revoke " + b.getAttribute("data-name") + "? Its address will stop working.", "Yes, revoke", function () {
+      api("/api/services/" + rev + "/revoke", {method: "POST"}).then(function () {
+        $("svc-msg").textContent = "Revoked.";
+        loadServices(); loadStatus(); loadSettings();
+      }).catch(function (err) { $("svc-msg").textContent = err.message; loadServices(); });
+    });
+    return;
+  }
+  if (del) {
+    askInline(b, "Delete this connection for good?", "Yes, delete", function () {
+      api("/api/services/" + del, {method: "DELETE"}).then(function () {
+        $("svc-msg").textContent = "Deleted.";
+        loadServices(); loadSettings();
+      }).catch(function (err) { $("svc-msg").textContent = err.message; loadServices(); });
+    });
   }
 });
 $("svc-add").onclick = function () {
@@ -949,32 +1470,49 @@ $("svc-add").onclick = function () {
     var addr = location.origin + d.url;
     var ok = copyText(addr);
     $("svc-msg").textContent = "Added " + d.name + " (ID " + d.id + "). Address " + (ok ? "copied" : "shown below") + ": " + addr;
-    loadServices(); loadStatus();
+    loadServices(); loadStatus(); loadSettings();
   }).catch(function (e) { $("svc-msg").textContent = e.message; });
 };
 
-function loadSettings() {
-  return api("/api/settings").then(function (s) {
-    $("last-call").textContent = s.last_call ? "Last request from a client: " + s.last_call : "No client has connected yet";
-  }).catch(function () {});
+/* gemini */
+function setPane(p) {
+  $("g-keys").setAttribute("aria-pressed", String(p === "keys"));
+  $("g-models").setAttribute("aria-pressed", String(p === "models"));
+  $("pane-keys").hidden = p !== "keys";
+  $("pane-models").hidden = p !== "models";
 }
-$("test").onclick = function () { loadStatus(); };
-
+$("g-keys").onclick = function () { setPane("keys"); };
+$("g-models").onclick = function () { setPane("models"); };
 function renderGemini(s) {
+  $("g-keys-n").textContent = s.keys.length;
+  $("g-models-n").textContent = s.models.length;
   $("gk-list").innerHTML = s.keys.map(function (k) {
-    return '<div class="item">' + esc(k.label) + ' ....' + esc(k.tail) + ' <span class="' + (k.enabled ? "ok" : "bad") + '">' + (k.enabled ? "enabled" : "disabled") + '</span> ' +
-      '<div class="row"><button data-op="toggle_key" data-id="' + esc(k.id) + '">Toggle</button>' +
-      '<button class="del" data-op="delete_key" data-id="' + esc(k.id) + '">Delete</button></div>' +
-      (k.cooling.length ? '<div class="muted">cooling: ' + k.cooling.map(esc).join(", ") + '</div>' : "") + "</div>";
-  }).join("") || '<p class="muted">No keys yet.</p>';
+    var key = "key:" + k.id, open = openDrawers[key];
+    return '<div class="dcard' + (open ? " open" : "") + '"><div class="dhead">' +
+      '<button class="dmain" data-drawer="' + esc(key) + '" aria-expanded="' + (open ? "true" : "false") + '">' +
+      '<span class="ic ' + (k.enabled ? "ok" : "lock") + '">' + (k.enabled ? ICONS.check : ICONS.lock) + '</span>' +
+      '<span class="tt"><code>' + esc(k.label) + '</code><small>....' + esc(k.tail) + (k.cooling.length ? " &middot; cooling" : "") + '</small></span>' +
+      '<span class="chev">' + ICONS.chev + '</span></button>' +
+      '<label class="sw" title="Enable or disable"><input type="checkbox" data-op="toggle_key" data-id="' + esc(k.id) + '"' + (k.enabled ? " checked" : "") + '></label></div>' +
+      '<div class="drawer"><div class="drawer-inner"><div class="pad">' +
+      '<p class="small muted" style="margin:0">' + (k.enabled ? "Used in rotation." : "Switched off. It is skipped until you turn it back on.") + (k.cooling.length ? " Cooling down for: " + k.cooling.map(esc).join(", ") + "." : "") + '</p>' +
+      '<div class="row"><button class="btn sm danger" data-op="delete_key" data-id="' + esc(k.id) + '">' + ICONS.trash + 'Delete key</button></div>' +
+      '</div></div></div></div>';
+  }).join("") || '<p class="empty">No keys yet.</p>';
   $("gm-list").innerHTML = s.models.map(function (m, i) {
-    var n = esc(m.name);
-    return '<div class="item">' + (i + 1) + '. ' + n + ' <span class="' + (m.enabled ? "ok" : "bad") + '">' + (m.enabled ? "on" : "off") + '</span>' +
-      '<div class="row"><button data-op="move_model" data-name="' + n + '" data-dir="-1">Up</button>' +
-      '<button data-op="move_model" data-name="' + n + '" data-dir="1">Down</button>' +
-      '<button data-op="toggle_model" data-name="' + n + '">Toggle</button>' +
-      '<button class="del" data-op="delete_model" data-name="' + n + '">Delete</button></div></div>';
-  }).join("") || '<p class="muted">No models yet.</p>';
+    var n = esc(m.name), key = "model:" + m.name, open = openDrawers[key];
+    return '<div class="dcard' + (open ? " open" : "") + '"><div class="dhead">' +
+      '<button class="dmain" data-drawer="' + esc(key) + '" aria-expanded="' + (open ? "true" : "false") + '">' +
+      '<span class="ic num">' + (i + 1) + '</span>' +
+      '<span class="tt"><code>' + n + '</code><small>' + (m.enabled ? "On" : "Off") + '</small></span>' +
+      '<span class="chev">' + ICONS.chev + '</span></button>' +
+      '<label class="sw" title="Enable or disable"><input type="checkbox" data-op="toggle_model" data-name="' + n + '"' + (m.enabled ? " checked" : "") + '></label></div>' +
+      '<div class="drawer"><div class="drawer-inner"><div class="pad">' +
+      '<div class="row"><button class="btn sm ghost" data-op="move_model" data-name="' + n + '" data-dir="-1">' + ICONS.up + 'Move up</button>' +
+      '<button class="btn sm ghost" data-op="move_model" data-name="' + n + '" data-dir="1">' + ICONS.down + 'Move down</button>' +
+      '<button class="btn sm danger" data-op="delete_model" data-name="' + n + '">' + ICONS.trash + 'Delete</button></div>' +
+      '</div></div></div></div>';
+  }).join("") || '<p class="empty">No models yet.</p>';
 }
 function loadGemini() {
   return api("/api/gemini").then(renderGemini).catch(function (e) { $("gm-msg").textContent = e.message; });
@@ -983,13 +1521,25 @@ function gop(body) {
   return api("/api/gemini", {method: "POST", body: JSON.stringify(body)}).then(function (s) {
     $("gm-msg").textContent = "";
     renderGemini(s);
-  }).catch(function (e) { $("gm-msg").textContent = e.message; });
+    loadSettings();
+  }).catch(function (e) { $("gm-msg").textContent = e.message; loadGemini(); });
+}
+function opBody(el) {
+  return {op: el.getAttribute("data-op"), id: el.getAttribute("data-id"), name: el.getAttribute("data-name"), dir: el.getAttribute("data-dir")};
 }
 document.addEventListener("click", function (e) {
-  var op = e.target.getAttribute("data-op");
-  if (!op) return;
-  if (op.indexOf("delete") === 0 && !confirm("Delete this?")) return;
-  gop({op: op, id: e.target.getAttribute("data-id"), name: e.target.getAttribute("data-name"), dir: e.target.getAttribute("data-dir")});
+  var b = e.target.closest ? e.target.closest("button[data-op]") : null;
+  if (!b) return;
+  var body = opBody(b);
+  if (body.op.indexOf("delete") === 0) {
+    askInline(b, "Delete this?", "Yes, delete", function () { gop(body); });
+    return;
+  }
+  gop(body);
+});
+document.addEventListener("change", function (e) {
+  var t = e.target;
+  if (t.type === "checkbox" && t.getAttribute("data-op")) gop(opBody(t));
 });
 $("gk-add").onclick = function () {
   gop({op: "add_key", label: $("gk-label").value, key: $("gk-key").value}).then(function () { $("gk-key").value = ""; });
@@ -1005,107 +1555,84 @@ $("gm-load").onclick = function () {
   }).catch(function (e) { $("gm-msg").textContent = e.message; });
 };
 
-function loadItems() {
-  api("/api/memories?q=" + encodeURIComponent($("q").value)).then(function (d) {
-    $("count").textContent = d.count + " memories";
-    $("items").innerHTML = d.items.map(function (m) {
-      return '<div class="item"><div>' + esc(m.text) + '</div><small class="muted">' + esc(m.time) + " · " + esc(m.tags) + " · " + esc(m.id) +
-        '</small> <button class="del" data-id="' + esc(m.id) + '">delete</button></div>';
-    }).join("");
-  }).catch(function (e) { $("items").textContent = "Error: " + e.message; });
+/* memories: editor */
+function hasRule(tags) {
+  return ("," + String(tags || "").toLowerCase().replace(/ /g, "") + ",").indexOf(",rules,") !== -1;
 }
-function loadStats() {
-  api("/api/stats").then(function (d) {
-    if (!d.clients.length) { $("stats").textContent = "No requests yet."; return; }
-    $("stats").innerHTML = "<table><tr><th>Client</th><th>Requests</th><th>In</th><th>Out</th><th>Last</th></tr>" +
-      d.clients.map(function (c) {
-        return "<tr><td>" + esc(c.client) + "</td><td>" + c.requests + "</td><td>" + fmt(c.bytes_in) + "</td><td>" + fmt(c.bytes_out) + "</td><td>" + esc(c.last) + "</td></tr>";
-      }).join("") + "</table>";
-  }).catch(function (e) { $("stats").textContent = "Error: " + e.message; });
+function editorHtml(p, o) {
+  var b = function (a, label) { return '<button type="button" class="btn sm ghost" data-ed="' + a + '" data-p="' + p + '">' + label + '</button>'; };
+  return '<div class="editor">' +
+    '<div class="tools">' + b("selectall", "Select all") + b("copy", "Copy") + b("paste", "Paste") + '<span class="count" id="' + p + '-count"></span></div>' +
+    '<textarea id="' + p + '-text" class="fld" maxlength="500" placeholder="One short, self-contained fact">' + esc(o.text || "") + '</textarea>' +
+    '<label class="sw"><input type="checkbox" id="' + p + '-rule"' + (o.rule ? " checked" : "") + '><span>Rule (only you can edit or delete)</span></label>' +
+    '<div class="tagrow"><input id="' + p + '-tags" class="fld" placeholder="Tags, comma separated (max 3)" value="' + esc(o.rule ? "rules" : (o.tags || "")) + '"' + (o.rule ? " disabled" : "") + '></div>' +
+    '<div class="note" id="' + p + '-note"></div></div>';
 }
-var hkGroups = [];
-function hkBox(html) { $("hk").innerHTML = html; }
-function hkCheck() {
-  hkGroups = [];
-  hkBox('<p class="muted">Checking...</p>');
-  api("/api/housekeep", {method: "POST", body: JSON.stringify({apply: false})}).then(function (d) {
-    loadStats(); loadGemini();
-    if (d.error) { hkBox('<p class="bad">' + esc(d.error) + '</p>'); return; }
-    if (!d.proposed || !d.proposed.length) { hkBox('<p class="muted">' + esc(d.message || "No duplicates found.") + '</p>'); return; }
-    hkGroups = d.proposed;
-    hkBox(d.proposed.map(function (g) {
-      var text = g.merged_text || g.keep_text;
-      return '<div class="item"><div>' + esc(text) + '</div><small class="muted">Merges ' + (g.drop.length + 1) + ' memories into this one</small></div>';
-    }).join("") +
-    '<div class="row"><button id="hk-fix">Fix Duplicate</button><button id="hk-cancel">Cancel</button></div>');
-  }).catch(function (e) { hkBox('<p class="bad">Error: ' + esc(e.message) + '</p>'); });
+function updateCount(p) {
+  var ta = $(p + "-text"), c = $(p + "-count");
+  if (ta && c) c.textContent = ta.value.length + "/500";
 }
-$("hk").addEventListener("click", function (e) {
-  if (e.target.id === "hk-cancel") { hkGroups = []; hkBox(""); return; }
-  if (e.target.id === "hk-fix") {
-    e.target.disabled = true;
-    api("/api/housekeep", {method: "POST", body: JSON.stringify({apply: true, groups: hkGroups})}).then(function (d) {
-      hkGroups = [];
-      if (d.error) { hkBox('<p class="bad">' + esc(d.error) + '</p>'); return; }
-      hkBox('<p class="ok">Fixed. Removed ' + d.removed + ' duplicate' + (d.removed === 1 ? "" : "s") + '.</p>');
-      loadItems(); loadStats();
-    }).catch(function (err) { hkBox('<p class="bad">Error: ' + esc(err.message) + '</p>'); });
+document.addEventListener("click", function (e) {
+  var btn = e.target.closest ? e.target.closest("[data-ed]") : null;
+  if (!btn) return;
+  var a = btn.getAttribute("data-ed");
+  var p = btn.getAttribute("data-p");
+  var ta = $(p + "-text"), note = $(p + "-note");
+  if (!ta) return;
+  if (a === "selectall") {
+    ta.focus();
+    ta.select();
+    try { ta.setSelectionRange(0, ta.value.length); } catch (x) {}
+    note.textContent = "";
+    return;
+  }
+  if (a === "copy") {
+    var sel = ta.selectionStart !== ta.selectionEnd ? ta.value.slice(ta.selectionStart, ta.selectionEnd) : ta.value;
+    if (!sel) { note.textContent = "Nothing to copy."; return; }
+    clip(sel).then(function (ok) { note.textContent = ok ? "Copied." : "The browser blocked copying."; });
+    return;
+  }
+  if (a === "paste") {
+    if (!navigator.clipboard || !navigator.clipboard.readText) { note.textContent = "Paste is not available here. Long-press the box and choose Paste."; return; }
+    navigator.clipboard.readText().then(function (t) {
+      if (!t) { note.textContent = "The clipboard is empty."; return; }
+      ta.setRangeText(t, ta.selectionStart, ta.selectionEnd, "end");
+      var cut = ta.value.length > 500;
+      if (cut) ta.value = ta.value.slice(0, 500);
+      note.textContent = cut ? "Pasted and trimmed to 500 characters." : "Pasted.";
+      ta.focus();
+      updateCount(p);
+    }, function () { note.textContent = "The browser blocked pasting. Long-press the box and choose Paste."; });
   }
 });
-$("items").addEventListener("click", function (e) {
-  var id = e.target.getAttribute("data-id");
-  if (!id || !confirm("Delete this memory?")) return;
-  api("/api/memories/" + id, {method: "DELETE"}).then(loadItems).then(loadStats);
+document.addEventListener("input", function (e) {
+  if (e.target.tagName === "TEXTAREA" && e.target.id.slice(-5) === "-text") updateCount(e.target.id.slice(0, -5));
 });
-$("go").onclick = loadItems;
-$("check").onclick = hkCheck;
-$("exp").onclick = function () {
-  fetch("/api/export").then(function (r) {
-    if (!r.ok) throw new Error(r.status);
-    return r.blob();
-  }).then(function (b) {
-    var a = document.createElement("a");
-    a.href = URL.createObjectURL(b); a.download = "memories-backup.json"; a.click();
-  }).catch(function (e) { $("msg").textContent = "Export failed: " + e.message; });
-};
-$("imp").onclick = function () {
-  var f = $("file").files[0];
-  if (!f) { $("msg").textContent = "Choose a JSON file first"; return; }
-  if ($("mode").value === "replace" && !confirm("Replace ALL memories with this file?")) return;
-  f.text().then(function (t) {
-    return fetch("/api/import?mode=" + $("mode").value, {method: "POST", headers: {"content-type": "application/json"}, body: t});
-  }).then(function (r) { return r.json(); }).then(function (d) {
-    if (d.error) throw new Error(d.error);
-    $("msg").textContent = "Imported " + d.imported + ". Total " + d.total + ".";
-    loadItems();
-  }).catch(function (e) { $("msg").textContent = "Import failed: " + e.message; });
-};
+document.addEventListener("change", function (e) {
+  var id = e.target.id || "";
+  if (id.slice(-5) !== "-rule") return;
+  var p = id.slice(0, -5), tags = $(p + "-tags");
+  if (!tags) return;
+  if (e.target.checked) { savedTags[p] = tags.value; tags.value = "rules"; tags.disabled = true; }
+  else { tags.disabled = false; tags.value = savedTags[p] && savedTags[p] !== "rules" ? savedTags[p] : ""; }
+});
 
-var installEvt = null;
-window.addEventListener("beforeinstallprompt", function (e) {
-  e.preventDefault();
-  installEvt = e;
-  $("install-row").style.display = "";
-});
-window.addEventListener("appinstalled", function () {
-  installEvt = null;
-  $("install-row").style.display = "none";
-});
-$("install").onclick = function () {
-  if (!installEvt) return;
-  installEvt.prompt();
-  installEvt.userChoice.then(function () {}, function () {}).then(function () {
-    installEvt = null;
-    $("install-row").style.display = "none";
-  });
-};
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", function () {
-    navigator.serviceWorker.register("/sw.js").catch(function () {});
-  });
+/* memories: list */
+function memCard(m) {
+  var rule = hasRule(m.tags);
+  var tagBadges = String(m.tags || "").split(",").map(function (t) { return t.trim(); }).filter(function (t) { return t && t.toLowerCase() !== "rules"; })
+    .map(function (t) { return '<span class="badge tag">' + esc(t) + '</span>'; }).join("");
+  var meta = '<div class="meta">' + (rule ? '<span class="badge rule">Rule</span>' : "") + tagBadges + '<span>' + esc(m.time) + '</span><span class="mono">' + esc(m.id) + '</span></div>';
+  if (m.id === editingId) {
+    return '<div class="mem' + (rule ? " is-rule" : "") + '">' + editorHtml("edit", {text: m.text, tags: rule ? "" : m.tags, rule: rule}) +
+      '<div class="row"><button class="btn" data-save="' + esc(m.id) + '">Save</button><button class="btn ghost" data-cancel="1">Cancel</button></div>' +
+      '<div class="bad small" id="edit-err" style="margin-top:8px"></div>' + meta + '</div>';
+  }
+  return '<div class="mem' + (rule ? " is-rule" : "") + '"><div class="mt">' + esc(m.text) + '</div>' + meta +
+    '<div class="acts"><button class="btn sm ghost" data-edit="' + esc(m.id) + '">' + ICONS.pencil + 'Edit</button>' +
+    '<button class="btn sm danger" data-del="' + esc(m.id) + '">' + ICONS.trash + 'Delete</button></div></div>';
 }
-
-fetch("/auth/status").then(function (r) { return r.json(); }).then(function (s) {
-  if (s.loggedIn) showApp(); else showGate(s.setup);
-});
-</script></body></html>`;
+function renderItems() {
+  var list = memItems.filter(function (m) { return memFilter === "all" || (memFilter === "rules") === hasRule(m.tags); });
+  $("count").textContent = memFilter === "all" ? memItems.length + " memories" : list.length + " of " + memItems.length + " memories";
+  $("items
