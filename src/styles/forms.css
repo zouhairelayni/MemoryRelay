@@ -1,0 +1,31 @@
+.fld{font:16px var(--sans);width:100%;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 14px;transition:border-color .2s,box-shadow .2s;min-height:44px}
+.fld:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-soft)}
+.fld::placeholder{color:var(--muted)}
+.fld:disabled{opacity:.6;background:var(--paper2)}
+textarea.fld{min-height:110px;resize:vertical;line-height:1.5}
+input[type=file].fld{padding:8px 10px}
+input[type=file]::file-selector-button{font:600 13px var(--sans);border:1px solid var(--line);background:var(--paper2);color:var(--ink);padding:6px 12px;border-radius:999px;margin-right:10px;cursor:pointer}
+
+.sw{display:inline-flex;align-items:center;gap:10px;cursor:pointer;font-size:15px;color:var(--ink2);user-select:none}
+.sw input{-webkit-appearance:none;appearance:none;width:46px;height:26px;border-radius:13px;background:var(--line);border:0;padding:0;margin:0;position:relative;cursor:pointer;flex:none;transition:background .25s}
+.sw input::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:var(--card);box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .25s cubic-bezier(.2,.8,.2,1)}
+.sw input:checked{background:var(--teal)}
+.sw input:checked::after{transform:translateX(20px)}
+.sw input:disabled{opacity:.5;cursor:default}
+.sw input:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+
+.seg{display:inline-flex;background:var(--paper2);border-radius:999px;padding:5px;border:1px solid var(--line);max-width:100%}
+.seg button{border:0;background:transparent;color:var(--ink2);font:600 14px var(--sans);padding:9px 18px;border-radius:999px;cursor:pointer;transition:background .25s,color .25s;white-space:nowrap}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.seg button:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+.seg .n{opacity:.6;font-weight:500;margin-left:4px}
+
+.toolbar{display:flex;gap:10px;align-items:center}
+.toolbar .fld{flex:1;min-width:0}
+.filter{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+
+.editor .tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+.editor .tools .count{margin-left:auto;font-size:12px;color:var(--muted)}
+.editor textarea{margin-bottom:12px}
+.editor .tagrow{margin-top:12px}
+.editor .note{min-height:20px;font-size:13px;color:var(--muted);margin-top:8px}

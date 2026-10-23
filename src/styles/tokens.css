@@ -1,0 +1,30 @@
+/* Design tokens (the Memory Atlas palette). Light by default, dark by system setting or by data-theme. */
+:root {
+  --paper: #F5F1EA; --paper2: #EDE7DC; --card: #FBF9F5; --ink: #1B2230; --ink2: #4A5263; --muted: #838896;
+  --line: #DCD5C8; --teal: #1E6F68; --teal-soft: #D6EAE6; --brass: #A97E36; --brass-soft: #F2E7D2;
+  --rose: #A4493F; --rose-soft: #F5DFDB; --info: #E6EDF3; --info-line: #C6D3DF; --info-ink: #40566B;
+  --shadow: 0 1px 2px rgba(27,34,48,.05), 0 12px 32px -18px rgba(27,34,48,.25);
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --r: 18px;
+  --tabbar: 68px;
+  --topbar: 58px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #13161E; --paper2: #1A1E28; --card: #1E2330; --ink: #EDE8DE; --ink2: #BDB8AD; --muted: #7E8594;
+    --line: #333A49; --teal: #5FC2B8; --teal-soft: #1B3B39; --brass: #D9B26E; --brass-soft: #362C1C;
+    --rose: #E38B81; --rose-soft: #3A221F; --info: #1D2935; --info-line: #324457; --info-ink: #B7C8D9;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 16px 40px -20px rgba(0,0,0,.6);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #13161E; --paper2: #1A1E28; --card: #1E2330; --ink: #EDE8DE; --ink2: #BDB8AD; --muted: #7E8594;
+  --line: #333A49; --teal: #5FC2B8; --teal-soft: #1B3B39; --brass: #D9B26E; --brass-soft: #362C1C;
+  --rose: #E38B81; --rose-soft: #3A221F; --info: #1D2935; --info-line: #324457; --info-ink: #B7C8D9;
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 16px 40px -20px rgba(0,0,0,.6);
+  color-scheme: dark;
+}

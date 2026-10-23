@@ -1,0 +1,16 @@
+name = "memory-relay"
+main = "worker/index.js"
+compatibility_date = "2026-10-22"
+
+# The React app (built by `npm run build` into ./dist) is served as static assets.
+# The Worker only runs for these paths; everything else is served directly from ./dist.
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/mcp/*", "/auth/*", "/api/*"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "memory-db"
+database_id = "d174349a-58ac-4603-8196-16ec19dec2db"
