@@ -1,6 +1,6 @@
 // Duplicate detection and merge through Gemini.
 import { MAX_LEN } from "./constants.js";
-import { gemini } from "./gemini.js";
+import { complete } from "./llm.js";
 import { now, runAll } from "./util.js";
 
 export async function housekeep(env, a) {
@@ -17,7 +17,7 @@ export async function housekeep(env, a) {
   if (a.apply && Array.isArray(a.groups)) {
     groups = a.groups; // dashboard: apply exactly what the user saw in the preview
   } else {
-    const g = await gemini(env, prompt);
+    const g = await complete(env, prompt);
     if (g.error) return { error: g.error };
     try {
       const s = g.text;

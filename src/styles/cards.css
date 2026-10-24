@@ -107,3 +107,8 @@ dl.kv dd{margin:0;color:var(--ink2);overflow-wrap:anywhere}
 .mem .acts{margin-top:12px}
 .suggest{background:var(--teal-soft);border-radius:14px;padding:14px 16px;margin-top:10px;color:var(--ink)}
 .suggest small{display:block;color:var(--ink2);margin-top:4px}
+
+/* skill genie */
+.card h3{margin:0}
+.card .top{margin-bottom:2px}
+.card .row .lbl{margin:0}

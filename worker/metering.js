@@ -4,7 +4,7 @@ import { now } from "./util.js";
 // Counts what an agent did, by outcome, for the per-connection stats.
 export function tally(stats, name, out) {
   const s = typeof out === "string" ? out : "";
-  if (name === "search" || name === "recent") stats.n_read++;
+  if (name === "search" || name === "recent" || name === "select_skills") stats.n_read++;
   else if (name === "remember") { if (s.startsWith("saved")) stats.n_write++; }
   else if (name === "update_memory") { if (s.startsWith("updated")) stats.n_write++; }
   else if (name === "forget") { if (s === "deleted") stats.n_delete++; }

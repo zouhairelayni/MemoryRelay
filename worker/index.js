@@ -8,12 +8,33 @@ import { meter } from "./metering.js";
 import { serviceBySecret } from "./services.js";
 import { json } from "./util.js";
 
+// Headers for the app itself: no framing (clickjacking), no MIME sniffing, no referrer leaks, strict scripts.
+function withSecurityHeaders(res) {
+  const h = new Headers(res.headers);
+  h.set("x-frame-options", "DENY");
+  h.set("x-content-type-options", "nosniff");
+  h.set("referrer-policy", "same-origin");
+  h.set("permissions-policy", "camera=(), microphone=(), geolocation=()");
+  h.set("content-security-policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; manifest-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
+  return new Response(res.body, { status: res.status, headers: h });
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const p = url.pathname;
     try {
       if (p === "/api/build") return json({ build: BUILD });
+      // Browser requests that change data must come from this site (JSON bodies cannot be sent cross-site without a preflight).
+      const changes = !["GET", "HEAD"].includes(request.method);
+      if (changes && (p.startsWith("/api/") || p.startsWith("/auth/"))) {
+        const origin = request.headers.get("origin");
+        if (origin && origin !== url.origin) return json({ error: "cross-site request refused" }, 403);
+        const hasBody = (request.headers.get("content-length") || "0") !== "0" || !!request.headers.get("transfer-encoding");
+        if (hasBody && !String(request.headers.get("content-type") || "").includes("application/json")) {
+          return json({ error: "send JSON" }, 415);
+        }
+      }
       if (p.startsWith("/mcp/") || p.startsWith("/auth/") || p.startsWith("/api/")) {
         await ensureSchema(env);
         if (p.startsWith("/mcp/")) {
@@ -28,7 +49,7 @@ export default {
         if (p.startsWith("/auth/")) return await auth(request, env, url);
         return await api(request, env, url);
       }
-      if (env.ASSETS) return env.ASSETS.fetch(request);
+      if (env.ASSETS) return withSecurityHeaders(await env.ASSETS.fetch(request));
       return new Response("not found", { status: 404 });
     } catch (e) {
       return json({ error: e.message }, 500);

@@ -79,3 +79,28 @@ More API-key providers: add a panel next to `src/modules/keys/GeminiPanel.jsx` a
 * Agent cards swipe on their own (the card area never changes tab).
 * Swipe the settings page to the right to close it. Android back and Esc close it too.
 * Swipes that start in a text field are ignored.
+
+## Skill Genie
+
+Skills are stored in D1 and chosen by Gemini (or keywords when Gemini is unavailable). Agents do not browse the library.
+
+* **Import:** Skills tab → Add → paste a `SKILL.md` or choose a `.md` file. The header needs `name:` and a `description:` that says when to use it ("Use when ...").
+* **Switch:** turn skills on or off, or mark one **Always on** (always sent to agents when enabled).
+* **Try:** type a request to see which skills an agent would get and why.
+* **Max per request:** how many skills the Genie may send (1 to 8, default 3).
+
+An agent calls the MCP tool `select_skills` with its request (and optionally the files and functions it will touch). The Genie returns only the chosen `SKILL.md` texts, or says that no skill is needed. The MCP handshake tells agents to call it first, so Claude, Gemini, ChatGPT or any other MCP client gets this behaviour with no extra setup.
+
+Skills are text an agent obeys. Import only what you trust. Risky patterns (pipes into a shell, `rm -rf`, links, secrets) show a warning but are not blocked.
+
+## OpenRouter
+
+Keys tab → OpenRouter. Paste a key that starts with `sk-or-`, then tap **Browse free models**. The list shows only models whose prices are zero, so nothing you add bills you. Tap **Add** on the ones you want, and reorder them. Gemini is tried first; OpenRouter is used when Gemini is missing or fails, for housekeeping and skill picks.
+
+## Agent-made skills
+
+Agents can add skills of their own over MCP:
+1. `get_skill_template` returns the required format (frontmatter `name` and `description`, then sections: When to use, Steps, Rules, Output, Example). It is based on the same format as Anthropic's skills.
+2. `upload_skill` with the full SKILL.md text. The description must say when to use the skill ("Use when ..."). Each skill is limited to **5000 tokens**; longer skills are refused with the count.
+
+Agent uploads are saved as **pending** and are never sent to other agents until you switch them on in the Skills tab. Owner uploads go live at once. Token counts are estimates (the larger of characters/4 and words×1.3).

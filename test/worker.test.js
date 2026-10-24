@@ -11,7 +11,7 @@ const setup = async () => {
   const env = { DB, ASSETS: { fetch: async () => new Response("<div id=root></div>", { headers: { "content-type": "text/html" } }) } };
   const ctx = { waitUntil: (p) => p };
   const call = (path, init) => worker.fetch(new Request(B + path, init), env, ctx);
-  const res = await call("/auth/setup", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: "o@x.io", password: "longenough1" }) });
+  const res = await call("/auth/setup", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: "o@x.io", password: "longenough12" }) });
   const cookie = res.headers.get("set-cookie").split(";")[0];
   const api = (path, method = "GET", body) => call(path, { method, headers: { cookie, "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
   const services = (await (await api("/api/services")).json()).services;
@@ -24,7 +24,7 @@ const setup = async () => {
 
 test("first run creates the tables and one default connection", async () => {
   const { db, api } = await setup();
-  for (const t of ["users", "sessions", "memories", "config", "services", "gemini_keys", "gemini_models", "service_stats"]) {
+  for (const t of ["users", "sessions", "memories", "config", "services", "gemini_keys", "gemini_models", "service_stats", "skills", "openrouter_keys", "openrouter_models", "openrouter_cooldowns"]) {
     assert.ok(db.prepare("SELECT 1 FROM sqlite_master WHERE name=?").get(t), t);
   }
   assert.equal((await (await api("/api/services")).json()).services.length, 1);
@@ -32,7 +32,7 @@ test("first run creates the tables and one default connection", async () => {
 
 test("only one owner account can be created", async () => {
   const { call } = await setup();
-  const r = await call("/auth/setup", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: "b@x.io", password: "longenough1" }) });
+  const r = await call("/auth/setup", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: "b@x.io", password: "longenough12" }) });
   assert.equal(r.status, 403);
 });
 
@@ -103,4 +103,49 @@ test("import skips rules and replace keeps them", async () => {
 test("everything else is served by the static assets", async () => {
   const { call } = await setup();
   assert.match(await (await call("/anything")).text(), /root/);
+});
+
+test("wrong passwords lock the account for 15 minutes", async () => {
+  const { call } = await setup();
+  const login = (password) => call("/auth/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: "o@x.io", password }) });
+  for (let i = 0; i < 5; i++) assert.equal((await login("wrong-password-1")).status, 401);
+  assert.equal((await login("longenough12")).status, 429, "correct password is refused while locked");
+});
+
+test("a correct login clears the failure count", async () => {
+  const { call } = await setup();
+  const login = (password) => call("/auth/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: "o@x.io", password }) });
+  for (let i = 0; i < 4; i++) await login("wrong-password-1");
+  assert.equal((await login("longenough12")).status, 200);
+  for (let i = 0; i < 4; i++) await login("wrong-password-1");
+  assert.equal((await login("longenough12")).status, 200, "count restarted after success");
+});
+
+test("session tokens are stored hashed, and the cookie is __Host- prefixed", async () => {
+  const { db, call } = await setup();
+  const res = await call("/auth/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: "o@x.io", password: "longenough12" }) });
+  const cookie = res.headers.get("set-cookie");
+  assert.match(cookie, /^__Host-sid=/);
+  assert.match(cookie, /HttpOnly/);
+  assert.match(cookie, /Secure/);
+  const token = cookie.split(";")[0].split("=")[1];
+  const rows = db.prepare("SELECT token FROM sessions").all();
+  assert.ok(rows.length >= 1);
+  assert.ok(rows.every((r) => r.token !== token), "raw token is not stored");
+});
+
+test("short passwords are refused at setup", async () => {
+  resetSchemaCache();
+  const { DB } = createD1();
+  const env = { DB, ASSETS: { fetch: async () => new Response("") } };
+  const r = await worker.fetch(new Request(B + "/auth/setup", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: "o@x.io", password: "short" }) }), env, { waitUntil: (p) => p });
+  assert.equal(r.status, 400);
+});
+
+test("state-changing requests from another site are refused", async () => {
+  const { call, api } = await setup();
+  const r = await call("/api/services", { method: "POST", headers: { "content-type": "application/json", origin: "https://evil.example" }, body: "{}" });
+  assert.equal(r.status, 403, "refused before the session is even checked");
+  const ok = await api("/api/services", "POST", { name: "x" });
+  assert.equal(ok.status, 200);
 });

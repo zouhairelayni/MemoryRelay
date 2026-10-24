@@ -52,3 +52,18 @@ export const backup = {
     return d;
   },
 };
+
+export const skills = {
+  list: () => get("/api/skills"),
+  add: (text, source = "paste") => post("/api/skills", { text, source }),
+  setFlag: (name, flag, value) => put("/api/skills/" + encodeURIComponent(name) + "/" + flag, { value }),
+  remove: (name) => del("/api/skills/" + encodeURIComponent(name)),
+  setMax: (max) => put("/api/skills/max", { max }),
+  try: (request) => post("/api/skills/try", { request }),
+};
+
+export const openrouter = {
+  state: () => get("/api/openrouter"),
+  op: (body) => post("/api/openrouter", body),
+  freeModels: () => get("/api/openrouter/models").then((d) => d.models),
+};
