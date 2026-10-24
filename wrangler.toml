@@ -13,4 +13,4 @@ run_worker_first = ["/mcp/*", "/auth/*", "/api/*"]
 [[d1_databases]]
 binding = "DB"
 database_name = "memory-db"
-database_id = "PUT-YOUR-REAL-DATABASE-ID-HERE"
+database_id = "d174349a-58ac-4603-8196-16ec19dec2db"
