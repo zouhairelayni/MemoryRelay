@@ -24,7 +24,7 @@ export function similar(a, b) {
   return common / (A.size + B.size - common) >= 0.8;
 }
 
-export const brief = (m) => ({ id: m.id, text: m.text.slice(0, 300), tags: m.tags || "", time: m.created });
+export const brief = (m) => ({ id: m.id, text: m.text.slice(0, 500), tags: m.tags || "", time: m.created });
 export const isProtected = (tags) => String(tags || "").split(",").map((t) => t.trim().toLowerCase()).includes("rules");
 
 export async function runAll(env, stmts) {
