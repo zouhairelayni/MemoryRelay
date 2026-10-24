@@ -59,12 +59,12 @@ export async function updateMemory(env, a) {
 export const cleanTags = (s) => String(s || "").split(",").map((x) => x.trim().toLowerCase()).filter(Boolean).join(",");
 
 // Dashboard only (the owner). Rule toggle on: the tag is exactly "rules", which agents can never
-// change or delete. Rule toggle off: free tags, never "rules", at most 3.
+// change or delete. Rule toggle off: free tags, never "rules", at most 5.
 export function ownerTags(rule, rawTags) {
   if (rule) return { tags: "rules" };
   const tags = cleanTags(rawTags);
   if (isProtected(tags)) return { error: "the tag rules is only set with the Rule toggle" };
-  if (tags && tags.split(",").length > 3) return { error: "use at most 3 tags" };
+  if (tags && tags.split(",").length > 5) return { error: "use at most 5 tags" };
   return { tags };
 }
 
