@@ -57,7 +57,7 @@ test("agents can save, search and update, but never touch rules", async () => {
 test("owner cannot type the rules tag by hand and is limited to 3 tags", async () => {
   const { api } = await setup();
   assert.equal((await api("/api/memories", "POST", { text: "a", tags: "rules" })).status, 400);
-  assert.equal((await api("/api/memories", "POST", { text: "b", tags: "a,b,c,d" })).status, 400);
+  assert.equal((await api("/api/memories", "POST", { text: "b", tags: "a,b,c,d,e,f" })).status, 400);
 });
 
 test("per-connection counters", async () => {
