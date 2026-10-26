@@ -1,6 +1,8 @@
 import { useState } from "react";
 import Segmented from "../../components/Segmented.jsx";
-import { PROVIDERS } from "./providers.js";
+import PageHead from "../../components/PageHead.jsx";
+import { PROVIDERS } from "./providers.jsx";
+import DelegationPanel from "./DelegationPanel.jsx";
 
 export default function KeysScreen({ active }) {
   const [id, setId] = useState(PROVIDERS[0].id);
@@ -8,13 +10,10 @@ export default function KeysScreen({ active }) {
   const { Panel } = provider;
   return (
     <div className="screen">
-      <div className="head">
-        <div className="eyebrow">Keys</div>
-        <h2>Keys and models</h2>
-        <p className="lede">Save more than one key and one model. They rotate, so a rate limit never stops your agents.</p>
-      </div>
+      <PageHead icon="keys" title="Keys and models" sub="Keys and models rotate, so a rate limit never stops your agents." />
+      <DelegationPanel active={active} />
       {PROVIDERS.length > 1 ? (
-        <div style={{ marginBottom: 14 }}>
+        <div>
           <Segmented label="Provider" value={id} onChange={setId} options={PROVIDERS.map((p) => ({ value: p.id, label: p.title }))} />
         </div>
       ) : null}

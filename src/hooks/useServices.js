@@ -27,11 +27,11 @@ export function useServices({ onChange } = {}) {
     if (onChange) onChange();
   }, [load, onChange]);
 
-  const create = useCallback(async (name) => {
+  const create = useCallback(async (name, access = "write") => {
     const clean = name.trim();
     if (!clean) { setMessage("Type a name first."); return false; }
     try {
-      const d = await services.create(clean);
+      const d = await services.create(clean, access);
       const addr = window.location.origin + d.url;
       const ok = await copyText(addr);
       await done("Added " + d.name + " (ID " + d.id + "). Address " + (ok ? "copied" : "shown below") + ": " + addr, d.id);
@@ -47,10 +47,19 @@ export function useServices({ onChange } = {}) {
     try { await services.remove(id); await done("Deleted."); } catch (e) { setMessage(e.message); load(); }
   }, [done, load]);
 
+  const setAccess = useCallback(async (id, access) => {
+    try { await services.setAccess(id, access); await done("Access changed."); } catch (e) { setMessage(e.message); load(); }
+  }, [done, load]);
+
+  const signOut = useCallback(async (id) => {
+    try { const d = await services.signOut(id); await done(d.signed_out ? "Signed out every OAuth session." : "No OAuth sessions were open."); }
+    catch (e) { setMessage(e.message); }
+  }, [done]);
+
   const copyAddress = useCallback(async (url) => {
     const ok = await copyText(window.location.origin + url);
     setMessage(ok ? "Address copied." : "Could not copy. Long-press the address to copy it manually.");
   }, []);
 
-  return { items, loaded, message, focusId, load, create, revoke, remove, copyAddress };
+  return { items, loaded, message, focusId, load, create, revoke, remove, copyAddress, setAccess, signOut };
 }

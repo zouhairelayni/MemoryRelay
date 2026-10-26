@@ -25,12 +25,24 @@ const PATHS = {
   moon: "M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5Z",
   info: "M12 11v6M12 7.5v.01M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z",
   phone: "M8 3h8a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1ZM11 18h2",
+  search: "M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14ZM20 20l-4-4",
+  eye: "M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12ZM12 14.8a2.8 2.8 0 1 0 0-5.6 2.8 2.8 0 0 0 0 5.6Z",
+  shield: "M12 3 4.5 6v5.5c0 4.4 3.1 8.3 7.5 9.5 4.4-1.2 7.5-5.1 7.5-9.5V6L12 3ZM9 12l2.2 2.2L15.5 10",
+  link: "M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1",
+  ban: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM5.6 5.6l12.8 12.8",
+  undo: "M9 6 4 11l5 5M4 11h10a5 5 0 0 1 0 10h-3",
+  bolt: "M13 3 5 13.5h6L10 21l8-10.5h-6L13 3Z",
+  refresh: "M20 11a8 8 0 0 0-14.5-3.5L4 9M4 4v5h5M4 13a8 8 0 0 0 14.5 3.5L20 15M20 20v-5h-5",
+  wand: "M5 19 17 7l2 2L7 21l-2-2ZM14 4v3M12.5 5.5h3M19 13v3M17.5 14.5h3",
+  save: "M5 4h11l3 3v13H5V4ZM8 4v5h7V4M8 20v-6h8v6",
+  clock: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM12 7v5l3 2",
+  signout: "M10 4H5v16h5M15 8l4 4-4 4M19 12H9",
   logout: "M10 4H5v16h5M15 8l4 4-4 4M19 12H9",
 };
 
 export default function Icon({ name, size = 20, className = "" }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65"
       strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={className}>
       <path d={PATHS[name] || ""} />
     </svg>

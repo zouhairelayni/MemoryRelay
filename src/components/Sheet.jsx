@@ -4,7 +4,7 @@ import { inertProps } from "../lib/inert.js";
 import { useSheetDrag } from "../hooks/useSheetDrag.js";
 
 // Full-height slide-over from the right. Swipe it right, press Esc or use the back button to close.
-export default function Sheet({ open, title, onClose, children }) {
+export default function Sheet({ open, title, onClose, closeLabel = "Close settings", children }) {
   const drag = useSheetDrag({ onClose });
   const { ref } = drag;
 
@@ -32,7 +32,7 @@ export default function Sheet({ open, title, onClose, children }) {
         onPointerDown={drag.onPointerDown} onPointerMove={drag.onPointerMove}
         onPointerUp={drag.onPointerUp} onPointerCancel={drag.onPointerCancel}>
         <header className="sheet-head">
-          <button type="button" className="icon-btn" onClick={onClose} aria-label="Close settings"><Icon name="back" /></button>
+          <button type="button" className="icon-btn" onClick={onClose} aria-label={closeLabel}><Icon name="back" /></button>
           <h2>{title}</h2>
         </header>
         <div className="sheet-body">{children}</div>

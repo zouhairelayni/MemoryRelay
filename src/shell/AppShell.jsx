@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef } from "react";
 import { AppContext } from "./AppContext.js";
-import { MODULES, TABS, TAB_IDS } from "../modules/index.js";
+import { TABS, TAB_IDS } from "../modules/index.js";
 import { useHashRoute } from "../hooks/useHashRoute.js";
 import { useOverview } from "../hooks/useOverview.js";
 import { usePersistent } from "../hooks/usePersistent.js";
@@ -46,12 +46,11 @@ export default function AppShell({ email, logout }) {
   }), [overview.counts, overview.status, overview.loadCounts, overview.test, select, email, doLogout, theme, setTheme, swipeTabs, setSwipeTabs]);
 
   const panes = TABS.map((m) => ({ id: m.id, title: m.title, node: <m.Screen active={m.id === tabId && !settingsOpen} /> }));
-  const title = (MODULES.find((m) => m.id === tabId) || MODULES[0]).title;
 
   return (
     <AppContext.Provider value={ctx}>
       <div className="shell">
-        <TopBar title={title} live={overview.status.live} onSettings={openSettings} />
+        <TopBar live={overview.status.live} onSettings={openSettings} />
         <main className="main">
           <Pager panes={panes} index={index} onChange={go} swipe={swipeTabs && !settingsOpen} />
         </main>

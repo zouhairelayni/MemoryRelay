@@ -1,3 +1,5 @@
 # Copy to .dev.vars for local development. Never commit .dev.vars.
 # Add future service secrets here and read them as env.NAME in the Worker.
 EXAMPLE_SECRET=change-me
+# Optional: require this token on the first-run account page (production: npx wrangler secret put SETUP_TOKEN)
+# SETUP_TOKEN=pick-a-long-random-string

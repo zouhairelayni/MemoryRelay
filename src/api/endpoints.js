@@ -4,7 +4,7 @@ import { del, get, post, put, request } from "./client.js";
 export const auth = {
   status: () => get("/auth/status"),
   login: (email, password) => post("/auth/login", { email, password }),
-  setup: (email, password) => post("/auth/setup", { email, password }),
+  setup: (email, password, setup_token) => post("/auth/setup", { email, password, setup_token }),
   logout: () => post("/auth/logout"),
 };
 
@@ -16,7 +16,9 @@ export const overview = {
 
 export const services = {
   list: () => get("/api/services").then((d) => d.services),
-  create: (name) => post("/api/services", { name }),
+  create: (name, access) => post("/api/services", { name, access }),
+  setAccess: (id, access) => put("/api/services/" + id + "/access", { access }),
+  signOut: (id) => post("/api/services/" + id + "/sessions/revoke"),
   revoke: (id) => post("/api/services/" + id + "/revoke"),
   remove: (id) => del("/api/services/" + id),
 };
@@ -60,10 +62,24 @@ export const skills = {
   remove: (name) => del("/api/skills/" + encodeURIComponent(name)),
   setMax: (max) => put("/api/skills/max", { max }),
   try: (request) => post("/api/skills/try", { request }),
+  get: (name) => get("/api/skills/" + encodeURIComponent(name)),
+  update: (name, text) => put("/api/skills/" + encodeURIComponent(name), { text }),
+  revert: (name) => post("/api/skills/" + encodeURIComponent(name) + "/revert"),
+  generate: (goal) => post("/api/skills/generate", { goal }),
+  improve: (text, instruction) => post("/api/skills/improve", { text, instruction }),
 };
 
-export const openrouter = {
-  state: () => get("/api/openrouter"),
-  op: (body) => post("/api/openrouter", body),
-  freeModels: () => get("/api/openrouter/models").then((d) => d.models),
+// OpenRouter, NVIDIA and OpenAI share one set of routes: /api/<id> and /api/<id>/models.
+export const provider = (id) => ({
+  state: () => get("/api/" + id),
+  op: (body) => post("/api/" + id, body),
+  models: () => get("/api/" + id + "/models").then((d) => d.models),
+});
+
+// Sub-agents: switch, hourly limit, routing, usage.
+export const delegation = {
+  get: () => get("/api/delegation"),
+  save: (patch) => put("/api/delegation", patch),
+  guide: () => get("/api/delegation/guide").then((d) => d.guide),
+  tryIt: (body) => post("/api/delegation/try", body),
 };

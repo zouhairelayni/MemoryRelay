@@ -26,12 +26,14 @@ export default function MemoryCard({ m, editing, onEdit, onCancel, onSave, onDel
   return (
     <div className={"mem" + (rule ? " is-rule" : "")}>
       <div className="mt">{m.text}</div>
-      {meta}
-      <ActionRow actions={[
-        { key: "edit", label: "Edit", icon: "pencil", onClick: () => onEdit(m.id) },
-        { key: "del", label: "Delete", icon: "trash", variant: "danger", onClick: () => onDelete(m.id),
-          confirm: { text: rule ? "Delete this rule?" : "Delete this memory?", yes: "Yes, delete" } },
-      ]} />
+      <div className="mem-foot">
+        {meta}
+        <ActionRow className="acts" actions={[
+          { key: "edit", label: "Edit memory", icon: "pencil", onClick: () => onEdit(m.id) },
+          { key: "del", label: "Delete memory", icon: "trash", variant: "danger", onClick: () => onDelete(m.id),
+            confirm: { text: rule ? "Delete this rule?" : "Delete this memory?", yes: "Yes, delete" } },
+        ]} />
+      </div>
     </div>
   );
 }

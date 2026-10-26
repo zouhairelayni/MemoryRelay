@@ -3,6 +3,8 @@ import { useSkills } from "../../hooks/useSkills.js";
 import { skills as api } from "../../api/endpoints.js";
 import { useApp } from "../../shell/AppContext.js";
 import Button from "../../components/Button.jsx";
+import IconButton from "../../components/IconButton.jsx";
+import SearchBar from "../../components/SearchBar.jsx";
 import Badge from "../../components/Badge.jsx";
 import Notice from "../../components/Notice.jsx";
 import Switch from "../../components/Switch.jsx";
@@ -10,6 +12,7 @@ import ActionRow from "../../components/ActionRow.jsx";
 import Collapse from "../../components/Collapse.jsx";
 import Segmented from "../../components/Segmented.jsx";
 import Icon from "../../components/Icon.jsx";
+import SkillStudio from "./SkillStudio.jsx";
 
 // The Skill Genie. Agents send their request; the Genie returns only the skills that fit.
 export default function SkillSelector({ active }) {
@@ -22,6 +25,7 @@ export default function SkillSelector({ active }) {
   const [tryText, setTryText] = useState("");
   const [trying, setTrying] = useState(null);
   const [open, setOpen] = useState({});
+  const [studio, setStudio] = useState(null);
   const [template, setTemplate] = useState("");
   const [limit, setLimit] = useState(5000);
   useEffect(() => { if (active) api.list().then((d) => { setTemplate(d.template); setLimit(d.max_tokens); }).catch(() => {}); }, [active]);
@@ -49,30 +53,12 @@ export default function SkillSelector({ active }) {
 
   return (
     <div className="stack">
-      <div className="card">
-        <div className="top">
-          <h3>Skill Genie</h3>
-          <div className="row" style={{ margin: 0, gap: 6 }}>
-            {pendingCount ? <Badge tone="rule">{pendingCount} pending</Badge> : null}
-            <Badge tone="tag">{enabledCount} on</Badge>
-          </div>
-        </div>
-        <p className="muted small" style={{ margin: "6px 0 0" }}>
-          Agents only send their request. The Genie picks up to {sk.max} matching skills (an AI model when a key is set, keywords otherwise)
-          and returns just those. Agents do not browse the library.
-        </p>
-        <div className="row">
-          <label className="lbl" htmlFor="sk-max">Max per request</label>
-          <input id="sk-max" className="fld" type="number" min="1" max="8" style={{ width: 90 }} value={sk.max}
-            onChange={(e) => sk.saveMax(e.target.value)} />
-        </div>
-      </div>
+      <SearchBar id="sk-q" type="search" placeholder="Search skills" value={q} onChange={(e) => setQ(e.target.value)}>
+        <IconButton id="sk-gen" icon="wand" label="Write a skill with AI" size="lg" onClick={() => setStudio({ fresh: true })} />
+        <IconButton id="sk-add-open" icon={adding ? "x" : "plus"} label={adding ? "Close" : "Add a skill"} variant="solid" size="lg" onClick={() => setAdding((a) => !a)} />
+      </SearchBar>
 
       <div className="card">
-        <div className="toolbar">
-          <input id="sk-q" className="fld" type="search" placeholder="Search skills" value={q} onChange={(e) => setQ(e.target.value)} />
-          <Button id="sk-add-open" icon="plus" onClick={() => setAdding((a) => !a)}>{adding ? "Close" : "Add"}</Button>
-        </div>
         <Collapse open={adding}>
           {adding ? (
             <div className="editor" style={{ marginTop: 12 }}>
@@ -90,11 +76,17 @@ export default function SkillSelector({ active }) {
             </div>
           ) : null}
         </Collapse>
-        <div className="filter" style={{ marginTop: 12 }}>
+        <div className="filter">
           <Segmented label="Filter skills" value={filter} onChange={setFilter} options={[
             { value: "all", label: "All", count: sk.items.length }, { value: "on", label: "On", count: enabledCount },
             { value: "off", label: "Off", count: sk.items.length - enabledCount },
           ]} />
+          <div className="cluster">
+            {pendingCount ? <Badge tone="rule">{pendingCount} to review</Badge> : null}
+            <label className="count-pill" htmlFor="sk-max" title="Skills sent per request">
+              Max <input id="sk-max" className="mini" type="number" min="1" max="8" value={sk.max} onChange={(e) => sk.saveMax(e.target.value)} />
+            </label>
+          </div>
         </div>
         <Notice tone={sk.message.tone} id="sk-msg">{sk.message.text}</Notice>
       </div>
@@ -115,10 +107,12 @@ export default function SkillSelector({ active }) {
               <Collapse open={isOpen}>
                 <div className="pad">
                   <p className="small" style={{ margin: 0, color: "var(--ink2)" }}>{s.description}</p>
+                  {s.warnings && s.warnings.length ? <Notice tone="bad">Check before use: {s.warnings.join("; ")}.</Notice> : null}
                   <ActionRow className="row" actions={[
-                    { key: "core", label: s.core ? "Stop always-on" : "Always on", icon: "check",
+                    { key: "edit", label: "Edit skill", icon: "pencil", onClick: () => setStudio({ name: s.name }) },
+                    { key: "core", label: s.core ? "Stop always sending it" : "Always send it", icon: "bolt", on: s.core,
                       onClick: () => sk.toggle(s.name, "core", !s.core) },
-                    { key: "del", label: "Delete", icon: "trash", variant: "danger", onClick: () => sk.remove(s.name),
+                    { key: "del", label: "Delete skill", icon: "trash", variant: "danger", onClick: () => sk.remove(s.name),
                       confirm: { text: "Delete the skill " + s.name + "?", yes: "Yes, delete" } },
                   ]} />
                 </div>
@@ -130,12 +124,15 @@ export default function SkillSelector({ active }) {
       </div>
 
       <div className="card">
-        <h3>Try the Genie</h3>
-        <p className="muted small" style={{ margin: "6px 0 0" }}>Type a request to see which skills an agent would receive.</p>
-        <div className="row">
-          <input id="sk-try" className="fld grow" placeholder="for example: make a remotion video" value={tryText} onChange={(e) => setTryText(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter" && tryText.trim()) runTry(); }} />
-          <Button id="sk-try-go" variant="ghost" onClick={runTry} disabled={!tryText.trim() || trying?.busy}>Ask</Button>
+        <div className="chead">
+          <span className="chip brass"><Icon name="skills" size={19} /></span>
+          <div className="grow"><h3>Try it</h3><div className="sub">See which skills an agent would receive for a request</div></div>
+        </div>
+        <div style={{ marginTop: 12 }}>
+          <SearchBar id="sk-try" icon="skills" placeholder="for example: make a remotion video" value={tryText} onChange={(e) => setTryText(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && tryText.trim()) runTry(); }}>
+            <IconButton id="sk-try-go" icon="up" label="Ask" variant="solid" size="lg" onClick={runTry} disabled={!tryText.trim() || trying?.busy} />
+          </SearchBar>
         </div>
         {trying && !trying.busy ? (
           <div className="stack" style={{ marginTop: 12 }}>
@@ -150,6 +147,8 @@ export default function SkillSelector({ active }) {
           </div>
         ) : null}
       </div>
+      <SkillStudio target={studio} onClose={() => setStudio(null)}
+        onSaved={(m, warn) => { sk.say(m, warn ? "bad" : "ok"); sk.load(); loadCounts(); }} />
     </div>
   );
 }

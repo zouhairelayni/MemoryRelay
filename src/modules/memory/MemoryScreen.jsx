@@ -2,8 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useApp } from "../../shell/AppContext.js";
 import { useMemories } from "../../hooks/useMemories.js";
 import { hasRule } from "../../lib/format.js";
-import Button from "../../components/Button.jsx";
 import Collapse from "../../components/Collapse.jsx";
+import IconButton from "../../components/IconButton.jsx";
+import PageHead from "../../components/PageHead.jsx";
+import SearchBar from "../../components/SearchBar.jsx";
 import Segmented from "../../components/Segmented.jsx";
 import MemoryCard from "./MemoryCard.jsx";
 import MemoryEditor from "./MemoryEditor.jsx";
@@ -35,6 +37,7 @@ export default function MemoryScreen({ active }) {
     () => mem.items.filter((m) => filter === "all" || (filter === "rules") === hasRule(m.tags)),
     [mem.items, filter]
   );
+  const rulesN = useMemo(() => mem.items.filter((m) => hasRule(m.tags)).length, [mem.items]);
   const reload = useCallback(() => mem.load(q), [mem, q]);
 
   const saveNew = async (body) => { await mem.add(body, q); setAdding(false); };
@@ -42,16 +45,11 @@ export default function MemoryScreen({ active }) {
 
   return (
     <div className="screen">
-      <div className="head">
-        <div className="eyebrow">Memory</div>
-        <h2>Shared memory</h2>
-        <p className="lede">What your agents know. Rules are protected: only you can change or delete them.</p>
-      </div>
+      <PageHead icon="memory" title="Shared memory" sub="What your agents know. Rules are yours alone." />
 
-      <div className="toolbar">
-        <input id="q" className="fld" type="search" placeholder="Search memories" value={q} onChange={(e) => setQ(e.target.value)} />
-        <Button id="add-open" icon="plus" onClick={() => setAdding((a) => !a)}>{adding ? "Close" : "Add"}</Button>
-      </div>
+      <SearchBar id="q" type="search" placeholder="Search memories" value={q} onChange={(e) => setQ(e.target.value)}>
+        <IconButton id="add-open" icon={adding ? "x" : "plus"} label={adding ? "Close" : "Add a memory"} variant="solid" size="lg" onClick={() => setAdding((a) => !a)} />
+      </SearchBar>
 
       <Collapse open={adding}>
         <div className="card" id="add-box">
@@ -64,11 +62,10 @@ export default function MemoryScreen({ active }) {
 
       <div className="filter">
         <Segmented label="Filter" value={filter} onChange={setFilter} options={[
-          { value: "all", label: "All" }, { value: "rules", label: "Rules" }, { value: "memories", label: "Memories" },
+          { value: "all", label: "All", count: mem.items.length },
+          { value: "rules", label: "Rules", count: rulesN },
+          { value: "memories", label: "Memories", count: mem.items.length - rulesN },
         ]} />
-        <span className="muted small" id="count">
-          {filter === "all" ? mem.items.length + " memories" : list.length + " of " + mem.items.length + " memories"}
-        </span>
       </div>
 
       <div id="items" className="stack">

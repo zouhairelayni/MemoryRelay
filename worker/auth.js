@@ -5,7 +5,7 @@
 //  - Login throttling: 5 wrong passwords lock that email (and that IP) for 15 minutes.
 //  - Setup works once: the owner row is inserted only if no user exists yet, in one statement.
 import { PBKDF2_ITER, SESSION_DAYS } from "./constants.js";
-import { fromHex, json, now, randomHex, toHex } from "./util.js";
+import { fromHex, json, now, randomHex, toHex, readObject } from "./util.js";
 
 const COOKIE = "__Host-sid";
 const MIN_PASSWORD = 12;
@@ -62,8 +62,7 @@ async function startSession(env, userId) {
   return sessionCookie(token, SESSION_DAYS * 86400);
 }
 
-async function readCreds(request, minLength = MIN_PASSWORD) {
-  const b = await request.json().catch(() => ({}));
+function readCreds(b, minLength = MIN_PASSWORD) {
   const email = String(b.email || "").trim().toLowerCase().slice(0, 254);
   const password = String(b.password || "");
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "enter a valid email" };
@@ -73,14 +72,14 @@ async function readCreds(request, minLength = MIN_PASSWORD) {
 }
 
 // Failed-login counters live in D1 so they hold across Worker instances.
-async function locked(env, keys) {
+export async function locked(env, keys) {
   for (const k of keys) {
     const r = await env.DB.prepare("SELECT fails, locked_until FROM login_fails WHERE key = ?").bind(k).first();
     if (r && r.locked_until > Date.now()) return true;
   }
   return false;
 }
-async function recordFail(env, keys) {
+export async function recordFail(env, keys) {
   for (const k of keys) {
     await env.DB.prepare(
       `INSERT INTO login_fails (key, fails, locked_until) VALUES (?, 1, 0)
@@ -89,7 +88,7 @@ async function recordFail(env, keys) {
     ).bind(k, MAX_FAILS, Date.now() + LOCK_MS).run();
   }
 }
-async function clearFails(env, keys) {
+export async function clearFails(env, keys) {
   for (const k of keys) await env.DB.prepare("DELETE FROM login_fails WHERE key = ?").bind(k).run();
 }
 const throttleKeys = (email, request) => [
@@ -98,9 +97,19 @@ const throttleKeys = (email, request) => [
 ];
 const TOO_MANY = { error: "too many wrong passwords. Wait 15 minutes and try again." };
 
+// Optional: set a SETUP_TOKEN secret (npx wrangler secret put SETUP_TOKEN) so nobody but you can create the owner account first.
 export async function authSetup(env, request) {
-  const c = await readCreds(request, MIN_PASSWORD);
+  const b = await readObject(request);
+  const c = readCreds(b, MIN_PASSWORD);
   if (c.error) return json({ error: c.error }, 400);
+  if (env.SETUP_TOKEN) {
+    const ipKey = ["setup-ip:" + (request.headers.get("cf-connecting-ip") || "unknown")];
+    if (await locked(env, ipKey)) return json(TOO_MANY, 429);
+    if (!sameText(String(b.setup_token || ""), String(env.SETUP_TOKEN))) {
+      await recordFail(env, ipKey);
+      return json({ error: "the setup token is wrong" }, 403);
+    }
+  }
   const { hash, salt } = await hashPassword(c.password);
   // One statement: the row is written only if there is still no user, so two simultaneous setups cannot both win.
   const r = await env.DB.prepare(
@@ -112,7 +121,7 @@ export async function authSetup(env, request) {
 
 export async function authLogin(env, request) {
   // Login accepts any length, so accounts created before the 12-character rule can still sign in.
-  const c = await readCreds(request, 1);
+  const c = readCreds(await readObject(request), 1);
   if (c.error) return json({ error: c.error }, 400);
   const keys = throttleKeys(c.email, request);
   if (await locked(env, keys)) return json(TOO_MANY, 429);
@@ -130,7 +139,7 @@ export async function auth(request, env, url) {
   const p = url.pathname, m = request.method;
   if (p === "/auth/status" && m === "GET") {
     const user = await currentUser(env, request);
-    return json({ setup: (await userCount(env)) === 0, loggedIn: !!user, email: user ? user.email : "" });
+    return json({ setup: (await userCount(env)) === 0, loggedIn: !!user, email: user ? user.email : "", setup_token: !!env.SETUP_TOKEN });
   }
   if (p === "/auth/setup" && m === "POST") return authSetup(env, request);
   if (p === "/auth/login" && m === "POST") return authLogin(env, request);

@@ -1,9 +1,10 @@
 import { useState } from "react";
 import Button from "./Button.jsx";
+import IconButton from "./IconButton.jsx";
 
-// A row of buttons. An action with `confirm: { text, yes }` swaps the whole row for an
-// inline "are you sure?" with two buttons (no native popup).
-// actions: [{ key, label, icon, variant, onClick, confirm? }]
+// A cluster of icon buttons (the label is the tooltip). An action with `confirm: { text, yes }` swaps
+// the cluster for an inline "are you sure?" with two buttons (no native popup).
+// actions: [{ key, label, icon, variant, onClick, confirm?, disabled?, on? }]
 export default function ActionRow({ actions, className = "acts" }) {
   const [pending, setPending] = useState(null);
   const act = actions.find((a) => a.key === pending);
@@ -18,11 +19,14 @@ export default function ActionRow({ actions, className = "acts" }) {
     );
   }
   return (
-    <div className={className}>
-      {actions.map((a) => (
-        <Button key={a.key} small variant={a.variant || "ghost"} icon={a.icon} disabled={a.disabled}
-          onClick={() => (a.confirm ? setPending(a.key) : a.onClick())}>{a.label}</Button>
-      ))}
+    <div className={className + " cluster"}>
+      {actions.map((a) => {
+        const go = () => (a.confirm ? setPending(a.key) : a.onClick());
+        return a.icon
+          ? <IconButton key={a.key} icon={a.icon} label={a.label} disabled={a.disabled} onClick={go}
+              variant={a.on ? "on" : a.variant === "danger" ? "danger" : a.variant === "solid" ? "solid" : ""} />
+          : <Button key={a.key} small variant={a.variant || "ghost"} disabled={a.disabled} onClick={go}>{a.label}</Button>;
+      })}
     </div>
   );
 }

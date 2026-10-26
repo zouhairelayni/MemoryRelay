@@ -1,7 +1,8 @@
 // Gemini key and model pools with rotation, cooldowns and retry handling.
 import { MAX_CALLS, RETRYABLE } from "./constants.js";
+import { AI_FAST, AI_LONG, fetchIdle, isSse, sseEvents } from "./aifetch.js";
 import { getConfig, setConfig } from "./db.js";
-import { newId, now, runAll, sleep } from "./util.js";
+import { newId, now, runAll, safeJson, sleep, readObject } from "./util.js";
 
 export async function listGeminiModels(key) {
   let r;
@@ -20,17 +21,37 @@ export async function listGeminiModels(key) {
   return { models };
 }
 
-export async function callGemini(key, model, prompt) {
+export async function callGemini(key, model, prompt, opts = {}) {
+  const generationConfig = {};
+  if (opts.json !== false) generationConfig.responseMimeType = "application/json";
+  if (opts.maxTokens) generationConfig.maxOutputTokens = opts.maxTokens;
+  if (opts.temperature !== undefined) generationConfig.temperature = opts.temperature;
   try {
-    return await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+    // Long jobs stream, so every chunk proves the model is still working (see aifetch.js).
+    const method = opts.long ? "streamGenerateContent?alt=sse" : "generateContent";
+    return await fetchIdle(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:${method}`, {
       method: "POST",
       headers: { "content-type": "application/json", "x-goog-api-key": key },
-      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json" } }),
-    });
+      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig,
+        ...(opts.system ? { systemInstruction: { parts: [{ text: String(opts.system) }] } } : {}) }),
+    }, opts.long ? AI_LONG : AI_FAST);
   } catch (e) {
     // Network failure: report it like a failed response so rotation carries on to the next key or model.
     return { ok: false, status: 0, json: async () => ({}), text: async () => String((e && e.message) || e) };
   }
+}
+
+// Reads a Gemini answer, streamed (SSE) or whole (JSON).
+export function readGemini(body) {
+  const events = isSse(body) ? sseEvents(body) : [safeJson(body, null)];
+  let text = "", finish = "";
+  for (const d of events) {
+    const c = d && d.candidates && d.candidates[0];
+    if (!c) continue;
+    text += ((c.content && c.content.parts) || []).filter((x) => !x.thought).map((x) => x.text || "").join("");
+    if (c.finishReason) finish = c.finishReason;
+  }
+  return { text, truncated: finish === "MAX_TOKENS" };
 }
 
 export async function setCooldown(env, keyId, model, ms) {
@@ -42,11 +63,12 @@ export async function setCooldown(env, keyId, model, ms) {
 // Tries every enabled model in order; for each model, tries every enabled key
 // (starting from a round-robin position). Handles 429 (cooldown), 503/5xx (one retry),
 // and 401/403 (disables the key).
-export async function gemini(env, prompt) {
+export async function gemini(env, prompt, opts = {}) {
   const keys = (await env.DB.prepare("SELECT id, label, key FROM gemini_keys WHERE enabled = 1 ORDER BY created").all()).results;
-  const models = (await env.DB.prepare("SELECT name FROM gemini_models WHERE enabled = 1 ORDER BY pos, name").all()).results.map((m) => m.name);
+  let models = (await env.DB.prepare("SELECT name FROM gemini_models WHERE enabled = 1 ORDER BY pos, name").all()).results.map((m) => m.name);
   if (!keys.length) return { error: "no enabled Gemini key (add one in the dashboard)" };
-  if (!models.length) return { error: "no enabled Gemini model (add one in the dashboard)" };
+  if (opts.onlyModel) models = models.filter((m) => m === opts.onlyModel);
+  if (!models.length) return { error: opts.onlyModel ? "model " + opts.onlyModel + " is not enabled for Gemini" : "no enabled Gemini model (add one in the dashboard)" };
 
   const cool = await env.DB.prepare("SELECT key_id, model FROM gemini_cooldowns WHERE until > ?").bind(Date.now()).all();
   const cooling = new Set(cool.results.map((c) => c.key_id + "|" + c.model));
@@ -57,24 +79,25 @@ export async function gemini(env, prompt) {
 
   const log = [];
   let calls = 0;
+  const t0 = Date.now(), budget = (opts.long ? AI_LONG : AI_FAST).deadlineMs;
   for (const model of models) {
     for (const k of rotated) {
       const tag = `${k.label}/${model}`;
+      if (Date.now() - t0 > budget) { log.push("time budget used up"); return { error: log.join("; ") }; }
       if (cooling.has(k.id + "|" + model)) { log.push(`${tag}: cooling down`); continue; }
       if (calls >= MAX_CALLS) { log.push("attempt limit reached"); return { error: log.join("; ") }; }
 
       calls++;
-      let r = await callGemini(k.key, model, prompt);
-      if (RETRYABLE.has(r.status) && calls < MAX_CALLS) {
+      let r = await callGemini(k.key, model, prompt, opts);
+      if (RETRYABLE.has(r.status) && calls < MAX_CALLS && Date.now() - t0 < budget / 2) {
         await sleep(1500);
         calls++;
-        r = await callGemini(k.key, model, prompt);
+        r = await callGemini(k.key, model, prompt, opts);
       }
 
       if (r.ok) {
-        const d = await r.json();
-        const text = d?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text) return { text, model, key: k.label };
+        const a = readGemini(await r.text());
+        if (a.text) return { text: a.text, model, key: k.label, truncated: a.truncated };
         log.push(`${tag}: empty reply`);
         continue;
       }
@@ -88,7 +111,7 @@ export async function gemini(env, prompt) {
         await env.DB.prepare("UPDATE gemini_keys SET enabled = 0 WHERE id = ?").bind(k.id).run();
         log.push(`${tag}: key rejected, disabled`);
       } else {
-        log.push(`${tag}: ${r.status ? "HTTP " + r.status : "network error"}${RETRYABLE.has(r.status) ? " (after retry)" : ""}`);
+        log.push(`${tag}: ${r.status ? "HTTP " + r.status : "network error (" + body.slice(0, 90) + ")"}${RETRYABLE.has(r.status) ? " (after retry)" : ""}`);
       }
     }
   }
@@ -109,7 +132,7 @@ export async function geminiState(env) {
 }
 
 export async function geminiOp(env, request) {
-  const b = await request.json().catch(() => ({}));
+  const b = await readObject(request);
   switch (b.op) {
     case "add_key": {
       const key = String(b.key || "").trim();

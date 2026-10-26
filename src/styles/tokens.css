@@ -1,29 +1,29 @@
 /* Design tokens (the Memory Atlas palette). Light by default, dark by system setting or by data-theme. */
 :root {
-  --paper: #F5F1EA; --paper2: #EDE7DC; --card: #FBF9F5; --ink: #1B2230; --ink2: #4A5263; --muted: #838896;
-  --line: #DCD5C8; --teal: #1E6F68; --teal-soft: #D6EAE6; --brass: #A97E36; --brass-soft: #F2E7D2;
+  --paper: #F4F1EA; --paper2: #ECE8DF; --card: #FFFEFB; --ink: #141A24; --ink2: #475060; --muted: #7C8493;
+  --line: #E3DDD0; --teal: #17635C; --teal-soft: #DCEDE9; --brass: #A9803A; --brass-soft: #F3E9D4;
   --rose: #A4493F; --rose-soft: #F5DFDB; --info: #E6EDF3; --info-line: #C6D3DF; --info-ink: #40566B;
-  --shadow: 0 1px 2px rgba(27,34,48,.05), 0 12px 32px -18px rgba(27,34,48,.25);
+  --shadow: 0 1px 1px rgba(20,26,36,.04), 0 2px 6px rgba(20,26,36,.03), 0 22px 44px -26px rgba(20,26,36,.32);
   --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
   --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  --r: 18px;
-  --tabbar: 68px;
+  --r: 22px;
+  --tabbar: 64px;
   --topbar: 58px;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --paper: #13161E; --paper2: #1A1E28; --card: #1E2330; --ink: #EDE8DE; --ink2: #BDB8AD; --muted: #7E8594;
-    --line: #333A49; --teal: #5FC2B8; --teal-soft: #1B3B39; --brass: #D9B26E; --brass-soft: #362C1C;
+    --paper: #0F1218; --paper2: #151922; --card: #181C26; --ink: #F0ECE2; --ink2: #BDB9AE; --muted: #7F8695;
+    --line: #2A3040; --teal: #6DD0C5; --teal-soft: #173431; --brass: #D9B26E; --brass-soft: #362C1C;
     --rose: #E38B81; --rose-soft: #3A221F; --info: #1D2935; --info-line: #324457; --info-ink: #B7C8D9;
     --shadow: 0 1px 2px rgba(0,0,0,.3), 0 16px 40px -20px rgba(0,0,0,.6);
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --paper: #13161E; --paper2: #1A1E28; --card: #1E2330; --ink: #EDE8DE; --ink2: #BDB8AD; --muted: #7E8594;
-  --line: #333A49; --teal: #5FC2B8; --teal-soft: #1B3B39; --brass: #D9B26E; --brass-soft: #362C1C;
+  --paper: #0F1218; --paper2: #151922; --card: #181C26; --ink: #F0ECE2; --ink2: #BDB9AE; --muted: #7F8695;
+  --line: #2A3040; --teal: #6DD0C5; --teal-soft: #173431; --brass: #D9B26E; --brass-soft: #362C1C;
   --rose: #E38B81; --rose-soft: #3A221F; --info: #1D2935; --info-line: #324457; --info-ink: #B7C8D9;
   --shadow: 0 1px 2px rgba(0,0,0,.3), 0 16px 40px -20px rgba(0,0,0,.6);
   color-scheme: dark;
