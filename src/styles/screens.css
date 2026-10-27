@@ -1,0 +1,78 @@
+/* Screens: Live, Memory, Agents. Agent identity = cable colour (--cable), set inline per agent. */
+.cd{width:10px;height:10px;border-radius:50%;background:var(--cable,var(--muted));flex:none;display:inline-block}
+
+/* Live */
+.status{display:flex;align-items:center;gap:18px;padding:8px 2px 4px}
+.ring{position:relative;width:76px;height:76px;flex:none;color:var(--mint)}
+.ring.bad{color:var(--rose)}
+.ring.idle{color:var(--muted)}
+.ring svg{width:100%;height:100%;overflow:visible;transform:rotate(-90deg)}
+.ring-bg{fill:none;stroke:var(--paper2);stroke-width:5}
+.ring-fg{fill:none;stroke:currentColor;stroke-width:5;stroke-linecap:round;stroke-dasharray:176;stroke-dashoffset:176;animation:ringdraw 900ms var(--ease-out) .15s forwards}
+.ring.idle .ring-fg{stroke-dashoffset:132;animation:none}
+.ring .mark{position:absolute;inset:0;display:grid;place-items:center}
+.ring .mark svg{width:28px;height:28px;transform:none}
+.status-t{font:700 clamp(26px,7.6vw,32px)/1.08 var(--display);letter-spacing:-.03em;overflow-wrap:anywhere}
+.status-s{color:var(--muted);font-size:14px;margin-top:4px}
+.status-acts{display:flex;gap:2px;margin:8px 0 0 -10px}
+.agent-row,.lib-row,.attn{display:flex;align-items:center;gap:14px;width:100%;min-height:60px;padding:12px 8px 12px 16px;background:transparent;border:0;color:inherit;font:inherit;text-align:left;cursor:pointer;transition:background var(--t-base) var(--ease-out),transform var(--t-fast) var(--ease-out)}
+.agent-row:active,.lib-row:active,.attn:active{background:var(--paper2)}
+.agent-row:focus-visible,.lib-row:focus-visible,.attn:focus-visible{outline:2px solid var(--cobalt);outline-offset:-2px}
+.agent-row .tt b,.lib-row .tt b{font-size:16px}
+.rwd{display:flex;gap:12px;font-size:13px;color:var(--ink2);font-variant-numeric:tabular-nums}
+.rwd span{display:inline-flex;align-items:center;gap:4px}
+.rwd svg{color:var(--muted)}
+.lib-n{font:650 22px var(--display);letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.attn .chip{background:var(--brass-soft);color:var(--brass)}
+.attn.bad .chip{background:var(--rose-soft);color:var(--rose)}
+
+/* Memory: a row is the memory itself; actions appear when it is opened */
+.mem{padding:0}
+.mem-main{display:flex;flex-direction:column;gap:8px;width:100%;text-align:left;background:transparent;border:0;padding:14px 16px;color:inherit;font:inherit;cursor:pointer;min-height:56px}
+.mem-main:focus-visible{outline:2px solid var(--cobalt);outline-offset:-2px}
+.mem .mt{font-size:16px;line-height:1.45;color:var(--ink);overflow-wrap:anywhere;white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.mem.open .mt{-webkit-line-clamp:unset;display:block}
+.mem .meta{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center;font-size:13px;color:var(--muted)}
+.src{display:inline-flex;align-items:center;gap:6px;color:var(--ink2);font-weight:560}
+.tag-rule{display:inline-flex;align-items:center;gap:4px;color:var(--brass);font-weight:620}
+.mem-acts{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 10px 8px 16px}
+.mem-acts .id{font-size:12px;color:var(--muted)}
+.mem>.pad{padding:12px 16px}
+
+/* Agents */
+.cables{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 4px;scrollbar-width:none}
+.cables::-webkit-scrollbar{display:none}
+.cable-chip{flex:none;display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 16px;border-radius:999px;border:0;background:var(--card);box-shadow:inset 0 0 0 1px var(--hair);color:var(--ink2);font:600 14px var(--sans);cursor:pointer;transition:background var(--t-base) var(--ease-out),color var(--t-base) var(--ease-out),box-shadow var(--t-base) var(--ease-out),transform var(--t-fast) var(--ease-out)}
+.cable-chip:active{transform:scale(.96)}
+.cable-chip.on{background:color-mix(in srgb,var(--cable) 13%,var(--card));color:var(--ink);box-shadow:inset 0 0 0 1.5px var(--cable)}
+.cable-chip:focus-visible{outline:2px solid var(--cobalt);outline-offset:2px}
+.agent-card-wrap{touch-action:pan-y;outline:none;transition:transform 260ms var(--ease-out),opacity 260ms var(--ease-out)}
+.agent-card-wrap.swipeable{cursor:grab}
+.agent-card-wrap.swipeable:active{cursor:grabbing}
+.agent-card-wrap.dragging{user-select:none;-webkit-user-select:none}
+.agent-card-wrap:focus-visible{outline:2px solid var(--cobalt);outline-offset:4px;border-radius:var(--r)}
+.agent-card-wrap.exit-left{transform:translateX(-40px);opacity:0}
+.agent-card-wrap.exit-right{transform:translateX(40px);opacity:0}
+.agent-card-wrap.enter-from-right{transform:translateX(40px);opacity:0;transition:none}
+.agent-card-wrap.enter-from-left{transform:translateX(-40px);opacity:0;transition:none}
+.agent-hint{text-align:center;color:var(--muted);font-size:13px;margin:0}
+.conn{box-shadow:inset 0 3px 0 var(--cable,var(--cobalt)),inset 0 0 0 1px var(--hair)}
+.conn.off{opacity:.78}
+.conn .cpad{padding:18px 18px 14px}
+.conn h3{overflow-wrap:anywhere;font-size:20px}
+.conn .pad{padding:0 18px 8px}
+.metrics{display:grid;grid-template-columns:repeat(3,1fr);margin-top:16px}
+.metric{display:flex;flex-direction:column;gap:2px;padding:0 0 0 14px;box-shadow:inset 1px 0 0 var(--hair)}
+.metric:first-child{padding-left:0;box-shadow:none}
+.metric b{font:650 26px/1 var(--display);letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.metric span{display:inline-flex;align-items:center;gap:5px;font-size:13px;color:var(--muted)}
+.split{display:flex;height:4px;border-radius:999px;background:var(--paper2);overflow:hidden;margin:14px 0 0}
+.split i{display:block;height:100%;transition:width 500ms var(--ease-out)}
+.split .r{background:var(--cobalt)}
+.split .w{background:var(--amber)}
+.split .d{background:var(--rose)}
+.conn-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 10px 10px 14px;border-top:1px solid var(--hair)}
+.chev-btn svg{transition:transform var(--t-drawer) var(--ease-drawer)}
+.dcard.open .chev-btn svg{transform:rotate(180deg)}
+.num-i{font:650 15px var(--sans);font-variant-numeric:tabular-nums}
+.ok-amber{color:var(--brass);font-weight:620}

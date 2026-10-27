@@ -19,7 +19,7 @@ export default function AccessPicker({ value, onChange, disabled = false }) {
           </button>
         ))}
       </div>
-      <span className="small"><b>{cur.label}</b><span className="muted"> · {cur.hint}</span></span>
+      <span className="small"><b>{cur.label}</b><span className="muted"> {cur.hint}</span></span>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { useServices } from "../../hooks/useServices.js";
 import { usePolling } from "../../hooks/usePolling.js";
 import { useSwipeDeck } from "../../hooks/useSwipeDeck.js";
 import { copyText } from "../../lib/clipboard.js";
+import { cableColor } from "../../lib/cable.js";
 import IconButton from "../../components/IconButton.jsx";
 import Icon from "../../components/Icon.jsx";
 import Notice from "../../components/Notice.jsx";
@@ -54,6 +55,17 @@ export default function AgentsScreen({ active }) {
         <Notice id="svc-msg">{svc.message}</Notice>
       </div>
 
+      {items.length ? (
+        <div className="cables" id="conn-dots" role="tablist" aria-label="Connections">
+          {items.map((c, i) => (
+            <button key={c.id} type="button" role="tab" aria-selected={i === idx} className={"cable-chip" + (i === idx ? " on" : "")} data-go={i}
+              style={{ "--cable": cableColor(c.name) }} onClick={() => deck.go(i, i > idx ? 1 : -1)}>
+              <i className="cd" />{c.name}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
       <div id="services" className="agent-card-wrap" tabIndex={0} aria-live="polite"
         data-noswipe={items.length > 1 ? "" : undefined} {...deck.wrapProps}>
         {cur ? (
@@ -65,13 +77,7 @@ export default function AgentsScreen({ active }) {
         )}
       </div>
 
-      <div className="agent-dots" id="conn-dots">
-        {items.length > 1 ? items.map((c, i) => (
-          <button key={c.id} type="button" className={"dot-i" + (i === idx ? " on" : "")} data-go={i}
-            aria-label={"Show " + c.name} onClick={() => deck.go(i, i > idx ? 1 : -1)} />
-        )) : null}
-      </div>
-      {items.length > 1 ? <p className="agent-hint" id="conn-hint">Swipe left or right to browse</p> : null}
+      {items.length > 1 ? <p className="agent-hint" id="conn-hint">Swipe the card or tap a name to switch</p> : null}
 
       <div className="card">
         <div className="chead">

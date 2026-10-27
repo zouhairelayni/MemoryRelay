@@ -36,6 +36,8 @@ const PATHS = {
   wand: "M5 19 17 7l2 2L7 21l-2-2ZM14 4v3M12.5 5.5h3M19 13v3M17.5 14.5h3",
   save: "M5 4h11l3 3v13H5V4ZM8 4v5h7V4M8 20v-6h8v6",
   clock: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM12 7v5l3 2",
+  live: "M3 12h4l3-7 4 14 3-7h4",
+  models: "M8 8h8v8H8V8ZM4 10h2M4 14h2M18 10h2M18 14h2M10 4v2M14 4v2M10 18v2M14 18v2",
   signout: "M10 4H5v16h5M15 8l4 4-4 4M19 12H9",
   logout: "M10 4H5v16h5M15 8l4 4-4 4M19 12H9",
 };
@@ -43,7 +45,7 @@ const PATHS = {
 export default function Icon({ name, size = 20, className = "" }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65"
-      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={className}>
+      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={(name === "check" ? "i-check " : "") + className}>
       <path d={PATHS[name] || ""} />
     </svg>
   );

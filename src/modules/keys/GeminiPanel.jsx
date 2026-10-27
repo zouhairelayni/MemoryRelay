@@ -42,7 +42,7 @@ export default function GeminiPanel({ active }) {
             {g.keys.map((k) => (
               <KeyRow key={k.id} enabled={k.enabled} onToggle={() => g.op({ op: "toggle_key", id: k.id })}
                 lead={<span className={"ic " + (k.enabled ? "ok" : "lock")}><Icon name={k.enabled ? "check" : "lock"} size={18} /></span>}
-                title={k.label} sub={"...." + k.tail + (k.cooling.length ? " · cooling" : "")}
+                title={k.label} sub={"Ends in " + k.tail + (k.cooling.length ? ", cooling down" : "")}
                 note={(k.enabled ? "Used in rotation." : "Switched off. It is skipped until you turn it back on.") +
                   (k.cooling.length ? " Cooling down for: " + k.cooling.join(", ") + "." : "")}
                 actions={[{ key: "del", label: "Delete key", icon: "trash", variant: "danger",

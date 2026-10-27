@@ -150,7 +150,7 @@ export async function editMemory(env, id, b) {
 export async function listMemories(env, q) {
   const { where, params } = searchWhere(q);
   const { results } = await env.DB.prepare(
-    `SELECT id, text, tags, created AS time FROM memories ${where} ORDER BY created DESC, rowid DESC LIMIT 500`
+    `SELECT id, text, tags, source, created AS time FROM memories ${where} ORDER BY created DESC, rowid DESC LIMIT 500`
   ).bind(...params).all();
   return { count: results.length, items: results };
 }

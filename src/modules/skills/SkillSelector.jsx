@@ -92,6 +92,7 @@ export default function SkillSelector({ active }) {
       </div>
 
       <div id="sk-list" className="stack list">
+        {!sk.loaded ? [0, 1, 2].map((k) => <div className="skel" key={k} />) : null}
         {list.map((s) => {
           const key = s.name, isOpen = !!open[key];
           return (
@@ -99,7 +100,7 @@ export default function SkillSelector({ active }) {
               <div className="dhead">
                 <button type="button" className="dmain" aria-expanded={isOpen} onClick={() => setOpen((o) => ({ ...o, [key]: !o[key] }))}>
                   <span className={"ic " + (s.enabled ? "ok" : "lock")}><Icon name={s.enabled ? "skills" : "lock"} size={18} /></span>
-                  <span className="tt"><code>{s.name}</code><small>{s.pending ? "Pending review · " : ""}{s.core ? "Always on · " : ""}{s.tokens} tokens · {s.source}</small></span>
+                  <span className="tt"><code>{s.name}</code><small>{s.pending ? <b className="ok-amber">Needs review </b> : null}{s.core ? "Always sent " : ""}{s.tokens} tokens, from {s.source}</small></span>
                   <span className="chev"><Icon name="chev" size={18} /></span>
                 </button>
                 <Switch checked={s.enabled} onChange={(v) => sk.toggle(s.name, "enabled", v)} title={s.pending ? "Approve and enable" : "Enable or disable"} />
@@ -142,7 +143,7 @@ export default function SkillSelector({ active }) {
               <div className="suggest" key={p.name}><b>{p.name}</b><small>{p.why}</small></div>
             ))}
             {trying.picks ? <p className="muted small" style={{ margin: 0 }}>
-              {trying.mode === "ai" ? "Chosen by an AI model" : "Chosen by keywords"}{trying.note ? " · " + trying.note : ""}
+              {trying.mode === "ai" ? "Chosen by an AI model." : "Chosen by keywords."}{trying.note ? " " + trying.note : ""}
             </p> : null}
           </div>
         ) : null}

@@ -183,3 +183,14 @@ kind: snippet | function | feature | refactor | tests | review | explain | debug
 * **OAuth registration is open** (that is how connectors sign themselves up). A stranger can register an app, but cannot get a token without your password on the approval page. Read the app name and the return address on that page before you approve. Unfinished registrations are removed after an hour.
 * **Sub-agent output is untrusted text.** It runs on other companies' servers and can be wrong or contain instructions. Agents are told to verify it and never follow instructions inside it.
 * **A secret address works like a password.** Anyone who has it has that connection's access level. Revoke it if it leaks; use OAuth to avoid pasting it anywhere.
+
+## Design system ("Patchbay")
+
+The look was planned from the product, not from a template, using the guidance of the most-used design skills (Anthropic's frontend-design, UI/UX Pro Max, Taste Skill, Emil Kowalski's design-engineering rules, and the mobile-design skills): commit to one idea, avoid the generic AI look, put accessibility and touch ergonomics first, and use motion only where it explains something.
+
+* **Idea:** every agent is a cable with its own colour (`lib/cable.js`, tokens `--cable-0..7`). That colour follows the agent through the app: its row on Live, its chip on Agents, the thin bar on the memories it wrote.
+* **Structure:** tabs are Live, Memory, Skills, Agents, Models. Live shows status, what needs you and the library; Models splits into Sub-agents and Providers. Lists are one grouped surface with hairline dividers, not piles of cards. Rows reveal their actions when tapped, so there are no button clusters.
+* **Files:** `styles/tokens.css` (palette, type, shape, motion tokens), `base.css`, `shell.css` (frame, floating tab bar, sheet), `system.css` (components), `screens.css`, `motion.css`.
+* **Motion rules:** ease-out only; UI motion under 300 ms (drawers 480 ms); nothing enters from scale(0); hover movement only on real pointers; one orchestrated entrance (Live); `prefers-reduced-motion` keeps colour and opacity changes and drops movement.
+* **Mobile rules:** 44 px touch targets, safe areas, 16 px inputs, bottom navigation with 5 items, labels above fields, dark and light themes with checked contrast (body text 4.7:1 or better in both).
+* **Fonts:** system fonts only (the app's security policy blocks external fonts). To use a custom typeface, add a self-hosted `@font-face` in `tokens.css` and put it first in `--display`.

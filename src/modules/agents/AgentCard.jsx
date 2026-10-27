@@ -5,6 +5,7 @@ import IconButton from "../../components/IconButton.jsx";
 import ActionRow from "../../components/ActionRow.jsx";
 import AccessPicker from "../../components/AccessPicker.jsx";
 import { fmtBytes, pct } from "../../lib/format.js";
+import { cableColor } from "../../lib/cable.js";
 
 // One connection: who it is, what it did, what it may do, and its few actions.
 export default function AgentCard({ s, open, onToggle, onCopy, onRevoke, onDelete, onAccess, onSignOut }) {
@@ -21,20 +22,20 @@ export default function AgentCard({ s, open, onToggle, onCopy, onRevoke, onDelet
       ];
 
   return (
-    <article className={"dcard conn" + (s.revoked ? " off" : "") + (open ? " open" : "")}>
+    <article className={"dcard conn" + (s.revoked ? " off" : "") + (open ? " open" : "")} style={{ "--cable": cableColor(s.name) }}>
       <div className="cpad">
         <div className="chead">
-          <span className={"chip " + (s.revoked ? "lock" : "")}><Icon name="agents" size={19} /></span>
+          <span className={"chip " + (s.revoked ? "lock" : "")} style={s.revoked ? undefined : { background: "color-mix(in srgb, var(--cable) 16%, var(--card))", color: "var(--cable)" }}><Icon name="agents" size={19} /></span>
           <div className="grow">
             <h3>{s.name}</h3>
-            <div className="sub">{s.app || "No app reported yet"}{s.sessions ? " · " + s.sessions + " signed in" : ""}</div>
+            <div className="sub">{s.sessions ? s.sessions + " signed in with OAuth" : s.app || "No app reported yet"}</div>
           </div>
           <Badge tone={s.revoked ? "bad" : "ok"}>{s.revoked ? "Revoked" : "Active"}</Badge>
         </div>
         <div className="metrics">
-          <div className="metric"><Icon name="eye" size={17} /><div><b>{s.n_read}</b><span>Reads</span></div></div>
-          <div className="metric"><Icon name="pencil" size={17} /><div><b>{s.n_write}</b><span>Writes</span></div></div>
-          <div className="metric"><Icon name="trash" size={17} /><div><b>{s.n_delete}</b><span>Deletes</span></div></div>
+          <div className="metric"><b>{s.n_read}</b><span><Icon name="eye" size={14} />Reads</span></div>
+          <div className="metric"><b>{s.n_write}</b><span><Icon name="pencil" size={14} />Writes</span></div>
+          <div className="metric"><b>{s.n_delete}</b><span><Icon name="trash" size={14} />Deletes</span></div>
         </div>
         <div className="split" aria-hidden="true">
           <i className="r" style={{ width: pct(s.n_read, total) + "%" }} />

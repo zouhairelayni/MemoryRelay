@@ -4,9 +4,9 @@ import App from "./App.jsx";
 import "./styles/tokens.css";
 import "./styles/base.css";
 import "./styles/shell.css";
-import "./styles/cards.css";
-import "./styles/forms.css";
-import "./styles/premium.css";
+import "./styles/system.css";
+import "./styles/screens.css";
+import "./styles/motion.css";
 
 createRoot(document.getElementById("root")).render(<StrictMode><App /></StrictMode>);
 

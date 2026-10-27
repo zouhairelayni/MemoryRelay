@@ -91,7 +91,7 @@ export default function DelegationPanel({ active }) {
                   <span className={"ic " + (on && ready ? "ok" : "lock")}>{on ? <span className="num-i">{pos + 1}</span> : <Icon name="lock" size={18} />}</span>
                   <span className="tt">
                     <b>{p.title}</b>
-                    <small>{p.keys} key{p.keys === 1 ? "" : "s"} · {p.models} model{p.models === 1 ? "" : "s"}{!ready ? " · add a key and a model" : ""}{p.paid ? " · paid" : ""}</small>
+                    <small>{p.keys} key{p.keys === 1 ? "" : "s"}, {p.models} model{p.models === 1 ? "" : "s"}{!ready ? ". Add a key and a model." : ""}{p.paid ? " Paid." : ""}</small>
                   </span>
                 </div>
                 {on ? <ActionRow className="acts" actions={[
@@ -123,8 +123,8 @@ export default function DelegationPanel({ active }) {
         <div className="stack list" style={{ marginTop: 10 }}>
           {d.recent.map((r) => (
             <div className="suggest" key={r.id}>
-              <b>{r.agent || "connection"} · {r.kind || "job"} <Badge tone={r.ok ? "ok" : "bad"}>{r.ok ? "Done" : "Failed"}</Badge></b>
-              <small>{r.ok ? r.provider + " / " + r.model + " · ~" + r.tokens_in + " in, ~" + r.tokens_out + " out · " + Math.round(r.ms / 100) / 10 + "s" : r.error}</small>
+              <b>{r.agent || "connection"}, {r.kind || "job"} <Badge tone={r.ok ? "ok" : "bad"}>{r.ok ? "Done" : "Failed"}</Badge></b>
+              <small>{r.ok ? r.provider + " / " + r.model + ", about " + r.tokens_in + " tokens in and " + r.tokens_out + " out, " + Math.round(r.ms / 100) / 10 + "s" : r.error}</small>
             </div>
           ))}
         </div>

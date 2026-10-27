@@ -50,7 +50,7 @@ export default function AppShell({ email, logout }) {
   return (
     <AppContext.Provider value={ctx}>
       <div className="shell">
-        <TopBar live={overview.status.live} onSettings={openSettings} />
+        <TopBar onSettings={openSettings} />
         <main className="main">
           <Pager panes={panes} index={index} onChange={go} swipe={swipeTabs && !settingsOpen} />
         </main>

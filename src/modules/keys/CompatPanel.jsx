@@ -65,7 +65,7 @@ export default function CompatPanel({ id, title, intro, keyHint, browseLabel = "
             {state.keys.map((k) => (
               <KeyRow key={k.id} enabled={k.enabled} onToggle={() => op({ op: "toggle_key", id: k.id })}
                 lead={<span className={"ic " + (k.enabled ? "ok" : "lock")}><Icon name={k.enabled ? "check" : "lock"} size={18} /></span>}
-                title={k.label} sub={"...." + k.tail + (k.cooling.length ? " · cooling" : "")}
+                title={k.label} sub={"Ends in " + k.tail + (k.cooling.length ? ", cooling down" : "")}
                 note={(k.enabled ? "Used in rotation." : "Switched off, or rejected by " + title + ".") + (k.cooling.length ? " Cooling down for: " + k.cooling.join(", ") + "." : "")}
                 actions={[{ key: "del", label: "Delete key", icon: "trash", variant: "danger", onClick: () => op({ op: "delete_key", id: k.id }),
                   confirm: { text: "Delete this key?", yes: "Yes, delete" } }]} />
@@ -94,7 +94,7 @@ export default function CompatPanel({ id, title, intro, keyHint, browseLabel = "
                   <div className="dcard" key={m.id}>
                     <div className="dhead">
                       <div className="dmain" style={{ cursor: "default" }}>
-                        <span className="tt"><code>{m.id}</code>{m.name !== m.id || m.context ? <small>{m.name !== m.id ? m.name : ""}{m.context ? (m.name !== m.id ? " · " : "") + m.context.toLocaleString() + " tokens" : ""}</small> : null}</span>
+                        <span className="tt"><code>{m.id}</code>{m.name !== m.id || m.context ? <small>{m.name !== m.id ? m.name : ""}{m.context ? (m.name !== m.id ? ", " : "") + m.context.toLocaleString() + " tokens" : ""}</small> : null}</span>
                       </div>
                       {have.has(m.id)
                         ? <span className="badge ok">Added</span>

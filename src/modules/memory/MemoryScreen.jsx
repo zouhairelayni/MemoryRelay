@@ -45,7 +45,7 @@ export default function MemoryScreen({ active }) {
 
   return (
     <div className="screen">
-      <PageHead icon="memory" title="Shared memory" sub="What your agents know. Rules are yours alone." />
+      <PageHead icon="memory" title="Memory" sub="What your agents know. Rules are yours alone." />
 
       <SearchBar id="q" type="search" placeholder="Search memories" value={q} onChange={(e) => setQ(e.target.value)}>
         <IconButton id="add-open" icon={adding ? "x" : "plus"} label={adding ? "Close" : "Add a memory"} variant="solid" size="lg" onClick={() => setAdding((a) => !a)} />
@@ -68,8 +68,9 @@ export default function MemoryScreen({ active }) {
         ]} />
       </div>
 
-      <div id="items" className="stack">
+      <div id="items" className={"stack" + (list.length || !mem.loaded ? " list" : "")}>
         {mem.error ? <p className="notice small bad">{mem.error}</p> : null}
+        {!mem.loaded && !mem.error ? [0, 1, 2].map((k) => <div className="skel" key={k} />) : null}
         {list.map((m) => (
           <MemoryCard key={m.id} m={m} editing={editing === m.id}
             onEdit={setEditing} onCancel={() => setEditing(null)} onSave={saveEdit} onDelete={(id) => mem.remove(id, q)} />

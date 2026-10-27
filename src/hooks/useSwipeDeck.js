@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import { CARD_THRESHOLD, LOCK_PX } from "../lib/gesture.js";
 
 // One card at a time with the Memory Atlas exit / enter animation.
-// Animation classes are applied straight to the wrapper element (see styles/cards.css).
+// Animation classes are applied straight to the wrapper element (see styles/screens.css).
 export function useSwipeDeck({ count, index, onIndex }) {
   const wrapRef = useRef(null);
   const live = useRef({ count, index });
