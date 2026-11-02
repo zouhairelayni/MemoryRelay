@@ -44,7 +44,7 @@
 .cables::-webkit-scrollbar{display:none}
 .cable-chip{flex:none;display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 16px;border-radius:999px;border:0;background:var(--card);box-shadow:inset 0 0 0 1px var(--hair);color:var(--ink2);font:600 14px var(--sans);cursor:pointer;transition:background var(--t-base) var(--ease-out),color var(--t-base) var(--ease-out),box-shadow var(--t-base) var(--ease-out),transform var(--t-fast) var(--ease-out)}
 .cable-chip:active{transform:scale(.96)}
-.cable-chip.on{background:color-mix(in srgb,var(--cable) 13%,var(--card));color:var(--ink);box-shadow:inset 0 0 0 1.5px var(--cable)}
+.cable-chip.on{background:var(--paper2);color:var(--ink);box-shadow:inset 0 0 0 1px var(--line)}
 .cable-chip:focus-visible{outline:2px solid var(--cobalt);outline-offset:2px}
 .agent-card-wrap{touch-action:pan-y;outline:none;transition:transform 260ms var(--ease-out),opacity 260ms var(--ease-out)}
 .agent-card-wrap.swipeable{cursor:grab}
@@ -66,11 +66,6 @@
 .metric:first-child{padding-left:0;box-shadow:none}
 .metric b{font:650 26px/1 var(--display);letter-spacing:-.03em;font-variant-numeric:tabular-nums}
 .metric span{display:inline-flex;align-items:center;gap:5px;font-size:13px;color:var(--muted)}
-.split{display:flex;height:4px;border-radius:999px;background:var(--paper2);overflow:hidden;margin:14px 0 0}
-.split i{display:block;height:100%;transition:width 500ms var(--ease-out)}
-.split .r{background:var(--cobalt)}
-.split .w{background:var(--amber)}
-.split .d{background:var(--rose)}
 .conn-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 10px 10px 14px;border-top:1px solid var(--hair)}
 .chev-btn svg{transition:transform var(--t-drawer) var(--ease-drawer)}
 .dcard.open .chev-btn svg{transform:rotate(180deg)}

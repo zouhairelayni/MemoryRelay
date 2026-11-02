@@ -302,12 +302,18 @@ export async function selectSkills(env, { request = "", files = [], functions = 
     return { name: p.name, why: p.why, description: s.description, body: s.body };
   });
   if (out.length) {
-    const scripts = (await env.DB.prepare("SELECT name, skill, description, code FROM skill_scripts ORDER BY name").all()).results;
-    const resources = (await env.DB.prepare("SELECT skill, path, kind, content, url FROM skill_resources ORDER BY skill, path").all()).results;
+    const slots = out.map((s) => s.name);
+    const placeholders = slots.map(() => "?").join(",");
+    const scripts = (await env.DB.prepare(`SELECT name, skill, description, code FROM skill_scripts WHERE skill IN (${placeholders}) ORDER BY name`).bind(...slots).all()).results;
+    // Only inline short scripts. Full source remains available through get_skill_resource.
+    const resources = (await env.DB.prepare(`SELECT skill, path, kind, LENGTH(content) bytes, url,
+      CASE WHEN kind = 'script' AND LENGTH(content) <= 7000 THEN content ELSE NULL END content
+      FROM skill_resources WHERE skill IN (${placeholders}) ORDER BY skill, path`).bind(...slots).all()).results;
     for (const sk of out) {
-      const official = (byName.get(sk.name).source || "").startsWith("builtin:anthropic-official");
-      sk.scripts = official ? [] : scripts.filter((x) => x.skill === sk.name);
-      sk.resources = official ? resources.filter((x) => x.skill === sk.name).map((x) => ({path: x.path,kind:x.kind,bytes:x.content?.length || 0,url:x.url, content:x.content})) : [];
+      const src = byName.get(sk.name).source || "";
+      const upstream = src === "builtin:anthropic-official" || src.startsWith("github:anthropics/skills:");
+      sk.scripts = upstream ? [] : scripts.filter((x) => x.skill === sk.name);
+      sk.resources = resources.filter((x) => x.skill === sk.name);
     }
   }
   return { mode, note, ms: Date.now() - t0, skills: out };

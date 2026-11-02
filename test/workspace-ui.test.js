@@ -44,3 +44,17 @@ test('skills selection uses stable selectable values; monitoring offers hour and
   assert.match(panel,/monitor-function-list/);
   assert.match(panel,/monitor-metric/);
 });
+
+
+test('selected connections and navigation use neutral surfaces instead of accent stripes', () => {
+  const workspace = read('src/styles/workspace.css');
+  const screens = read('src/styles/screens.css');
+  const card = read('src/modules/agents/AgentCard.jsx');
+  assert.match(workspace, /\.agents-screen \.cable-chip\.on \{[^}]*box-shadow:none;/);
+  assert.match(workspace, /\.agents-screen \.conn \{[^}]*border:1px solid var\(--line\);\}/);
+  assert.match(workspace, /\.tab\.on \{[^}]*box-shadow:none;/);
+  assert.doesNotMatch(workspace, /border-top:3px|inset 0 -3px 0|inset 3px 0 0/);
+  assert.doesNotMatch(screens, /\.split\s*\{|inset 0 0 0 1\.5px var\(--cable\)/);
+  assert.doesNotMatch(card, /className="split"|\bpct\(/);
+  assert.match(read('package.json'), /https:\/\/memoryrelay\.zouhairelayni\.workers\.dev/);
+});

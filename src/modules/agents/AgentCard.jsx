@@ -6,13 +6,12 @@ import Brand from "../../components/Brand.jsx";
 import IconButton from "../../components/IconButton.jsx";
 import ActionRow from "../../components/ActionRow.jsx";
 import AccessPicker from "../../components/AccessPicker.jsx";
-import { fmtBytes, pct } from "../../lib/format.js";
+import { fmtBytes } from "../../lib/format.js";
 import { cableColor } from "../../lib/cable.js";
 
 // One connection: who it is, what it did, what it may do, and its few actions.
 export default function AgentCard({ s, open, onToggle, onCopy, onRevoke, onDelete, onAccess, onSignOut, onRename }) {
   const [draft,setDraft]=useState(s.name);
-  const total = s.n_read + s.n_write + s.n_delete;
   const actions = s.revoked
     ? [{ key: "delete", label: "Delete connection", icon: "trash", variant: "danger", onClick: onDelete,
         confirm: { text: "Delete this connection for good?", yes: "Yes, delete" } }]
@@ -25,7 +24,7 @@ export default function AgentCard({ s, open, onToggle, onCopy, onRevoke, onDelet
       ];
 
   return (
-    <article className={"dcard conn" + (s.revoked ? " off" : "") + (open ? " open" : "")} style={{ "--cable": cableColor(s.name) }}>
+    <article className={"dcard conn" + (s.revoked ? " off" : "") + (open ? " open" : "")}>
       <div className="cpad">
         <div className="chead">
           <Brand names={[s.name, s.app]} size={46} cable={cableColor(s.name)} />
@@ -39,11 +38,6 @@ export default function AgentCard({ s, open, onToggle, onCopy, onRevoke, onDelet
           <div className="metric"><b>{s.n_read}</b><span><Icon name="eye" size={14} />Reads</span></div>
           <div className="metric"><b>{s.n_write}</b><span><Icon name="pencil" size={14} />Writes</span></div>
           <div className="metric"><b>{s.n_delete}</b><span><Icon name="trash" size={14} />Deletes</span></div>
-        </div>
-        <div className="split" aria-hidden="true">
-          <i className="r" style={{ width: pct(s.n_read, total) + "%" }} />
-          <i className="w" style={{ width: pct(s.n_write, total) + "%" }} />
-          <i className="d" style={{ width: pct(s.n_delete, total) + "%" }} />
         </div>
         {!s.revoked ? <AccessPicker value={s.access} onChange={onAccess} /> : null}
       </div>

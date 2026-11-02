@@ -186,7 +186,7 @@ const field = (v) => String(v ?? "").trim();
 async function run(env, chain, prompt, system, opts) {
   const errors = [];
   for (const id of chain) {
-    const r = await callProvider(env, id, prompt, { system, long: true, ...opts });
+    const r = await callProvider(env, id, prompt, { system, long: true, ...opts, json: false }); // Delegation requires Markdown code fences, not JSON.
     if (!r.error) return { ...r, provider: id };
     errors.push(PROVIDER_LABEL[id] + ": " + r.error);
   }

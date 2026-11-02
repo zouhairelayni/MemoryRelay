@@ -116,6 +116,21 @@ test("errors never leak internals to the client", async () => {
   } finally { console.error = real; }
 });
 
+test("an internal error never logs the secret MCP URL", async () => {
+  resetSchemaCache();
+  const secret = "a".repeat(48);
+  const env = { DB: { batch: async () => { throw new Error("D1 unavailable"); }, prepare: () => { throw new Error("D1 unavailable"); } } };
+  const original = console.error, lines = [];
+  console.error = (...parts) => lines.push(parts.map(String).join(" "));
+  try {
+    const r = await worker.fetch(new Request("http://localhost/mcp/" + secret, { method: "POST", headers: JSONH, body: "{}" }), env, { waitUntil() {} });
+    assert.equal(r.status, 500);
+  } finally { console.error = original; }
+  assert.equal(lines.length, 1);
+  assert.ok(lines[0].includes("/mcp/[redacted]"));
+  assert.ok(!lines[0].includes(secret));
+});
+
 test("agents can only apply a housekeeping proposal they have seen", async () => {
   const { mcp, api } = await setup();
   await mcp("remember", { text: "Likes strong black coffee every morning" });

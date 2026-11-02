@@ -94,7 +94,7 @@ export default {
       if (env.ASSETS) return withSecurityHeaders(await env.ASSETS.fetch(request));
       return new Response("not found", { status: 404 });
     } catch (e) {
-      console.error("request failed:", request.method, p, e && e.stack || e); // details stay in the logs, never in the reply
+      console.error("request failed:", request.method, p.startsWith("/mcp/") ? "/mcp/[redacted]" : p, e && e.stack || e); // Secret-link tokens must not enter logs.
       return json({ error: "internal error, please try again" }, 500);
     }
   },

@@ -89,6 +89,7 @@ test("delegate: a connection with write access gets the sub-agent's answer", asy
     assert.match(r.content[0].text, /const add/);
     assert.match(r.content[0].text, /-- sub-agent: Gemini \/ \S+ \(~\d+ tokens in/);
     assert.match(seen[0].url, /streamGenerateContent/, "long jobs stream so slow answers are not cut off");
+    assert.equal(seen[0].body.generationConfig.responseMimeType, undefined, "Gemini delegation must not force JSON output");
     assert.match(JSON.stringify(seen[0].body), /sub-agent/);
     assert.match(JSON.stringify(seen[0].body), /one complete function/);
   });

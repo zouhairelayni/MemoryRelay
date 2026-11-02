@@ -4,7 +4,7 @@ import { createD1 } from './helpers/d1.js';
 import { resetSchemaCache, ensureSchema } from '../worker/db.js';
 import { seedBuiltins } from '../worker/builtins.js';
 import { addSkillRepo, listSkillRepos, repoArgs, setSkillRepoSync, syncEnabledSkillRepos, syncSkillRepo } from '../worker/githubSkills.js';
-import { deleteSkill } from '../worker/skills.js';
+import { deleteSkill, selectSkills, formatForAgent } from '../worker/skills.js';
 
 const sha1 = 'a'.repeat(40),sha2='b'.repeat(40),treeSha='c'.repeat(40);
 const fn = (name)=>`---\nname: ${name}\ndescription: Use when reviewing a demo workflow.\n---\n# Demo\n\n${'Exact official source. '.repeat(70)}\n`;
@@ -48,6 +48,11 @@ test('GitHub repo switch controls automatic sync; scripts update, delete with sk
   const imported=await syncSkillRepo(env,repo,{importMissing:true});
   assert.equal(imported.complete,true);
   assert.equal(db.prepare('SELECT content FROM skill_resources WHERE skill = ? AND path = ?').get('demo-tool','scripts/test.py').content,"print('version a')\n");
+  const picked=await selectSkills(env,{request:'reviewing a demo workflow demo-tool'},{useGemini:false});
+  assert.ok(picked.skills.some(x=>x.name==='demo-tool' && x.resources?.some(f=>f.path==='scripts/test.py')),
+    'GitHub-installed skill must include its resource listing when selected');
+  assert.match(formatForAgent(picked), /scripts\/test\.py/);
+
   assert.match(db.prepare('SELECT body FROM skills WHERE name = ?').get('demo-tool').body,/Exact official source/);
   await setSkillRepoSync(env,repo,true);
   restore();restore=githubMock(sha2);

@@ -46,3 +46,16 @@ test('skill selection limit persists and rejects invalid values',async()=>{
   assert.equal((await getSkillSettings(env)).max,8);
   assert.equal((await setSkillMax(env,1)).max,1);
 });
+
+
+test('older running agents remain visible after forty newer completed jobs',async()=>{
+  resetSchemaCache();const {DB}=createD1(),env={DB};await ensureSchema(env);
+  await DB.prepare("INSERT INTO delegations(service_id,kind,ts,state,task_summary) VALUES ('','review',?,'running','still processing')")
+    .bind(Date.now()-600000).run();
+  for(let i=0;i<40;i++)await DB.prepare("INSERT INTO delegations(service_id,kind,ts,state) VALUES ('','review',?,'completed')")
+    .bind(Date.now()-i*1000).run();
+  const result=await monitor(env,'1h');
+  assert.equal(result.counts.active,1);
+  assert.equal(result.jobs[0].state,'running');
+  assert.equal(result.jobs[0].task_summary,'still processing');
+});

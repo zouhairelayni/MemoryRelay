@@ -60,7 +60,7 @@ export default function AgentsScreen({ active }) {
         <div className="cables" id="conn-dots" role="tablist" aria-label="Connections">
           {items.map((c, i) => (
             <button key={c.id} type="button" role="tab" aria-selected={i === idx} className={"cable-chip" + (i === idx ? " on" : "")} data-go={i}
-              style={{ "--cable": cableColor(c.name) }} onClick={() => deck.go(i, i > idx ? 1 : -1)}>
+              onClick={() => deck.go(i, i > idx ? 1 : -1)}>
               <Brand names={[c.name, c.app]} size={24} cable={cableColor(c.name)} />{c.name}
             </button>
           ))}

@@ -14,7 +14,7 @@
 /* reduced motion: keep colour and opacity changes, drop movement */
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.01ms!important;animation-delay:0ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important}
-  .tab-pill,.drawer,.drawer-inner,.sheet,.agent-card-wrap,.split i,.chev,.tab svg{transition-duration:.01ms!important}
+  .tab-pill,.drawer,.drawer-inner,.sheet,.agent-card-wrap,.chev,.tab svg{transition-duration:.01ms!important}
   .pulse.ok::after{display:none}
   .btn:active,.ib:active,.tab:active svg,.cable-chip:active{transform:none}
   .enter>*{animation:none}
