@@ -83,8 +83,10 @@ export default function SkillSelector({ active, onDeleted }) {
           </select>
           <div className="cluster">
             {pendingCount ? <Badge tone="rule">{pendingCount} to review</Badge> : null}
-            <label className="count-pill" htmlFor="sk-max" title="Skills sent per request">
-              Max <input id="sk-max" className="mini" type="number" min="1" max="8" value={sk.max} onChange={(e) => sk.saveMax(e.target.value)} />
+            <label className="count-pill" htmlFor="sk-max" title="Total maximum number of skills selected per request">
+              Skills per request <select id="sk-max" aria-label="Maximum skills per request" value={sk.max} onChange={(e) => sk.saveMax(Number(e.target.value))}>
+                {Array.from({length:8},(_,i)=><option key={i+1} value={i+1}>{i+1}</option>)}
+              </select>
             </label>
           </div>
         </div>
@@ -100,7 +102,7 @@ export default function SkillSelector({ active, onDeleted }) {
               <div className="dhead">
                 <button type="button" className="dmain" aria-expanded={isOpen} onClick={() => setOpen((o) => ({ ...o, [key]: !o[key] }))}>
                   <span className={"ic " + (s.enabled ? "ok" : "lock")}><Icon name={s.enabled ? "skills" : "lock"} size={18} /></span>
-                  <span className="tt"><code>{s.name}</code><small>{s.pending ? <b className="ok-amber">Needs review </b> : null}{s.core ? "Always sent " : ""}{s.tokens} tokens, from {s.source}</small></span>
+                  <span className="tt"><code>{s.name}</code><small>{s.pending ? <b className="ok-amber">Needs review </b> : null}{s.core ? "Prioritized " : ""}{s.tokens} tokens, from {s.source}</small></span>
                   <span className="chev"><Icon name="chev" size={18} /></span>
                 </button>
                 <Switch checked={s.enabled} onChange={(v) => sk.toggle(s.name, "enabled", v)} title={s.pending ? "Approve and enable" : "Enable or disable"} />
@@ -111,7 +113,7 @@ export default function SkillSelector({ active, onDeleted }) {
                   {s.warnings && s.warnings.length ? <Notice tone="bad">Check before use: {s.warnings.join("; ")}.</Notice> : null}
                   <ActionRow className="row" actions={[
                     { key: "edit", label: "Edit skill", icon: "pencil", onClick: () => setStudio({ name: s.name }) },
-                    { key: "core", label: s.core ? "Stop always sending it" : "Always send it", icon: "bolt", on: s.core,
+                    { key: "core", label: s.core ? "Stop prioritizing" : "Prioritize this skill", icon: "bolt", on: s.core,
                       onClick: () => sk.toggle(s.name, "core", !s.core) },
                     { key: "del", label: "Delete skill", icon: "trash", variant: "danger", onClick: async () => { if (await sk.remove(s.name)) onDeleted?.(); },
                       confirm: { text: "Delete " + s.name + " and all of its linked scripts and resources?", yes: "Yes, delete" } },

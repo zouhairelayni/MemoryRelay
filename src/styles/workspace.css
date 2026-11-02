@@ -288,3 +288,14 @@ button:focus-visible, a:focus-visible, select:focus-visible, summary:focus-visib
 @media (prefers-reduced-motion:reduce) {
   .home-screen .enter>* {animation:none;}
 }
+/* Controls: one consistent, compact size system across panels and menus. */
+.count-pill{display:inline-flex;align-items:center;gap:8px;padding:4px 8px 4px 12px;font-size:12px;white-space:nowrap;border-radius:10px}
+.count-pill select{background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:6px 24px 6px 9px;min-width:56px;font-size:13px;cursor:pointer}
+.filter>.cluster{gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.filter select.fld{min-height:38px;padding:7px 30px 7px 10px;border-radius:9px}
+.monitor-header select.fld{min-width:114px;width:auto;min-height:40px;padding:7px 28px 7px 10px}
+.btn{min-height:40px;padding:9px 14px;font-size:13px;font-weight:600}
+.btn.sm{min-height:36px;padding:7px 12px}
+.home-screen>.tip{border-left:0}
+.home-screen .lib-row,.home-screen .agent-row{box-shadow:none}
+@media(max-width:600px){.filter{flex-wrap:wrap}.filter>.cluster{flex:1;justify-content:space-between}.count-pill{font-size:12px}}

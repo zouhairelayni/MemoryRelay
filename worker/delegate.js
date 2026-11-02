@@ -272,7 +272,11 @@ export async function delegate(env, svc, a) {
     }
   }
 
-  const left = [...check.hard, ...(rev && rev.verdict === "REVISE" ? rev.issues.filter((i) => /^high/i.test(i)) : [])];
+  // A requested independent review must never silently count as a pass when it failed or could not run.
+  const reviewProblems = !verify || rev?.verdict === "ACCEPT" ? [] :
+    rev?.verdict === "REVISE" ? (rev.issues.length ? rev.issues : ["independent reviewer requested revisions"]) :
+    ["independent review unavailable or inconclusive"];
+  const left = [...check.hard, ...reviewProblems];
   const tout = estimateTokens(r.text);
   await log(env, svc, { provider: r.provider, model: r.model, kind, tin, tout, ms: Date.now() - t0, ok: !left.length },jobId);
   const quality = left.length

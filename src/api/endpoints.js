@@ -89,7 +89,7 @@ export const provider = (id) => ({
 });
 
 // Sub-agents: switch, hourly limit, routing, usage.
-export const monitoring = { get: (days=30) => get("/api/monitor?days="+days) };
+export const monitoring = { get: (period="30") => get("/api/monitor?days="+encodeURIComponent(period)) };
 
 export const delegation = {
   get: () => get("/api/delegation"),

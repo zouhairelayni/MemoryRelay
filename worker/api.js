@@ -108,7 +108,7 @@ export async function api(request, env, url) {
   }
   const skillFlag = p.match(/^\/api\/skills\/([^/]+)\/(enabled|core)$/);
   if (skillFlag && m === "PUT") return withStatus(await setSkillFlag(env, dec(skillFlag[1]), skillFlag[2], !!(await body(request)).value));
-  if (p === "/api/skills/max" && m === "PUT") return json(await setSkillMax(env, (await body(request)).max));
+  if (p === "/api/skills/max" && m === "PUT") return withStatus(await setSkillMax(env, (await body(request)).max));
   if (p === "/api/skills/try" && m === "POST") {
     const b = await body(request);
     const r = await selectSkills(env, { request: String(b.request || "").slice(0, 4000), files: Array.isArray(b.files) ? b.files.map(String) : [], functions: [] });

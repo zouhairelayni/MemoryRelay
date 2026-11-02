@@ -95,7 +95,8 @@ test("delegate: a connection with write access gets the sub-agent's answer", asy
   const row = db.prepare("SELECT * FROM delegations").get();
   assert.equal(row.ok, 1);
   assert.equal(row.provider, "gemini");
-  assert.ok(!JSON.stringify(row).includes("add function"), "the log never stores the request text");
+  assert.equal(row.task_summary, "write an add function in JavaScript", "the monitor keeps only a bounded task summary");
+  assert.ok(!JSON.stringify(row).includes("<requirements>"), "full delegated briefs are not logged");
 });
 
 test("delegate: requests spread over providers, and fall back when one fails", async () => {
@@ -302,4 +303,19 @@ test("owner can try the sub-agent pipeline from the dashboard", async () => {
     assert.match((await ok.json()).text, /quality/);
     assert.equal((await api("/api/delegation/try", "POST", { task: "x" })).status, 400);
   });
+});
+
+test('requested independent verification cannot pass when reviewer returns no verdict', async () => {
+  const {api,mcp,db}=await setup();
+  await pool(api);
+  await api('/api/delegation','PUT',{strategy:'order',order:['gemini','openrouter']});
+  await withProviders({
+    'generativelanguage':gem(GOOD),
+    'openrouter.ai/api/v1/chat/completions':chat('Reviewer response without a verdict'),
+  },async()=>{
+    const r=await mcp('delegate',{task:'write an add function',kind:'function',verify:true});
+    assert.match(r.content[0].text,/independent review unavailable or inconclusive/);
+    assert.match(r.content[0].text,/Treat this as a draft/);
+  });
+  assert.equal(db.prepare('SELECT ok FROM delegations ORDER BY id DESC LIMIT 1').get().ok,0);
 });

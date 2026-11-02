@@ -239,3 +239,18 @@ test("agent uploads that break the rules come back with a reason", async () => {
   const noTrigger = JSON.parse((await mcp("upload_skill", { skill_md: SKILL("no-trigger", "Helps with a lot of general things.") })).content[0].text);
   assert.match(noTrigger.error, /Use when/);
 });
+
+test('the selected total, including prioritized skills, respects the configured maximum', async () => {
+  const {env,api}=await setup();
+  for (const name of ['priority-one','priority-two']) {
+    await api('/api/skills','POST',{text:SKILL(name,'Use when testing selection limits and prioritization.')});
+    await api('/api/skills/'+name+'/core','PUT',{value:true});
+  }
+  await api('/api/skills/max','PUT',{max:1});
+  const selected=await selectSkills(env,{request:'testing selection limits'},{useGemini:false});
+  assert.deepEqual(selected.skills.map(x=>x.name),['priority-one']);
+  await api('/api/skills/max','PUT',{max:3});
+  const expanded=await selectSkills(env,{request:'testing selection limits'},{useGemini:false});
+  assert.ok(expanded.skills.length<=3);
+  assert.ok(expanded.skills.some(x=>x.name==='priority-two'));
+});

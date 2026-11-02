@@ -20,3 +20,29 @@ test('activity monitoring reports skill calls, provider tokens, failures, and ru
  assert.equal(result.errors[0].error_message,'Safe error message');
  assert.equal(db.prepare('SELECT COUNT(*) n FROM activity_events').get().n,3);
 });
+
+test('hour and day periods keep separate five-minute and hourly trend buckets', async () => {
+  resetSchemaCache();const {DB}=createD1(),env={DB};await ensureSchema(env);
+  await activity(env,{category:'mcp',action:'remember'});
+  await activity(env,{category:'provider',action:'api_call',tin:20,tout:9});
+  await activity(env,{category:'api',action:'PUT /api/settings',ok:false,code:'HTTP_400'});
+  for(const [period,step] of [['1h',300000],['1d',3600000]]){
+    const result=await monitor(env,period);
+    assert.equal(result.period,period);assert.equal(result.step,step);
+    assert.equal(result.counts.requests,3);assert.equal(result.counts.tokens_in,20);
+    assert.ok(result.series.some(x=>x.category==='mcp'&&x.action==='remember'));
+    assert.ok(result.series.every(x=>Number(x.bucket)%step===0));
+    assert.equal(result.totals.find(x=>x.category==='api').errors,1);
+  }
+  assert.equal((await monitor(env,'not-a-period')).period,'30');
+});
+
+test('skill selection limit persists and rejects invalid values',async()=>{
+  resetSchemaCache();const {DB}=createD1(),env={DB};await ensureSchema(env);
+  const {getSkillSettings,setSkillMax}=await import('../worker/skills.js');
+  assert.equal((await setSkillMax(env,8)).max,8);
+  assert.equal((await getSkillSettings(env)).max,8);
+  for(const value of [0,9,-1,'wrong',1.5])assert.match((await setSkillMax(env,value)).error,/1 to 8/);
+  assert.equal((await getSkillSettings(env)).max,8);
+  assert.equal((await setSkillMax(env,1)).max,1);
+});
