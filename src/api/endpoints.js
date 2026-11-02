@@ -56,6 +56,7 @@ export const backup = {
 };
 
 export const skills = {
+  scripts: () => get("/api/skill-scripts").then((d) => d.scripts),
   list: () => get("/api/skills"),
   add: (text, source = "paste") => post("/api/skills", { text, source }),
   setFlag: (name, flag, value) => put("/api/skills/" + encodeURIComponent(name) + "/" + flag, { value }),

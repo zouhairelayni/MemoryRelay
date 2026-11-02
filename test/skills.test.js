@@ -44,10 +44,11 @@ test("import: add, reject duplicates, switch off, delete", async () => {
   assert.equal((await api("/api/skills", "POST", { text: SKILL("css-tips", "Use when styling again.") })).status, 400);
   await api("/api/skills/css-tips/enabled", "PUT", { value: false });
   let list = (await (await api("/api/skills")).json()).skills;
-  assert.equal(list[0].enabled, false);
+  assert.equal(list.find((s) => s.name === "css-tips").enabled, false);
   await api("/api/skills/css-tips", "DELETE");
   list = (await (await api("/api/skills")).json()).skills;
-  assert.deepEqual(list.map((x) => x.name), ["delegating-to-subagents"], "only the built-in skill is left");
+  assert.equal(list.length, 12, "the delegation skill and 11 adapted built-ins remain");
+  assert.ok(list.some((s) => s.name === "delegating-to-subagents"));
 });
 
 test("keyword picks: only enabled skills, best match first, at most the max", async () => {

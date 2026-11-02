@@ -6,19 +6,19 @@ export const SESSION_DAYS = 14;
 export const PBKDF2_ITER = 100000;
 export const MAX_CALLS = 8; // Workers subrequest budget per request
 export const RETRYABLE = new Set([0, 500, 502, 503, 504]); // 0 = could not reach Gemini at all
-export const BUILD = "2026-10-24.2-oauth";
+export const BUILD = "2026-11-02.1-skills-oauth";
 export const MAX_MEMORIES = 5000;        // library cap, stops a looping agent from filling the database
 export const MAX_TAGS = 5;
 export const MAX_ARG_CHARS = 100000;     // largest single string an agent may send
 export const MCP_PER_MINUTE = 300;       // requests per connection
 export const PROTOCOLS = ["2025-06-18", "2025-03-26", "2024-11-05"];
-export const SERVER_VERSION = "3.1.0";
+export const SERVER_VERSION = "3.2.0";
 export const ACCESS = ["read", "write", "full"];   // what a connection may do
 export const ACCESS_RANK = { read: 1, write: 2, full: 3 };
 export const ACCESS_LABEL = { read: "Read only", write: "Read and write", full: "Full access" };
 // The lowest access level that may call each tool.
 export const TOOL_LEVEL = { search: "read", recent: "read", get_skill_template: "read", select_skills: "read", draft_skill: "read",
-  remember: "write", update_memory: "write", upload_skill: "write", delegate: "write", get_delegation_brief: "read", forget: "full", housekeep: "full" };
+  get_skill_script: "read", remember: "write", update_memory: "write", upload_skill: "write", delegate: "write", get_delegation_brief: "read", forget: "full", housekeep: "full" };
 
 const T = (title, o) => ({ title, readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false, ...o });
 export const TOOLS = [
@@ -46,6 +46,9 @@ export const TOOLS = [
   { name: "upload_skill", annotations: T("Upload a skill", {}),
     description: "Upload a new skill as SKILL.md text using the template from get_skill_template. It is saved as pending and used only after the owner approves it. Max 5000 tokens.",
     inputSchema: { type: "object", properties: { skill_md: { type: "string" } }, required: ["skill_md"] } },
+  { name: "get_skill_script", annotations: T("Fetch a Python skill script", { readOnlyHint: true, idempotentHint: true }),
+    description: "Fetch a source-only Python script template from MemoryRelay's script bank. Scripts are included automatically when the matching skill is selected; they are never executed by the server.",
+    inputSchema: { type: "object", properties: { name: { type: "string" } }, required: ["name"] } },
   { name: "get_delegation_brief", annotations: T("Delegation guide and brief form", { readOnlyHint: true, idempotentHint: true }),
     description: "Returns the guide for delegating work to sub-agents and the brief form to fill in. Read it once before your first delegate call.",
     inputSchema: { type: "object", properties: {} } },

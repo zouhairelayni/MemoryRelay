@@ -26,7 +26,7 @@ async function setup(extraEnv = {}) {
   const svc = (await (await api("/api/services")).json()).services[0];
   const rpc = async (method, params, id = 1, headers = {}) => call(svc.url, { method: "POST", headers: { ...JSONH, ...headers }, body: JSON.stringify({ jsonrpc: "2.0", id, method, params }) });
   const mcp = async (name, args) => (await (await rpc("tools/call", { name, arguments: args })).json()).result;
-  return { db, env, call, api, rpc, mcp, svc };
+  return { db, env, call, api, rpc, mcp, svc, cookie };
 }
 
 // Replaces fetch for AI providers with a scripted list of answers (strings or Response-like).
@@ -174,7 +174,7 @@ test("Skill Studio: generates a valid draft and saves nothing", async () => {
     assert.match(r.text, /^---\nname: weekly-report/);
     assert.equal(r.repaired, false);
   });
-  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM skills WHERE source != 'builtin'").get().n, 0);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM skills WHERE source NOT LIKE 'builtin%'").get().n, 0);
   assert.match((await generateSkill(env, { goal: "x" })).error, /Describe/);
 });
 
@@ -213,7 +213,7 @@ test("MCP draft_skill returns a draft that still needs upload_skill and owner ap
     assert.match(r.skill_md, /agent-draft/);
     assert.match(r.next, /upload_skill/);
   });
-  assert.equal((await (await api("/api/skills")).json()).skills.filter((x) => x.source !== "builtin").length, 0);
+  assert.equal((await (await api("/api/skills")).json()).skills.filter((x) => !x.source.startsWith("builtin")).length, 0);
 });
 
 test("SETUP_TOKEN: the first account needs it when it is configured", async () => {
@@ -288,11 +288,16 @@ async function oauthFlow(ctx, { access = "write", redirect = "https://app.exampl
   const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)));
   const challenge = b64url(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier)));
   const q = new URLSearchParams({ response_type: "code", client_id: reg.client_id, redirect_uri: redirect, code_challenge: challenge, code_challenge_method: "S256", state: "xyz" });
-  const approve = (extra = {}) => call("/oauth/authorize", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ client_id: reg.client_id, redirect_uri: redirect, code_challenge: challenge, code_challenge_method: "S256", state: "xyz", service: "__new", name: "OAuth agent", access, password: "longenough12", decision: "approve", ...extra }) });
+  const consent = await call("/oauth/authorize?" + q, { headers: { cookie: ctx.cookie } });
+  const csrfCookie = consent.headers.get("set-cookie").split(";")[0];
+  const csrf = (await consent.text()).match(/name="csrf" value="([^"]+)"/)[1];
+  const browserCookie = ctx.cookie + "; " + csrfCookie;
+  // The signed browser posts both its session cookie and the form's CSRF cookie.
+  const approve = (extra = {}, headers = {}) => call("/oauth/authorize", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded", cookie: browserCookie, ...headers },
+    body: new URLSearchParams({ csrf, client_id: reg.client_id, redirect_uri: redirect, code_challenge: challenge, code_challenge_method: "S256", state: "xyz", step: "consent", name: "OAuth agent", access, decision: "approve", ...extra }) });
   const exchange = async (code, v = verifier) => call("/oauth/token", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ grant_type: "authorization_code", code, redirect_uri: redirect, client_id: reg.client_id, code_verifier: v }) });
-  return { reg, q, approve, exchange, verifier, redirect };
+  return { reg, q, approve, exchange, verifier, redirect, challenge, csrf, csrfCookie, browserCookie };
 }
 const codeOf = (res) => new URL(res.headers.get("location")).searchParams.get("code");
 
@@ -321,14 +326,10 @@ test("OAuth: register rejects unsafe redirect addresses", async () => {
 test("OAuth: full sign-in, token use, refresh rotation and reuse detection", async () => {
   const ctx = await setup();
   const f = await oauthFlow(ctx);
-  const page = await ctx.call("/oauth/authorize?" + f.q);
+  const page = await ctx.call("/oauth/authorize?" + f.q, { headers: { cookie: ctx.cookie } });
   assert.equal(page.status, 200);
-  assert.match(await page.text(), /Allow <b>Test App/);
+  assert.match(await page.text(), /Connect Test App\?/);
   assert.match(page.headers.get("content-security-policy"), /frame-ancestors 'none'/);
-
-  const wrong = await f.approve({ password: "not-the-password" });
-  assert.equal(wrong.status, 401);
-  assert.equal(wrong.headers.get("location"), null);
 
   const ok = await f.approve();
   assert.equal(ok.status, 302);
@@ -389,4 +390,128 @@ test("OAuth: the secret address also honours the access level, and a denial goes
   const bad = await ctx.call("/oauth/authorize?" + new URLSearchParams({ client_id: f.reg.client_id, redirect_uri: "https://evil.example/cb", response_type: "code", code_challenge: "a".repeat(43) }));
   assert.equal(bad.status, 400);
   assert.equal(bad.headers.get("location"), null);
+});
+
+// ---- OAuth sign-in and approval flow ----
+const FORM = { "content-type": "application/x-www-form-urlencoded" };
+const login = (ctx, f, pw = "longenough12", extra = {}) => ctx.call("/oauth/authorize", { method: "POST", headers: { ...FORM, cookie: f.csrfCookie },
+  body: new URLSearchParams({ csrf: f.csrf, client_id: f.reg.client_id, redirect_uri: f.redirect, code_challenge: f.challenge, code_challenge_method: "S256", state: "xyz", step: "login", email: "o@x.io", password: pw, ...extra }) });
+
+test("OAuth page: a signed-out visitor sees only a sign-in form and nothing about the account", async () => {
+  const ctx = await setup();
+  await ctx.api("/api/services", "POST", { name: "TopSecretConn", access: "full" });
+  const f = await oauthFlow(ctx);
+  const res = await ctx.call("/oauth/authorize?" + f.q);            // no cookie
+  const html = await res.text();
+  assert.equal(res.status, 200);
+  assert.match(html, /Sign in to continue/);
+  assert.doesNotMatch(html, /TopSecretConn/);
+  assert.doesNotMatch(html, /Full access|Read only|<select/);
+  assert.doesNotMatch(html, /name="decision"/, "no approve button before signing in");
+  const before = ctx.db.prepare("SELECT COUNT(*) AS n FROM oauth_codes").get().n;
+  const post = await f.approve({}, { cookie: f.csrfCookie });       // valid CSRF but no login session
+  assert.equal(post.status, 200);
+  assert.equal(post.headers.get("location"), null);
+  assert.match(await post.text(), /Sign in to continue/);
+  assert.equal(ctx.db.prepare("SELECT COUNT(*) AS n FROM oauth_codes").get().n, before, "no code was issued");
+});
+
+test("OAuth sign-in step: wrong password is refused, the right one continues the handshake with a Lax session", async () => {
+  const ctx = await setup();
+  const f = await oauthFlow(ctx);
+  const bad = await login(ctx, f, "not-the-password");
+  assert.equal(bad.status, 401);
+  assert.equal(bad.headers.get("set-cookie"), null);
+  const good = await login(ctx, f);
+  assert.equal(good.status, 302);
+  const loc = new URL(good.headers.get("location"));
+  assert.equal(loc.pathname, "/oauth/authorize");
+  assert.equal(loc.searchParams.get("client_id"), f.reg.client_id);
+  const cookie = good.headers.get("set-cookie");
+  assert.match(cookie, /__Host-sid=/);
+  assert.match(cookie, /SameSite=Lax/, "so the browser sends it when an app links here");
+  const consent = await ctx.call(loc.pathname + loc.search, { headers: { cookie: cookie.split(";")[0] } });
+  assert.match(await consent.text(), /Connect Test App\?/);
+});
+
+test("OAuth approval: no password, no list of other connections, new connection by default", async () => {
+  const ctx = await setup();
+  await ctx.api("/api/services", "POST", { name: "OldConnection", access: "write" });
+  const f = await oauthFlow(ctx);
+  const html = await (await ctx.call("/oauth/authorize?" + f.q, { headers: { cookie: ctx.cookie } })).text();
+  assert.match(html, /New connection/);
+  assert.doesNotMatch(html, /type="password"/);
+  assert.doesNotMatch(html, /OldConnection|<select/);
+  const before = ctx.db.prepare("SELECT COUNT(*) AS n FROM services").get().n;
+  const ok = await f.approve({ name: "Fresh one", access: "read" });
+  assert.equal(ok.status, 302);
+  assert.ok(codeOf(ok));
+  assert.equal(ctx.db.prepare("SELECT COUNT(*) AS n FROM services").get().n, before + 1);
+  const made = ctx.db.prepare("SELECT name, access FROM services WHERE name = 'Fresh one'").get();
+  assert.equal(made.access, "read");
+});
+
+test("OAuth: every handshake is new; the same app coming back refreshes its own connection", async () => {
+  const ctx = await setup();
+  const count = () => ctx.db.prepare("SELECT COUNT(*) AS n FROM services").get().n;
+  const a = await oauthFlow(ctx);                       // "Test App" at app.example
+  const start = count();
+  assert.ok(codeOf(await a.approve()));
+  assert.equal(count(), start + 1, "first time: a new connection");
+  const again = await oauthFlow(ctx);                   // same app name, same site, registered again
+  const page = await (await ctx.call("/oauth/authorize?" + again.q, { headers: { cookie: ctx.cookie } })).text();
+  assert.match(page, /Refreshing an existing connection/);
+  assert.match(page, /Reconnect Test App\?/);
+  assert.ok(codeOf(await again.approve()));
+  assert.equal(count(), start + 1, "refresh: no second connection");
+  assert.ok(codeOf(await again.approve({ decision: "new" })));
+  assert.equal(count(), start + 2, "asking for a separate one creates it");
+  const other = await oauthFlow(ctx, { redirect: "https://other.example/cb" });   // same name, different site: not a refresh
+  assert.match(await (await ctx.call("/oauth/authorize?" + other.q, { headers: { cookie: ctx.cookie } })).text(), /New connection/);
+  const names = ctx.db.prepare("SELECT name FROM services WHERE name LIKE 'OAuth agent%' OR name LIKE 'Test App%'").all().map((r) => r.name);
+  assert.equal(new Set(names).size, names.length, "names stay unique");
+});
+
+test("OAuth consent accepts valid CSRF even from embedded app browsers; forged submissions are refused", async () => {
+  const ctx = await setup();
+  const f = await oauthFlow(ctx);
+  const page = await ctx.call("/oauth/authorize?" + f.q, { headers: { cookie: ctx.cookie } });
+  assert.equal(page.headers.get("referrer-policy"), "same-origin");
+  // A browser may report Origin:null or Sec-Fetch-Site:cross-site after external-app redirects.
+  // The unguessable double-submit cookie still proves that this form was displayed by this server.
+  const f2 = await oauthFlow(ctx);
+  assert.equal((await f2.approve({}, { origin: "null", "sec-fetch-site": "cross-site" })).status, 302);
+  assert.equal((await f2.approve({}, { origin: "https://evil.example" })).status, 302);
+  assert.equal((await f2.approve({ csrf: "x" })).status, 403);
+  assert.equal((await f2.approve({}, { cookie: ctx.cookie })).status, 403);
+  const forged = await ctx.call("/oauth/authorize", { method: "POST", headers: FORM,
+    body: new URLSearchParams({ ...Object.fromEntries(f2.q), step: "consent", decision: "approve" }) });
+  assert.equal(forged.status, 403);
+});
+
+test("OAuth page shows the connecting app's logo and the M mark", async () => {
+  const ctx = await setup();
+  for (const [name, mark] of [["Claude", "#D97757"], ["ChatGPT", "#10A37F"], ["Gemini CLI", "mr-gem"]]) {
+    const reg = await (await ctx.call("/oauth/register", { method: "POST", headers: JSONH, body: JSON.stringify({ client_name: name, redirect_uris: ["https://app.example/cb"] }) })).json();
+    const q = new URLSearchParams({ response_type: "code", client_id: reg.client_id, redirect_uri: "https://app.example/cb", code_challenge: "a".repeat(43), code_challenge_method: "S256" });
+    const html = await (await ctx.call("/oauth/authorize?" + q, { headers: { cookie: ctx.cookie } })).text();
+    assert.ok(html.includes(mark), name + " mark");
+    assert.ok(html.includes('rx="7.2" fill="#2F54EB"'), "the M logo tile");
+  }
+});
+
+test("brand detection from a connection name or what the app reports", async () => {
+  const { detectBrand } = await import("../shared/brands.js");
+  assert.equal(detectBrand("My Claude", ""), "claude");
+  assert.equal(detectBrand("Work", "openai-mcp 1.0"), "chatgpt");
+  assert.equal(detectBrand("", "gemini-cli 0.9"), "gemini");
+  assert.equal(detectBrand("Editor", "Cursor"), "cursor");
+  assert.equal(detectBrand("Home server", "some-tool 1.0"), "");
+});
+
+test("the dashboard session cookie is Lax", async () => {
+  const ctx = await setup();
+  const r = await ctx.call("/auth/login", { method: "POST", headers: JSONH, body: JSON.stringify({ email: "o@x.io", password: "longenough12" }) });
+  assert.match(r.headers.get("set-cookie"), /SameSite=Lax/);
+  assert.match(r.headers.get("set-cookie"), /HttpOnly/);
 });

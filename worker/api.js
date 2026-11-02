@@ -74,6 +74,10 @@ export async function api(request, env, url) {
     return json(await housekeep(env, { apply: !!b.apply, groups: b.groups }));
   }
 
+  // Read-only Python script bank, available only to the signed-in owner.
+  if (p === "/api/skill-scripts" && m === "GET") return json({ scripts: (await env.DB.prepare(
+    "SELECT name, skill, description, code FROM skill_scripts ORDER BY skill, name").all()).results });
+
   // skills (Skill Genie)
   if (p === "/api/skills" && m === "GET") return json({ skills: await listSkills(env), settings: await getSkillSettings(env), template: SKILL_TEMPLATE, max_tokens: MAX_TOKENS });
   if (p === "/api/skills" && m === "POST") {

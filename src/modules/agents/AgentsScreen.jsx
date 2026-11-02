@@ -11,6 +11,7 @@ import Notice from "../../components/Notice.jsx";
 import PageHead from "../../components/PageHead.jsx";
 import SearchBar from "../../components/SearchBar.jsx";
 import AccessPicker from "../../components/AccessPicker.jsx";
+import Brand from "../../components/Brand.jsx";
 import AgentCard from "./AgentCard.jsx";
 
 export default function AgentsScreen({ active }) {
@@ -60,7 +61,7 @@ export default function AgentsScreen({ active }) {
           {items.map((c, i) => (
             <button key={c.id} type="button" role="tab" aria-selected={i === idx} className={"cable-chip" + (i === idx ? " on" : "")} data-go={i}
               style={{ "--cable": cableColor(c.name) }} onClick={() => deck.go(i, i > idx ? 1 : -1)}>
-              <i className="cd" />{c.name}
+              <Brand names={[c.name, c.app]} size={24} cable={cableColor(c.name)} />{c.name}
             </button>
           ))}
         </div>
@@ -90,8 +91,8 @@ export default function AgentsScreen({ active }) {
         </div>
         <ol className="steps">
           <li>Paste this address into the app as a remote MCP server.</li>
-          <li>The app opens a page here. Pick a connection (or make a new one) and approve with your password.</li>
-          <li>That connection's access level and statistics apply. Revoke it any time to end the sign-in.</li>
+          <li>The app opens a page here. Sign in if you are not signed in, then approve. No password is asked again.</li>
+          <li>Each sign-in is a new connection with its own access level. The same app signing in again refreshes its connection instead of adding another. Revoke it any time.</li>
         </ol>
       </div>
     </div>

@@ -288,6 +288,10 @@ export async function selectSkills(env, { request = "", files = [], functions = 
     const s = byName.get(p.name);
     return { name: p.name, why: p.why, description: s.description, body: s.body };
   });
+  if (out.length) {
+    const scripts = (await env.DB.prepare("SELECT name, skill, description, code FROM skill_scripts ORDER BY name").all()).results;
+    for (const s of out) s.scripts = scripts.filter((x) => x.skill === s.name);
+  }
   return { mode, note, ms: Date.now() - t0, skills: out };
 }
 
@@ -296,5 +300,7 @@ export function formatForAgent(result) {
   if (!result.skills.length) return "GENIE: no extra skill is needed for this request. Continue without skills.";
   const head = "GENIE SKILL SELECTION (" + (result.mode === "ai" ? "chosen by an AI model" : "chosen by keywords") + "). " +
     "Follow ONLY the skills below. Do not look for other skills.\n";
-  return head + result.skills.map((s) => "\n===== SKILL: " + s.name + " =====\n" + s.body).join("\n");
+  return head + result.skills.map((s) => "\n===== SKILL: " + s.name + " =====\n" + s.body +
+    (s.scripts || []).map((x) => "\n\n===== PYTHON SCRIPT BANK: " + x.name + " =====\n" + x.description +
+      "\nThis is source code, not executed. If the host has authorized file and Python tools, create a file from this template, adapt it and run the checks. If no tools exist, deliver the source only and state that it was not run.\n```python\n" + x.code + "\n```").join("")) .join("\n");
 }

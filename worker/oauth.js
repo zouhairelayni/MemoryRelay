@@ -7,13 +7,21 @@
 // Every approval is tied to ONE connection, so each agent has its own access level, statistics and kill switch.
 // Only SHA-256 hashes of codes and tokens are stored.
 import { ACCESS, ACCESS_LABEL } from "./constants.js";
-import { clearFails, hashPassword, locked, recordFail, sameText, sha256Hex } from "./auth.js";
+import { cookieFrom, currentUser, passwordLogin, sameText, sha256Hex } from "./auth.js";
+import { brandSvg, detectBrand } from "../shared/brands.js";
 import { rateLimit } from "./limits.js";
 import { createService } from "./services.js";
 import { clip, json, now, randomHex } from "./util.js";
 
 const ACCESS_TTL = 3600, REFRESH_TTL = 30 * 86400, CODE_TTL = 300; // seconds
 const MAX_CLIENTS = 100;
+const CSRF_NAME = "__Host-mr-oauth";
+const csrfCookie = (token) => `${CSRF_NAME}=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=600`;
+const csrfPage = (res, token) => {
+  const headers = new Headers(res.headers);
+  headers.set("set-cookie", csrfCookie(token));
+  return new Response(res.body, { status: res.status, headers });
+};
 export const CORS = {
   "access-control-allow-origin": "*",
   "access-control-allow-headers": "authorization, content-type, mcp-protocol-version, mcp-session-id",
@@ -93,25 +101,48 @@ async function register(request, env) {
     ...(secret ? { client_secret: secret, client_secret_expires_at: 0 } : {}) }, 201, null, CORS);
 }
 
-// ---------- authorize (the owner approves) ----------
+// ---------- authorize (sign in, then approve) ----------
+// 1. Not signed in: the page shows ONLY a sign-in form. It reveals nothing about your account or connections.
+// 2. Signed in: no password again. Every handshake is a NEW connection, unless the same app signed in before:
+//    then it is a refresh and the existing connection is reused (and the page says so).
+// The approval is a same-origin form post authenticated by the session cookie; cross-site posts are refused.
 const PAGE_HEADERS = {
-  "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-frame-options": "DENY", "referrer-policy": "no-referrer",
-  "x-content-type-options": "nosniff", "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'",
+  "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-frame-options": "DENY",
+  "referrer-policy": "same-origin", // never "no-referrer": that makes browsers send "Origin: null" on form posts
+  "x-content-type-options": "nosniff", "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
+};
+const M_MARK = (size) => `<svg width="${size}" height="${size}" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7.2" fill="#2F54EB"/><path d="M8.5 22V11.5l7.5 6.5 7.5-6.5V22" fill="none" stroke="#fff" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="16" cy="8.2" r="2.5" fill="#fff"/></svg>`;
+const appTile = (name) => {
+  const id = detectBrand(name);
+  const inner = id ? brandSvg(id, 34) : `<span style="font:700 26px system-ui;color:#2F54EB">${esc(String(name || "?").trim().charAt(0).toUpperCase() || "?")}</span>`;
+  return `<span class="tile">${inner}</span>`;
 };
 const page = (title, inner, status = 200) => new Response(
   `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>${esc(title)}</title><style>
-:root{--bg:#F6F3EC;--card:#FFFFFF;--ink:#171C26;--ink2:#505867;--line:#E1DBCF;--accent:#1B6B64;--soft:#E3F0EE;--rose:#A4493F}
-@media(prefers-color-scheme:dark){:root{--bg:#10131A;--card:#181C26;--ink:#EEEAE0;--ink2:#B3B0A7;--line:#2C3342;--accent:#62C7BC;--soft:#17332F;--rose:#E58C82}}
-*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:20px;background:var(--bg);color:var(--ink);font:16px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-.c{width:100%;max-width:440px;background:var(--card);border:1px solid var(--line);border-radius:22px;padding:28px;box-shadow:0 24px 60px -30px rgba(0,0,0,.35)}
-.logo{width:48px;height:48px;border-radius:14px;background:var(--soft);color:var(--accent);display:grid;place-items:center;margin-bottom:16px}
-h1{font:600 22px/1.2 ui-serif,Georgia,serif;margin:0 0 6px}p{margin:0 0 14px;color:var(--ink2);font-size:15px}b{color:var(--ink)}
-label{display:block;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink2);margin:14px 0 6px}
-select,input{width:100%;font:inherit;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:12px;padding:11px 12px}
-select:focus,input:focus{outline:2px solid var(--accent);outline-offset:1px}
-.row{display:flex;gap:10px;margin-top:20px}button{flex:1;font:600 15px inherit;font-family:inherit;border-radius:999px;padding:12px 16px;cursor:pointer;border:1px solid var(--ink);background:var(--ink);color:var(--bg)}
-button.g{background:transparent;color:var(--ink);border-color:var(--line)}.err{color:var(--rose);font-size:14px;margin:12px 0 0}.fine{font-size:13px;color:var(--ink2);margin-top:16px}
-</style></head><body><main class="c"><div class="logo"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4.5 6v5.5c0 4.4 3.1 8.3 7.5 9.5 4.4-1.2 7.5-5.1 7.5-9.5V6L12 3Z"/><path d="m9 12 2.2 2.2L15.5 10"/></svg></div>${inner}</main></body></html>`,
+:root{--bg:#EEF1F5;--card:#FFFFFF;--ink:#0D1626;--ink2:#475268;--line:#D5DCE7;--cobalt:#2F54EB;--soft:#E3E9FD;--rose:#B92A44;--paper2:#E2E7EF}
+@media(prefers-color-scheme:dark){:root{--bg:#0A1020;--card:#111A2E;--ink:#E8EDF7;--ink2:#AAB5C9;--line:#26324A;--cobalt:#8EA3FF;--soft:#1B2547;--rose:#FF8696;--paper2:#0E1830}}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:20px;background:var(--bg);color:var(--ink);font:16px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.c{width:100%;max-width:440px;background:var(--card);border-radius:28px;padding:28px;box-shadow:0 0 0 1px var(--line),0 24px 60px -30px rgba(0,0,0,.45)}
+.pair{display:flex;align-items:center;justify-content:center;gap:0;margin:2px 0 22px}
+.tile{width:60px;height:60px;border-radius:18px;background:var(--bg);box-shadow:inset 0 0 0 1px var(--line);display:grid;place-items:center;flex:none}
+.pair .tile.m{background:none;box-shadow:none}
+.cable{height:3px;width:46px;border-radius:3px;background:var(--cobalt);opacity:.55;margin:0 6px}
+h1{font:700 24px/1.15 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:-.025em;margin:0 0 8px;text-align:center}
+p{margin:0 0 14px;color:var(--ink2);font-size:15px;text-align:center}b{color:var(--ink)}
+label{display:block;font-size:13px;font-weight:600;color:var(--ink2);margin:14px 0 6px}
+input[type=text],input[type=email],input[type=password]{width:100%;font:inherit;color:var(--ink);background:var(--bg);border:0;box-shadow:inset 0 0 0 1px var(--line);border-radius:14px;padding:12px 14px;min-height:46px}
+input:focus-visible{outline:2px solid var(--cobalt);outline-offset:1px}
+.opts{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.opt{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-radius:14px;box-shadow:inset 0 0 0 1px var(--line);cursor:pointer;margin:0;font-weight:400;color:var(--ink)}
+.opt input{margin-top:4px;accent-color:var(--cobalt)}.opt span{display:block;font-size:13px;color:var(--ink2)}.opt b{display:block;font-size:15px}
+.opt:has(input:checked){box-shadow:inset 0 0 0 2px var(--cobalt);background:var(--soft)}
+.row{display:flex;gap:10px;margin-top:22px}button{flex:1;font:600 15px inherit;font-family:inherit;border-radius:999px;padding:12px 16px;min-height:46px;cursor:pointer;border:0;background:var(--ink);color:var(--bg);transition:transform .14s cubic-bezier(.23,1,.32,1)}
+button:active{transform:scale(.97)}button.g{background:transparent;color:var(--ink);box-shadow:inset 0 0 0 1px var(--line)}
+button.link{background:none;color:var(--ink2);font-weight:500;text-decoration:underline;min-height:40px;margin-top:6px;width:100%;flex:none}
+.err{color:var(--rose);font-size:14px;margin:12px 0 0;text-align:center}.fine{font-size:13px;color:var(--ink2);margin:16px 0 0;text-align:center}
+.tag{display:block;width:fit-content;margin:0 auto 14px;background:var(--soft);color:var(--cobalt);font:600 13px system-ui;border-radius:8px;padding:5px 11px}
+@media(prefers-reduced-motion:reduce){button{transition:none}}
+</style></head><body><main class="c">${inner}</main></body></html>`,
   { status, headers: PAGE_HEADERS });
 
 // Reads and checks the authorize parameters. Returns { client, p } or { error }.
@@ -121,7 +152,8 @@ async function authParams(env, src) {
   if (!client) return { error: "This app is not registered. Remove the connector and add it again." };
   const redirect_uri = g("redirect_uri");
   if (!client.uris.includes(redirect_uri)) return { error: "The return address does not match the one this app registered." };
-  const p = { client_id: client.id, redirect_uri, state: g("state").slice(0, 500), code_challenge: g("code_challenge"), code_challenge_method: g("code_challenge_method"), response_type: g("response_type") || "code" };
+  const resource = g("resource");
+  const p = { client_id: client.id, redirect_uri, state: g("state").slice(0, 500), code_challenge: g("code_challenge"), code_challenge_method: g("code_challenge_method"), response_type: g("response_type") || "code", resource };
   if (p.response_type !== "code") return { client, p, redirect: "unsupported_response_type" };
   if (!/^[A-Za-z0-9_-]{43,128}$/.test(p.code_challenge) || g("code_challenge_method") !== "S256") return { client, p, redirect: "invalid_request" };
   return { client, p };
@@ -132,67 +164,105 @@ const back = (p, params) => {
   for (const [k, v] of Object.entries(params)) if (v !== "" && v != null) u.searchParams.set(k, v);
   return new Response(null, { status: 302, headers: { location: u.toString(), "cache-control": "no-store", "referrer-policy": "no-referrer" } });
 };
+const authorizeUrl = (url, p) => url.origin + "/oauth/authorize?" + new URLSearchParams({ response_type: "code", client_id: p.client_id, redirect_uri: p.redirect_uri, state: p.state, code_challenge: p.code_challenge, code_challenge_method: "S256", ...(p.resource ? { resource: p.resource } : {}) });
+const hiddenFields = (p, csrf) => ["client_id", "redirect_uri", "state", "code_challenge", "code_challenge_method", "resource"].filter((k) => p[k]).map((k) => `<input type="hidden" name="${k}" value="${esc(p[k])}">`).join("") + `<input type="hidden" name="csrf" value="${esc(csrf)}">`;
+const hostOf = (uri) => { try { const u = new URL(uri); return u.host || u.protocol; } catch { return ""; } };
 
-async function consent(env, url, client, p, error = "") {
-  const { results } = await env.DB.prepare("SELECT id, name, access FROM services WHERE revoked = 0 ORDER BY created").all();
-  const opts = results.map((s) => `<option value="${esc(s.id)}">${esc(s.name)} (${esc(ACCESS_LABEL[s.access] || "Full access")})</option>`).join("");
-  const hidden = ["client_id", "redirect_uri", "state", "code_challenge", "code_challenge_method"].map((k) => `<input type="hidden" name="${k}" value="${esc(p[k])}">`).join("");
-  let host = ""; try { host = new URL(p.redirect_uri).host || new URL(p.redirect_uri).protocol; } catch { /* shown empty */ }
-  return page("Allow access", `<h1>Allow <b>${esc(client.name)}</b> to use your memory?</h1>
-<p>It will get its own connection with its own access level and statistics. You can revoke it at any time. It returns to <b>${esc(host)}</b>.</p>
-<form method="post" action="/oauth/authorize" autocomplete="off">${hidden}
-<label for="service">Connection</label><select id="service" name="service">${opts}<option value="__new">New connection for ${esc(client.name)}</option></select>
-<label for="name">Name (new connection)</label><input id="name" name="name" maxlength="60" value="${esc(client.name)}">
-<label for="access">Access (new connection)</label><select id="access" name="access">${ACCESS.map((a) => `<option value="${a}"${a === "write" ? " selected" : ""}>${esc(ACCESS_LABEL[a])}</option>`).join("")}</select>
-<label for="password">Your password</label><input id="password" name="password" type="password" required autocomplete="current-password">
+// Every browser-rendered form includes a random double-submit CSRF cookie. Some Android
+// OAuth browsers report misleading Origin/Sec-Fetch-Site values; a valid form nonce is authoritative.
+// Cross-site forms cannot read the nonce and SameSite=Lax does not send the cookie on their POST.
+// "Claude at claude.ai" is the same app coming back; "Claude on a different site" is not.
+function oauthKey(name, redirectUri) {
+  let host = "";
+  try { const u = new URL(redirectUri); host = ["localhost", "127.0.0.1", "[::1]"].includes(u.hostname) ? "loopback" : (u.host || u.protocol); } catch { /* empty */ }
+  return (String(name || "").trim().toLowerCase() + "@" + host).slice(0, 200);
+}
+const findReconnect = (env, client, p) => env.DB.prepare("SELECT id, name, access FROM services WHERE revoked = 0 AND oauth_key = ? ORDER BY created DESC LIMIT 1").bind(oauthKey(client.name, p.redirect_uri)).first();
+
+function loginPage(client, p, csrf, { error = "", email = "" } = {}, status = 200) {
+  return page("Sign in", `<div class="pair">${appTile(client.name)}<span class="cable"></span><span class="tile m">${M_MARK(60)}</span></div>
+<h1>Sign in to continue</h1>
+<p><b>${esc(client.name)}</b> wants to connect to your Memory Relay. Sign in to your account first.</p>
+<form method="post" action="/oauth/authorize">${hiddenFields(p, csrf)}<input type="hidden" name="step" value="login">
+<label for="email">Email</label><input id="email" name="email" type="email" required autocomplete="username" value="${esc(email)}">
+<label for="password">Password</label><input id="password" name="password" type="password" required autocomplete="current-password">
 ${error ? `<p class="err" role="alert">${esc(error)}</p>` : ""}
-<div class="row"><button class="g" name="decision" value="deny" type="submit" formnovalidate>Deny</button><button name="decision" value="approve" type="submit">Allow</button></div></form>
-<p class="fine">Only continue if you started this connection yourself.</p>`);
+<div class="row"><button type="submit">Sign in</button></div></form>
+<p class="fine">Nothing is shared until you approve it on the next step.</p>`, status);
+}
+
+function consentPage(client, p, csrf, user, reconnect, error = "") {
+  const host = hostOf(p.redirect_uri);
+  const label = ACCESS_LABEL[reconnect ? reconnect.access : "write"];
+  const access = reconnect ? `<p class="fine" style="margin:0 0 6px"><b>${esc(reconnect.name)}</b> keeps its access level (${esc(label)}) and its history.</p>` : `
+<label>Access for this connection</label><div class="opts">${[["read", "Reads memory and skills. Cannot change anything."], ["write", "Also saves memories, uploads skills and hands jobs to sub-agents."], ["full", "Also deletes memories and cleans up duplicates."]].map(([v, hint]) =>
+  `<label class="opt"><input type="radio" name="access" value="${v}"${v === "write" ? " checked" : ""}><div><b>${esc(ACCESS_LABEL[v])}</b><span>${esc(hint)}</span></div></label>`).join("")}</div>
+<label for="name">Connection name</label><input id="name" name="name" type="text" maxlength="60" value="${esc(client.name)}">`;
+  return page("Allow access", `<div class="pair">${appTile(client.name)}<span class="cable"></span><span class="tile m">${M_MARK(60)}</span></div>
+<span class="tag">${reconnect ? "Refreshing an existing connection" : "New connection"}</span>
+<h1>${reconnect ? "Reconnect" : "Connect"} ${esc(client.name)}?</h1>
+<p>${reconnect ? `This app was connected before, so this refreshes <b>${esc(reconnect.name)}</b> instead of making a new one.` : `This creates a new connection with its own access level, activity and kill switch.`} It returns to <b>${esc(host)}</b>.</p>
+<form method="post" action="/oauth/authorize">${hiddenFields(p, csrf)}<input type="hidden" name="step" value="consent">${access}
+${error ? `<p class="err" role="alert">${esc(error)}</p>` : ""}
+<div class="row"><button class="g" name="decision" value="deny" type="submit">Deny</button><button name="decision" value="approve" type="submit">${reconnect ? "Reconnect" : "Allow"}</button></div>
+${reconnect ? `<button class="link" name="decision" value="new" type="submit">Create a separate new connection instead</button>` : ""}</form>
+<p class="fine">Signed in as ${esc(user.email)}. Only continue if you started this connection yourself.</p>`);
 }
 
 async function authorize(request, env, url) {
-  if (request.method === "GET") {
-    const r = await authParams(env, url.searchParams);
-    if (r.error) return page("Cannot continue", `<h1>Cannot continue</h1><p>${esc(r.error)}</p>`, 400);
-    if (r.redirect) return back(r.p, { error: r.redirect, state: r.p.state, iss: url.origin });
-    return consent(env, url, r.client, r.p);
+  if (request.method !== "GET" && request.method !== "POST") return new Response("method not allowed", { status: 405, headers: { allow: "GET, POST" } });
+  const post = request.method === "POST";
+  let form = null;
+  if (post) {
+    try { form = await request.formData(); } catch { return page("Cannot continue", "<h1>Cannot continue</h1><p>Bad request.</p>", 400); }
   }
-  if (request.method !== "POST") return new Response("method not allowed", { status: 405, headers: { allow: "GET, POST" } });
-  const origin = request.headers.get("origin");
-  if (origin && origin !== url.origin) return page("Refused", "<h1>Refused</h1><p>This form must be sent from this site.</p>", 403);
-  let form;
-  try { form = await request.formData(); } catch { return page("Cannot continue", "<h1>Cannot continue</h1><p>Bad request.</p>", 400); }
-  const r = await authParams(env, form);
+  const r = await authParams(env, post ? form : url.searchParams);
   if (r.error) return page("Cannot continue", `<h1>Cannot continue</h1><p>${esc(r.error)}</p>`, 400);
   if (r.redirect) return back(r.p, { error: r.redirect, state: r.p.state, iss: url.origin });
-  if (form.get("decision") !== "approve") return back(r.p, { error: "access_denied", state: r.p.state, iss: url.origin });
-
-  const keys = ["oauth-ip:" + ip(request)];
-  if (await locked(env, keys)) return consent(env, url, r.client, r.p, "Too many wrong passwords. Wait 15 minutes.").then((x) => new Response(x.body, { status: 429, headers: x.headers }));
-  const owner = await env.DB.prepare("SELECT pass_hash, salt FROM users ORDER BY id LIMIT 1").first();
-  const pw = String(form.get("password") || "").slice(0, 256);
-  const { hash } = await hashPassword(pw, owner ? owner.salt : randomHex(16));
-  if (!owner || !sameText(hash, owner.pass_hash)) {
-    await recordFail(env, keys);
-    return consent(env, url, r.client, r.p, "Wrong password.").then((x) => new Response(x.body, { status: 401, headers: x.headers }));
+  const { client, p } = r;
+  if (p.resource && p.resource !== url.origin + "/mcp") return back(p, { error: "invalid_target", state: p.state, iss: url.origin });
+  const storedCsrf = cookieFrom(request, CSRF_NAME);
+  if (post && (!/^[a-f0-9]{64}$/.test(String(form.get("csrf") || "")) ||
+    !storedCsrf || !sameText(storedCsrf, String(form.get("csrf"))))) {
+    return page("Refused", "<h1>Refused</h1><p>This authorization form expired. Return to the app and connect again.</p>", 403);
   }
-  await clearFails(env, keys);
+  const csrf = post ? storedCsrf : randomHex(32);
+  const rendered = (res) => post ? res : csrfPage(res, csrf);
 
-  let serviceId = String(form.get("service") || "");
-  if (serviceId === "__new") {
-    const access = ACCESS.includes(String(form.get("access"))) ? String(form.get("access")) : "write";
-    const made = await createService(env, String(form.get("name") || r.client.name), access);
-    if (made.error) return consent(env, url, r.client, r.p, made.error);
-    serviceId = made.id;
+  // step 1: sign in (only ever a form; it shows nothing about the account)
+  if (post && form.get("step") === "login") {
+    const res = await passwordLogin(env, request, form.get("email"), form.get("password"));
+    if (!res.ok) return loginPage(client, p, csrf, { error: res.error, email: String(form.get("email") || "") }, res.status);
+    return new Response(null, { status: 302, headers: { location: authorizeUrl(url, p), "set-cookie": res.cookie, "cache-control": "no-store" } });
+  }
+  const user = await currentUser(env, request);
+  if (!user) return rendered(loginPage(client, p, csrf));
+
+  // step 2: approve (new connection, or refresh of the same app's connection)
+  const reconnect = await findReconnect(env, client, p);
+  if (!post) return rendered(consentPage(client, p, csrf, user, reconnect));
+  const decision = String(form.get("decision") || "");
+  if (decision === "deny") return back(p, { error: "access_denied", state: p.state, iss: url.origin });
+  if (decision !== "approve" && decision !== "new") return consentPage(client, p, csrf, user, reconnect);
+
+  let serviceId;
+  if (reconnect && decision === "approve") {
+    serviceId = reconnect.id;
   } else {
-    const s = await env.DB.prepare("SELECT id FROM services WHERE id = ? AND revoked = 0").bind(serviceId).first();
-    if (!s) return consent(env, url, r.client, r.p, "Pick a connection.");
+    const access = ACCESS.includes(String(form.get("access"))) ? String(form.get("access")) : "write";
+    let name = String(form.get("name") || client.name).trim().slice(0, 60) || client.name;
+    const taken = new Set((await env.DB.prepare("SELECT name FROM services WHERE revoked = 0").all()).results.map((x) => x.name));
+    for (let n = 2, base = name; taken.has(name) && n < 50; n++) name = (base + " " + n).slice(0, 60);
+    const made = await createService(env, name, access);
+    if (made.error) return consentPage(client, p, csrf, user, reconnect, made.error);
+    await env.DB.prepare("UPDATE services SET oauth_key = ? WHERE id = ?").bind(oauthKey(client.name, p.redirect_uri), made.id).run();
+    serviceId = made.id;
   }
   const code = randomHex(32);
   await env.DB.prepare("DELETE FROM oauth_codes WHERE expires < ?").bind(Date.now()).run();
   await env.DB.prepare("INSERT INTO oauth_codes (code_hash, client_id, service_id, redirect_uri, challenge, expires) VALUES (?, ?, ?, ?, ?, ?)")
-    .bind(await sha256Hex(code), r.client.id, serviceId, r.p.redirect_uri, r.p.code_challenge, Date.now() + CODE_TTL * 1000).run();
-  return back(r.p, { code, state: r.p.state, iss: url.origin });
+    .bind(await sha256Hex(code), client.id, serviceId, p.redirect_uri, p.code_challenge, Date.now() + CODE_TTL * 1000).run();
+  return back(p, { code, state: p.state, iss: url.origin });
 }
 
 // ---------- tokens ----------
@@ -214,6 +284,7 @@ async function token(request, env) {
   if (!(await rateLimit(env, "oauth-tok:" + ip(request), 60, 60000)).ok) return oerr("temporarily_unavailable", "slow down", 429);
   const b = await readParams(request);
   if (!b) return oerr("invalid_request", "send form fields or JSON");
+  if (b.resource && b.resource !== new URL(request.url).origin + "/mcp") return oerr("invalid_target", "wrong resource");
   let clientId = String(b.client_id || ""), secret = String(b.client_secret || "");
   const basic = (request.headers.get("authorization") || "").match(/^Basic\s+(\S+)$/i);
   if (basic) { try { const [i, ...rest] = atob(basic[1]).split(":"); clientId = decodeURIComponent(i); secret = decodeURIComponent(rest.join(":")); } catch { /* fall through */ } }

@@ -59,6 +59,11 @@ export async function callTool(env, name, a, agentName = "", svc = null) {
       return { skill_md: r.text, tokens: r.tokens, warnings: r.warnings,
         next: "Review the draft. Then call upload_skill with skill_md. The owner must approve it before any agent can use it." };
     }
+    case "get_skill_script": {
+      const row = await env.DB.prepare("SELECT name, skill, description, code FROM skill_scripts WHERE name = ?").bind(a.name).first();
+      if (!row) throw new ToolError("script not found");
+      return row;
+    }
     case "get_delegation_brief": return { text: GUIDE + "\n\n## Brief form\n" + BRIEF_FORM };
     case "delegate": {
       const r = await delegate(env, svc, a);

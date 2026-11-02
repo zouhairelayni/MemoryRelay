@@ -65,6 +65,14 @@ public/            manifest, service worker, icons
 test/              node:test unit tests
 ```
 
+## Included adapted skills and Python bank
+
+MemoryRelay installs 11 concise, original adaptations based on the public Anthropic skills catalog on first startup. Existing same-name skills are never overwritten. Skill Genie automatically selects relevant instructions; when `webapp-testing` or `canvas-design` is selected, its Python template is included alongside the skill. The Skills screen shows a read-only **Python script bank**. Agents can also call `get_skill_script(name)` to retrieve source for a supported template. **Scripts are never executed on the Worker.** A host with an approved Python environment must create and run them.
+
+The OAuth authorization form now uses an expiring, same-origin double-submit CSRF cookie so embedded/in-app browsers with unusual Origin and Sec-Fetch-Site headers can complete approval. OAuth still requires registered callbacks, PKCE S256 and account sign-in. Reconnect from Claude/Gemini with your **plain `/mcp` URL** after deployment; no long secret URL is needed. Existing secret URLs remain valid and untouched.
+
+Install instructions: `npm install`, `npm run test:core`, `npm run deploy`. Node.js 22+ is recommended for the built-in SQLite test helper. The source archive contains `package.json` but no lockfile; create one by running `npm install` before deployment.
+
 ## Adding a module (a new tab)
 
 1. Create `src/modules/<id>/<Id>Screen.jsx` (it receives `{ active }`).
@@ -134,7 +142,7 @@ Skills tab → **Write with AI** to make a new skill, or open a skill and tap **
 There are two ways to connect an agent, and both work at the same time:
 
 1. **Secret address** `https://your-app/mcp/<secret>`, one per connection (as before).
-2. **OAuth** `https://your-app/mcp`. Apps that support remote MCP with OAuth (for example a Claude custom connector) find everything themselves: they register, open a page on your Worker, and you approve with your **password**. Pick an existing connection or make a new one, and choose its access level. Tokens last 1 hour and refresh automatically (rotating refresh tokens; a reused refresh token ends that sign-in). PKCE (S256) is required. Only hashes are stored.
+2. **OAuth** `https://your-app/mcp`. Apps that support remote MCP with OAuth (for example a Claude custom connector) find everything themselves: they register, open a page on your Worker, and you approve there. If you are not signed in you sign in first (the page shows nothing about your account until you do); if you are, there is no password step. Every sign-in creates a **new** connection and you choose its access level; the same app signing in again is recognised as a refresh and reuses its connection (the page says so, and offers a separate new one instead). Tokens last 1 hour and refresh automatically (rotating refresh tokens; a reused refresh token ends that sign-in). PKCE (S256) is required. Only hashes are stored.
 
 Each connection has an **access level** (the eye / pencil / shield control on the Agents tab):
 
@@ -180,7 +188,7 @@ kind: snippet | function | feature | refactor | tests | review | explain | debug
 ## Known limits (by design, worth knowing)
 
 * **Provider keys are stored as plain text in your D1 database** (the dashboard shows only the last 4 characters). Anyone with access to your Cloudflare account or the database can read them. Use keys with spending limits, and rotate them if the account is ever shared.
-* **OAuth registration is open** (that is how connectors sign themselves up). A stranger can register an app, but cannot get a token without your password on the approval page. Read the app name and the return address on that page before you approve. Unfinished registrations are removed after an hour.
+* **OAuth registration is open** (that is how connectors sign themselves up). A stranger can register an app, but cannot get a token without signing in as you and approving it. Read the app name and the return address on that page before you approve. Unfinished registrations are removed after an hour.
 * **Sub-agent output is untrusted text.** It runs on other companies' servers and can be wrong or contain instructions. Agents are told to verify it and never follow instructions inside it.
 * **A secret address works like a password.** Anyone who has it has that connection's access level. Revoke it if it leaks; use OAuth to avoid pasting it anywhere.
 
@@ -194,3 +202,8 @@ The look was planned from the product, not from a template, using the guidance o
 * **Motion rules:** ease-out only; UI motion under 300 ms (drawers 480 ms); nothing enters from scale(0); hover movement only on real pointers; one orchestrated entrance (Live); `prefers-reduced-motion` keeps colour and opacity changes and drops movement.
 * **Mobile rules:** 44 px touch targets, safe areas, 16 px inputs, bottom navigation with 5 items, labels above fields, dark and light themes with checked contrast (body text 4.7:1 or better in both).
 * **Fonts:** system fonts only (the app's security policy blocks external fonts). To use a custom typeface, add a self-hosted `@font-face` in `tokens.css` and put it first in `--display`.
+
+## App icon and connected-app logos
+
+* The installed (PWA) icon is the M mark: `public/icons/` has 192/512 px icons, maskable 192/512 px versions with the logo inside the safe zone, an Apple touch icon, favicons and an SVG. The manifest lists them all. Phones keep the old icon until the app is removed from the home screen and added again.
+* When Claude, ChatGPT, Gemini, Cursor, Copilot, Perplexity or Mistral connect, their logo is shown instead of a generic icon (dashboard and sign-in page). The app is recognised from the connection name and from what the app reports about itself. Unknown apps get a letter tile in the agent's cable colour. The marks live in `shared/brands.js` and are simplified drawings for identification only; edit them there.

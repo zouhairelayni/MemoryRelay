@@ -7,6 +7,7 @@ import { useInstallPrompt } from "../../hooks/useInstallPrompt.js";
 import { cableColor } from "../../lib/cable.js";
 import { copyText } from "../../lib/clipboard.js";
 import Icon from "../../components/Icon.jsx";
+import Brand from "../../components/Brand.jsx";
 import IconButton from "../../components/IconButton.jsx";
 import Button from "../../components/Button.jsx";
 
@@ -80,7 +81,7 @@ export default function HomeScreen({ active }) {
           {agents === null ? [0, 1].map((k) => <div className="skel" key={k} />) : null}
           {connected.slice(0, 4).map((a) => (
             <button key={a.id} type="button" className="agent-row" style={{ "--cable": cableColor(a.name) }} onClick={() => go("agents")}>
-              <i className="cd" />
+              <Brand names={[a.name, a.app]} size={38} cable={cableColor(a.name)} />
               <span className="tt"><b>{a.name}</b><small>{a.last ? "Last used " + a.last : "Not used yet"}</small></span>
               <span className="rwd" aria-label={a.n_read + " reads, " + a.n_write + " writes, " + a.n_delete + " deletes"}>
                 <span><Icon name="eye" size={14} />{a.n_read}</span>

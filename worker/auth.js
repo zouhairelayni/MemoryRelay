@@ -51,8 +51,11 @@ export async function currentUser(env, request) {
   ).bind(await sha256Hex(token), Date.now()).first();
 }
 
+// SameSite=Lax (not Strict): the browser must send the session when an app (ChatGPT, Claude...) sends you to the sign-in
+// page by a normal link, otherwise you would be asked to log in again every time. Lax still withholds the cookie from
+// cross-site POST and fetch requests, and every state-changing route also checks the request's origin.
 const sessionCookie = (token, maxAge) =>
-  COOKIE + "=" + token + "; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=" + maxAge;
+  COOKIE + "=" + token + "; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=" + maxAge;
 
 async function startSession(env, userId) {
   const token = randomHex(32);
@@ -119,20 +122,28 @@ export async function authSetup(env, request) {
   return json({ ok: true }, 200, await startSession(env, r.meta.last_row_id));
 }
 
-export async function authLogin(env, request) {
-  // Login accepts any length, so accounts created before the 12-character rule can still sign in.
-  const c = readCreds(await readObject(request), 1);
-  if (c.error) return json({ error: c.error }, 400);
-  const keys = throttleKeys(c.email, request);
-  if (await locked(env, keys)) return json(TOO_MANY, 429);
-  const u = await env.DB.prepare("SELECT id, pass_hash, salt FROM users WHERE email = ?").bind(c.email).first();
-  const { hash } = await hashPassword(c.password, u ? u.salt : randomHex(16)); // same work whether or not the email exists
+// Checks an email and password with the same throttling as the dashboard login. Returns { ok, cookie } or { status, error }.
+export async function passwordLogin(env, request, email, password) {
+  const e = String(email || "").trim().toLowerCase().slice(0, 254), pw = String(password || "").slice(0, MAX_PASSWORD);
+  if (!e || !pw) return { status: 400, error: "enter your email and password" };
+  const keys = throttleKeys(e, request);
+  if (await locked(env, keys)) return { status: 429, error: TOO_MANY.error };
+  const u = await env.DB.prepare("SELECT id, pass_hash, salt FROM users WHERE email = ?").bind(e).first();
+  const { hash } = await hashPassword(pw, u ? u.salt : randomHex(16)); // same work whether or not the email exists
   if (!u || !sameText(hash, u.pass_hash)) {
     await recordFail(env, keys);
-    return json({ error: "wrong email or password" }, 401);
+    return { status: 401, error: "wrong email or password" };
   }
   await clearFails(env, keys);
-  return json({ ok: true }, 200, await startSession(env, u.id));
+  return { ok: true, cookie: await startSession(env, u.id), email: e };
+}
+
+export async function authLogin(env, request) {
+  // Login accepts any length, so accounts created before the 12-character rule can still sign in.
+  const b = await readObject(request);
+  const r = await passwordLogin(env, request, b.email, b.password);
+  if (!r.ok) return json({ error: r.error }, r.status);
+  return json({ ok: true }, 200, r.cookie);
 }
 
 export async function auth(request, env, url) {

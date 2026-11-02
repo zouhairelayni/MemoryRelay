@@ -5,6 +5,6 @@ import react from "@vitejs/plugin-react";
 const worker = "http://localhost:8787";
 export default defineConfig({
   plugins: [react()],
-  server: { proxy: { "/api": worker, "/auth": worker, "/mcp": worker } },
+  server: { proxy: { "/api": worker, "/auth": worker, "/mcp": worker, "/oauth": worker, "/.well-known": worker } },
   build: { outDir: "dist", sourcemap: false },
 });

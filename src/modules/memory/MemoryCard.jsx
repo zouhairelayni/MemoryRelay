@@ -2,6 +2,7 @@ import { useState } from "react";
 import ActionRow from "../../components/ActionRow.jsx";
 import Collapse from "../../components/Collapse.jsx";
 import Icon from "../../components/Icon.jsx";
+import Brand from "../../components/Brand.jsx";
 import MemoryEditor from "./MemoryEditor.jsx";
 import { hasRule, splitTags } from "../../lib/format.js";
 import { sourceInfo } from "../../lib/cable.js";
@@ -29,7 +30,7 @@ export default function MemoryCard({ m, editing, onEdit, onCancel, onSave, onDel
       <button type="button" className="mem-main" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
         <span className="mt">{m.text}</span>
         <span className="meta">
-          {rule ? <span className="tag-rule"><Icon name="lock" size={13} />Rule</span> : <span className="src"><i className="cd" style={{ "--cable": src.color }} />{src.name}</span>}
+          {rule ? <span className="tag-rule"><Icon name="lock" size={13} />Rule</span> : <span className="src">{src.agent ? <Brand names={[src.name]} size={18} cable={src.color} /> : <i className="cd" style={{ "--cable": src.color }} />}{src.name}</span>}
           {tags.map((t) => <span key={t}>#{t}</span>)}
           <span>{m.time}</span>
         </span>

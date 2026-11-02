@@ -1,6 +1,7 @@
 import Badge from "../../components/Badge.jsx";
 import Collapse from "../../components/Collapse.jsx";
 import Icon from "../../components/Icon.jsx";
+import Brand from "../../components/Brand.jsx";
 import IconButton from "../../components/IconButton.jsx";
 import ActionRow from "../../components/ActionRow.jsx";
 import AccessPicker from "../../components/AccessPicker.jsx";
@@ -25,7 +26,7 @@ export default function AgentCard({ s, open, onToggle, onCopy, onRevoke, onDelet
     <article className={"dcard conn" + (s.revoked ? " off" : "") + (open ? " open" : "")} style={{ "--cable": cableColor(s.name) }}>
       <div className="cpad">
         <div className="chead">
-          <span className={"chip " + (s.revoked ? "lock" : "")} style={s.revoked ? undefined : { background: "color-mix(in srgb, var(--cable) 16%, var(--card))", color: "var(--cable)" }}><Icon name="agents" size={19} /></span>
+          <Brand names={[s.name, s.app]} size={46} cable={cableColor(s.name)} />
           <div className="grow">
             <h3>{s.name}</h3>
             <div className="sub">{s.sessions ? s.sessions + " signed in with OAuth" : s.app || "No app reported yet"}</div>

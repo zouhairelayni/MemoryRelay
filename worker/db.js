@@ -31,6 +31,7 @@ export async function ensureSchema(env) {
     env.DB.prepare("CREATE TABLE IF NOT EXISTS openrouter_models (name TEXT PRIMARY KEY, enabled INTEGER NOT NULL DEFAULT 1, pos INTEGER NOT NULL DEFAULT 0)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS openrouter_cooldowns (key_id TEXT NOT NULL, model TEXT NOT NULL, until INTEGER NOT NULL, PRIMARY KEY (key_id, model))"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS skills (name TEXT PRIMARY KEY, description TEXT NOT NULL, body TEXT NOT NULL, enabled INTEGER NOT NULL DEFAULT 1, core INTEGER NOT NULL DEFAULT 0, source TEXT NOT NULL DEFAULT '', created TEXT NOT NULL, updated TEXT NOT NULL)"),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS skill_scripts (name TEXT PRIMARY KEY, skill TEXT NOT NULL, description TEXT NOT NULL, code TEXT NOT NULL)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS memories (id TEXT PRIMARY KEY, text TEXT NOT NULL, tags TEXT NOT NULL DEFAULT '', source TEXT NOT NULL DEFAULT '', created TEXT NOT NULL, updated TEXT NOT NULL, history TEXT NOT NULL DEFAULT '[]')"),
   ]);
   await env.DB.prepare(
@@ -66,11 +67,15 @@ export async function ensureSchema(env) {
     env.DB.prepare("CREATE TABLE IF NOT EXISTS delegations (id INTEGER PRIMARY KEY AUTOINCREMENT, service_id TEXT NOT NULL, provider TEXT NOT NULL DEFAULT '', model TEXT NOT NULL DEFAULT '', kind TEXT NOT NULL DEFAULT '', tokens_in INTEGER NOT NULL DEFAULT 0, tokens_out INTEGER NOT NULL DEFAULT 0, ms INTEGER NOT NULL DEFAULT 0, ok INTEGER NOT NULL DEFAULT 0, error TEXT NOT NULL DEFAULT '', ts INTEGER NOT NULL)"),
     env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_delegations_ts ON delegations (ts)"),
   ]);
-  // Access level per connection (read / write / full). Older connections keep full access.
-  const hasAccess = await env.DB.prepare("SELECT 1 AS x FROM pragma_table_info('services') WHERE name = 'access'").first();
-  if (!hasAccess) {
-    try { await env.DB.prepare("ALTER TABLE services ADD COLUMN access TEXT NOT NULL DEFAULT 'full'").run(); }
-    catch (e) { if (!/duplicate column/i.test(String(e && e.message))) throw e; } // another instance added it first
+  // Columns added after the first release. Older databases get them here; "already exists" from a racing instance is fine.
+  const have = new Set((await env.DB.prepare("SELECT name FROM pragma_table_info('services')").all()).results.map((c) => c.name));
+  for (const [col, ddl] of [
+    ["access", "access TEXT NOT NULL DEFAULT 'full'"],   // read / write / full (older connections keep full)
+    ["oauth_key", "oauth_key TEXT NOT NULL DEFAULT ''"], // which app signed in with OAuth, to recognise a reconnect
+  ]) {
+    if (have.has(col)) continue;
+    try { await env.DB.prepare("ALTER TABLE services ADD COLUMN " + ddl).run(); }
+    catch (e) { if (!/duplicate column/i.test(String(e && e.message))) throw e; }
   }
   await env.DB.prepare(
     "CREATE TABLE IF NOT EXISTS gemini_keys (id TEXT PRIMARY KEY, label TEXT NOT NULL, key TEXT NOT NULL UNIQUE, enabled INTEGER NOT NULL DEFAULT 1, created TEXT NOT NULL)"

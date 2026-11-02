@@ -1,8 +1,8 @@
 // Service worker: network-first for pages, cache fallback when offline.
 // /api, /auth, /mcp, /oauth and /.well-known are never touched or cached (the sign-in page must never become the cached app page). Bump CACHE to force clients to refresh.
-const CACHE = "memory-relay-v4";
+const CACHE = "memory-relay-v5";
 self.addEventListener("install", (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(["/", "/manifest.webmanifest", "/icons/icon-192.png"])).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(["/", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon.svg"])).then(() => self.skipWaiting()));
 });
 self.addEventListener("activate", (e) => {
   e.waitUntil(
