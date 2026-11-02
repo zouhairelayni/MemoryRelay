@@ -298,3 +298,10 @@ button:focus-visible, a:focus-visible, select:focus-visible, summary:focus-visib
 .btn.sm{min-height:36px;padding:7px 12px}
 .home-screen .lib-row,.home-screen .agent-row{box-shadow:none}
 @media(max-width:600px){.filter{flex-wrap:wrap}.filter>.cluster{flex:1;justify-content:space-between}.count-pill{font-size:12px}}
+
+/* Activity: compact totals and meaningful Chart.js plots instead of mini SVGs. */
+.monitor-metrics{gap:10px;background:transparent;border:0;border-radius:0;overflow:visible}
+.monitor-metrics>div{border:1px solid var(--line);border-radius:12px;padding:14px 16px;min-height:76px;gap:8px}
+.monitor-metrics b{font-size:24px;font-weight:600}
+.monitor-figure{gap:16px}
+.monitor-chart-title{align-items:center}

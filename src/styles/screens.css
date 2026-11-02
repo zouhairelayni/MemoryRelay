@@ -82,13 +82,15 @@
 .monitor-metric{display:flex;flex-direction:column;min-width:0;gap:4px;padding:14px 16px;background:var(--card);border:1px solid var(--line);border-radius:12px}
 .monitor-metric span{font-size:12px;color:var(--muted)}
 .monitor-metric b{font:600 24px/1.15 var(--display);font-variant-numeric:tabular-nums;color:var(--ink)}
-.monitor-line{display:block;width:100%;height:40px;overflow:visible}
-.monitor-line.large{height:130px}
 .monitor-chart-title{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
 .monitor-function-list{max-height:480px;overflow-y:auto;scrollbar-color:var(--line) transparent}
-.monitor-function{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(70px,1fr) minmax(30px,auto);gap:14px;align-items:center;padding:9px 0;border-bottom:1px solid var(--hair);font-size:12px}
-.monitor-function:last-child{border-bottom:0}
-.monitor-function span{min-width:0;overflow-wrap:anywhere;color:var(--ink2)}
-.monitor-function .monitor-line{height:26px}
-.monitor-function b{font-variant-numeric:tabular-nums;font-weight:600;text-align:right}
+/* Chart.js canvases use their own responsive container, not stretched SVG paths. */
+.activity-chart{height:240px;min-width:0;position:relative;width:100%}
+.activity-chart canvas{max-width:100%;max-height:100%}
+.activity-chart-bar{height:clamp(185px,36vw,280px)}
+.monitor-chart-title select.fld{max-width:100%;min-height:40px;width:auto;flex:0 1 220px;font-size:13px}
+.monitor-chart-title p{margin:4px 0 0}
+.monitor-metric{min-height:76px}
+.monitor-metrics b{font-variant-numeric:tabular-nums}
+@media(max-width:600px){.activity-chart{height:208px}.activity-chart-bar{height:235px}.monitor-chart-title select.fld{width:100%;flex:1 1 100%}}
 @media(min-width:800px){.monitor-metrics{grid-template-columns:repeat(4,minmax(0,1fr))}}

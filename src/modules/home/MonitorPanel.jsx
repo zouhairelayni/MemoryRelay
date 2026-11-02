@@ -1,5 +1,6 @@
 import {useEffect,useMemo,useState} from 'react';
 import {monitoring} from '../../api/endpoints.js';
+import ActivityChart from './ActivityChart.jsx';
 
 const fmt=n=>Intl.NumberFormat().format(Number(n)||0);
 const time=ts=>new Date(ts).toLocaleString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
@@ -21,16 +22,6 @@ const METRICS=[
   ['provider','Model API calls'],['api','Dashboard API calls'],['tokens','Estimated tokens'],['errors','Errors'],
 ];
 function RunningElapsed({start}){const [clock,setClock]=useState(Date.now());useEffect(()=>{const id=setInterval(()=>setClock(Date.now()),1000);return()=>clearInterval(id);},[]);return <span>{elapsed(clock-start)} elapsed{clock-start>20*60e3?' · Check for stalled task':''}</span>;}
-function ChartLine({values,label,large=false}){
-  const max=Math.max(1,...values);
-  const width=320,height=large?110:44,pad=large?8:3;
-  const points=values.map((n,i)=>[pad+(width-2*pad)*i/Math.max(1,values.length-1),height-pad-(height-2*pad)*n/max]);
-  const d=points.map(([x,y],i)=>(i?'L':'M')+x.toFixed(1)+','+y.toFixed(1)).join(' ');
-  return <svg className={large?'monitor-line large':'monitor-line'} role="img" aria-label={label} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
-    {large?<path d={`M${pad},${height-pad}H${width-pad}`} stroke="var(--line)" fill="none"/>:null}
-    <path d={d} stroke="var(--cobalt)" strokeWidth={large?2.5:2} strokeLinejoin="round" strokeLinecap="round" fill="none" vectorEffect="non-scaling-stroke"/>
-  </svg>;
-}
 function Heat({hourly}){
   const counts=new Map(hourly.map(x=>[x.weekday+'-'+x.hour,Number(x.n)]));
   const max=Math.max(1,...counts.values());
@@ -43,7 +34,7 @@ function Heat({hourly}){
   </div></div>;
 }
 export default function MonitorPanel({active}) {
-  const [period,setPeriod]=useState('30'),[data,setData]=useState(null),[error,setError]=useState('');
+  const [period,setPeriod]=useState('30'),[metric,setMetric]=useState('mcp'),[data,setData]=useState(null),[error,setError]=useState('');
   useEffect(()=>{if(!active)return;let alive=true;setData(null);
     const load=()=>monitoring.get(period).then(d=>{if(alive){setData(d);setError('');}}).catch(e=>{if(alive)setError(e.message)});
     load();const id=setInterval(load,8000);return()=>{alive=false;clearInterval(id)};
@@ -64,32 +55,43 @@ export default function MonitorPanel({active}) {
     return {buckets,totals,byMetric,byAction};
   },[data]);
   const totals=useMemo(()=>METRICS.map(([id,label])=>({id,label,count:(data?.totals||[]).reduce((n,row)=>n+measure(row,id),0)})),[data]);
+  const timeLabels=useMemo(()=>timeline.buckets.map(t=>new Date(t).toLocaleString(undefined,
+    period==='1h'||period==='1d'?{hour:'2-digit',minute:'2-digit'}:{month:'short',day:'numeric'})),[timeline.buckets,period]);
+  const functionRows=useMemo(()=>(data?.totals||[]).filter(x=>Number(x.n)>0),[data]);
+  const topFunctions=useMemo(()=>functionRows.slice(0,8),[functionRows]);
+  const functionNames=useMemo(()=>topFunctions.map(x=>{const name=x.category+' / '+x.action;return name.length>26?name.slice(0,25)+'…':name;}),[topFunctions]);
+  const functionCounts=useMemo(()=>topFunctions.map(x=>Number(x.n)),[topFunctions]);
+  const plotValues=metric==='all'?timeline.totals:metric.startsWith('fn:')?
+    timeline.byAction.get(metric.slice(3))||[]:timeline.byMetric[metric]||[];
+  const selectedLabel=metric==='all'?'All recorded events':metric.startsWith('fn:')?
+    metric.slice(3).replace(':',' / '):METRICS.find(([id])=>id===metric)?.[1]||'MCP calls';
   const jobs=data?.jobs||[],activeJobs=jobs.filter(j=>j.state==='running');
-  const periodStart=data?.start?time(data.start):'';
   return <section className="monitor-root" aria-label="Activity monitoring">
     <div className="monitor-header"><div><h3>Activity</h3><p className="muted small">Recorded usage. AI token counts are estimates, not billing totals.</p></div>
-      <select className="fld" aria-label="Activity period" value={period} onChange={e=>setPeriod(e.target.value)}>
+      <select className="fld" aria-label="Activity period" value={period} onChange={e=>{setPeriod(e.target.value);setMetric('mcp')}}>
         <option value="1h">1 hour</option><option value="1d">1 day</option><option value="7">7 days</option><option value="30">30 days</option><option value="90">90 days</option>
       </select></div>
     {error?<p className="small" role="alert">Unable to load activity: {error}</p>:null}
     {!data?<p className="muted small">Loading activity…</p>:<>
       <div className="monitor-metrics">
-        {totals.map(({id,label,count})=><div key={id} className="monitor-metric"><span>{label}</span><b>{fmt(count)}</b>
-          <ChartLine values={timeline.byMetric[id]||[]} label={`${label} trend over ${data.label}`}/></div>)}
+        {totals.map(({id,label,count})=><div key={id} className="monitor-metric"><span>{label}</span><b>{fmt(count)}</b></div>)}
       </div>
-      <div className="card monitor-figure"><div className="monitor-chart-title"><h4>Recorded events over time</h4><span className="muted small">Since {periodStart}</span></div>
-        <ChartLine large values={timeline.totals} label={`All recorded events over ${data.label}`}/>
-        <div className="monitor-chart-ends"><span>{periodStart}</span><span>Now</span></div>
-        {period==='1h'||period==='1d'?null:<><h4>Hourly activity</h4><Heat hourly={data.hourly}/></>}
+      <div className="card monitor-figure">
+        <div className="monitor-chart-title"><div><h4>Activity trend</h4><p className="muted small">{data.label} · Recorded data, not cumulative totals</p></div>
+          <select className="fld" aria-label="Chart metric" value={metric} onChange={e=>setMetric(e.target.value)}>
+            <option value="all">All recorded events</option>
+            <optgroup label="Metrics">{METRICS.map(([id,name])=><option key={id} value={id}>{name}</option>)}</optgroup>
+            <optgroup label="Functions">{functionRows.map(x=><option key={`${x.category}:${x.action}`} value={`fn:${x.category}:${x.action}`}>{x.category} / {x.action}</option>)}</optgroup>
+          </select>
+        </div>
+        <ActivityChart type="line" labels={timeLabels} values={plotValues} label={`${selectedLabel} over ${data.label}`} unit={metric==='tokens'?'tokens':metric==='skill'?'selections':metric==='delegate'?'tasks':metric==='errors'?'errors':'calls'}/>
+        {period==='1h'||period==='1d'?null:<><h4>Hourly activity (UTC)</h4><Heat hourly={data.hourly}/></>}
       </div>
-      <div className="card monitor-figure"><h4>Recorded functions</h4><p className="muted small">Each function has its own usage trend for the selected period</p>
-        <div className="monitor-function-list">{data.totals.map(x=>{
-          const key=x.category+':'+x.action;return <div className="monitor-function" key={key}>
-            <span>{x.category} / {x.action}</span>
-            <ChartLine values={timeline.byAction.get(key)||[]} label={`${key} call trend`}/>
-            <b>{fmt(x.n)}</b>
-          </div>;
-        })}{!data.totals.length?<p className="muted small">No activity in this period.</p>:null}</div>
+      <div className="card monitor-figure"><div className="monitor-chart-title"><h4>Most used functions</h4><span className="muted small">Top {topFunctions.length} in {data.label}</span></div>
+        {topFunctions.length?<ActivityChart type="bar" labels={functionNames} values={functionCounts} label="Most used functions"/>:<p className="muted small">No functions recorded for this period.</p>}
+        <details className="monitor-details"><summary>All recorded functions ({functionRows.length})</summary>
+          <div className="monitor-function-list">{functionRows.map(x=><div key={`${x.category}:${x.action}`} className="monitor-breakdown"><span>{x.category} / {x.action}</span><b>{fmt(x.n)}</b></div>)}</div>
+        </details>
       </div>
       <div className="card monitor-figure" aria-live="polite"><div className="monitor-chart-title"><h4>Subagent tasks</h4><span className="muted small">{activeJobs.length} running</span></div>
         {activeJobs.map(j=><div key={j.id} className="job-row"><div className="row" style={{alignItems:'center',gap:8}}><span className="job-dot"/><b>{j.agent}</b><span className="muted small">{j.provider||'Finding a model'} {j.model}</span></div><p>{j.task_summary||'Task summary unavailable'}</p><small className="muted">{j.kind} · Started {time(j.ts)} · <RunningElapsed start={j.ts}/></small></div>)}
