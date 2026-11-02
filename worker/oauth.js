@@ -117,7 +117,13 @@ const appTile = (name) => {
   const inner = id ? brandSvg(id, 34) : `<span style="font:700 26px system-ui;color:#2F54EB">${esc(String(name || "?").trim().charAt(0).toUpperCase() || "?")}</span>`;
   return `<span class="tile">${inner}</span>`;
 };
-const page = (title, inner, status = 200) => new Response(
+// Chromium checks form-action across 302 redirects after submitting the consent form.
+// Allow the exact registered callback origin (or custom app scheme), never arbitrary sites.
+const callbackSource = (redirectUri) => {
+  const u = new URL(redirectUri);
+  return u.protocol === "https:" || u.protocol === "http:" ? u.origin : u.protocol;
+};
+const page = (title, inner, status = 200, callbackUri = "") => new Response(
   `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>${esc(title)}</title><style>
 :root{--bg:#EEF1F5;--card:#FFFFFF;--ink:#0D1626;--ink2:#475268;--line:#D5DCE7;--cobalt:#2F54EB;--soft:#E3E9FD;--rose:#B92A44;--paper2:#E2E7EF}
 @media(prefers-color-scheme:dark){:root{--bg:#0A1020;--card:#111A2E;--ink:#E8EDF7;--ink2:#AAB5C9;--line:#26324A;--cobalt:#8EA3FF;--soft:#1B2547;--rose:#FF8696;--paper2:#0E1830}}
@@ -143,7 +149,11 @@ button.link{background:none;color:var(--ink2);font-weight:500;text-decoration:un
 .tag{display:block;width:fit-content;margin:0 auto 14px;background:var(--soft);color:var(--cobalt);font:600 13px system-ui;border-radius:8px;padding:5px 11px}
 @media(prefers-reduced-motion:reduce){button{transition:none}}
 </style></head><body><main class="c">${inner}</main></body></html>`,
-  { status, headers: PAGE_HEADERS });
+  { status, headers: callbackUri ? {
+    ...PAGE_HEADERS,
+    "content-security-policy": PAGE_HEADERS["content-security-policy"].replace(
+      "form-action 'self'", `form-action 'self' ${callbackSource(callbackUri)}`),
+  } : PAGE_HEADERS });
 
 // Reads and checks the authorize parameters. Returns { client, p } or { error }.
 async function authParams(env, src) {
@@ -206,7 +216,7 @@ function consentPage(client, p, csrf, user, reconnect, error = "") {
 ${error ? `<p class="err" role="alert">${esc(error)}</p>` : ""}
 <div class="row"><button class="g" name="decision" value="deny" type="submit">Deny</button><button name="decision" value="approve" type="submit">${reconnect ? "Reconnect" : "Allow"}</button></div>
 ${reconnect ? `<button class="link" name="decision" value="new" type="submit">Create a separate new connection instead</button>` : ""}</form>
-<p class="fine">Signed in as ${esc(user.email)}. Only continue if you started this connection yourself.</p>`);
+<p class="fine">Signed in as ${esc(user.email)}. Only continue if you started this connection yourself.</p>`, 200, p.redirect_uri);
 }
 
 async function authorize(request, env, url) {

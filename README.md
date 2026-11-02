@@ -207,3 +207,9 @@ The look was planned from the product, not from a template, using the guidance o
 
 * The installed (PWA) icon is the M mark: `public/icons/` has 192/512 px icons, maskable 192/512 px versions with the logo inside the safe zone, an Apple touch icon, favicons and an SVG. The manifest lists them all. Phones keep the old icon until the app is removed from the home screen and added again.
 * When Claude, ChatGPT, Gemini, Cursor, Copilot, Perplexity or Mistral connect, their logo is shown instead of a generic icon (dashboard and sign-in page). The app is recognised from the connection name and from what the app reports about itself. Unknown apps get a letter tile in the agent's cable colour. The marks live in `shared/brands.js` and are simplified drawings for identification only; edit them there.
+
+### GitHub skill repositories
+
+In **Skills → GitHub skill sync**, add a repository (`owner/repo`), branch and skills directory. You can optionally restrict the set to comma-separated skill names. Each repository or skill set has its own **Auto sync** switch; enabled sets are checked daily by Cloudflare Cron at 05:00 UTC. **Sync now** imports available skills and their original text, scripts and reference files without waiting for the schedule.
+
+Automatic checks update only skills already installed, so deleting a skill also deletes its resources and does not silently recreate it. An owner can manually import the same skill again, and an agent can propose it via the existing approval flow. Removing a GitHub source stops tracking; it does not delete skills. Owner-edited skills are not overwritten. The repository URL must be GitHub, and no downloaded script is executed.

@@ -64,6 +64,11 @@ export async function callTool(env, name, a, agentName = "", svc = null) {
       if (!row) throw new ToolError("script not found");
       return row;
     }
+    case "get_skill_resource": {
+      const row = await env.DB.prepare("SELECT skill, path, kind, content, url FROM skill_resources WHERE skill = ? AND path = ?").bind(a.skill, a.path).first();
+      if (!row) throw new ToolError("resource not found");
+      return row;
+    }
     case "get_delegation_brief": return { text: GUIDE + "\n\n## Brief form\n" + BRIEF_FORM };
     case "delegate": {
       const r = await delegate(env, svc, a);

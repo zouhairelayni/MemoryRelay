@@ -32,6 +32,8 @@ export async function ensureSchema(env) {
     env.DB.prepare("CREATE TABLE IF NOT EXISTS openrouter_cooldowns (key_id TEXT NOT NULL, model TEXT NOT NULL, until INTEGER NOT NULL, PRIMARY KEY (key_id, model))"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS skills (name TEXT PRIMARY KEY, description TEXT NOT NULL, body TEXT NOT NULL, enabled INTEGER NOT NULL DEFAULT 1, core INTEGER NOT NULL DEFAULT 0, source TEXT NOT NULL DEFAULT '', created TEXT NOT NULL, updated TEXT NOT NULL)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS skill_scripts (name TEXT PRIMARY KEY, skill TEXT NOT NULL, description TEXT NOT NULL, code TEXT NOT NULL)"),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS skill_resources (skill TEXT NOT NULL, path TEXT NOT NULL, kind TEXT NOT NULL, content TEXT, url TEXT NOT NULL, PRIMARY KEY (skill, path))"),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS skill_repos (id TEXT PRIMARY KEY, owner TEXT NOT NULL, repo TEXT NOT NULL, root TEXT NOT NULL, ref TEXT NOT NULL, names TEXT NOT NULL DEFAULT '[]', enabled INTEGER NOT NULL DEFAULT 0, last_sha TEXT NOT NULL DEFAULT '', last_checked TEXT NOT NULL DEFAULT '', last_error TEXT NOT NULL DEFAULT '')"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS memories (id TEXT PRIMARY KEY, text TEXT NOT NULL, tags TEXT NOT NULL DEFAULT '', source TEXT NOT NULL DEFAULT '', created TEXT NOT NULL, updated TEXT NOT NULL, history TEXT NOT NULL DEFAULT '[]')"),
   ]);
   await env.DB.prepare(

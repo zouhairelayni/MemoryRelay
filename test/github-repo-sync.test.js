@@ -1,0 +1,70 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { createD1 } from './helpers/d1.js';
+import { resetSchemaCache, ensureSchema } from '../worker/db.js';
+import { seedBuiltins } from '../worker/builtins.js';
+import { addSkillRepo, listSkillRepos, repoArgs, setSkillRepoSync, syncEnabledSkillRepos, syncSkillRepo } from '../worker/githubSkills.js';
+import { deleteSkill } from '../worker/skills.js';
+
+const sha1 = 'a'.repeat(40),sha2='b'.repeat(40),treeSha='c'.repeat(40);
+const fn = (name)=>`---\nname: ${name}\ndescription: Use when reviewing a demo workflow.\n---\n# Demo\n\n${'Exact official source. '.repeat(70)}\n`;
+function githubMock(ref=sha1){
+ const original=globalThis.fetch;
+ const responses=(url)=>{
+  const s=String(url);
+  if(s.endsWith('/commits/main'))return {sha:ref,commit:{tree:{sha:treeSha}}};
+  if(s.includes('/git/trees/'))return {truncated:false,tree:[
+   {type:'blob',path:'skills/demo-tool/SKILL.md',size:5000},
+   {type:'blob',path:'skills/demo-tool/scripts/test.py',size:42},
+   {type:'blob',path:'skills/demo-tool/refs/guide.md',size:60},
+   {type:'blob',path:'skills/demo-tool/assets/icon.png',size:300},
+  ]};
+  if(s.endsWith('/SKILL.md'))return fn('demo-tool');
+  if(s.endsWith('/test.py'))return `print('version ${ref[0]}')\n`;
+  if(s.endsWith('/guide.md'))return 'Keep this guide unchanged.';
+  throw Error('unexpected mocked GitHub URL '+s);
+ };
+ globalThis.fetch=async url=>({ok:true,headers:new Headers(),json:async()=>responses(url),text:async()=>responses(url)});
+ return ()=>{globalThis.fetch=original};
+}
+async function fixture(){resetSchemaCache();const {db,DB}=createD1();const env={DB};await ensureSchema(env);await seedBuiltins(env);return {env,db};}
+
+test('GitHub repo parsing accepts GitHub sources only, and tracks one skill set per folder',()=>{
+ assert.equal(repoArgs('https://github.com/example/demo','skills','main','demo-tool').id,'example/demo:skills');
+ assert.throws(()=>repoArgs('https://evil.test/x/y'),/GitHub owner/);
+ assert.throws(()=>repoArgs('example/demo','../secret'),/GitHub owner/);
+});
+
+test('GitHub repo switch controls automatic sync; scripts update, delete with skill, and can be reimported',async()=>{
+ const {env,db}=await fixture();
+ let restore=githubMock();
+ try {
+  const created=await addSkillRepo(env,{repo:'example/demo',names:'demo-tool'});
+  assert.equal(created.ok,true);
+  const repo=created.id;
+  assert.equal((await listSkillRepos(env)).find(x=>x.id===repo).enabled,false);
+  await syncEnabledSkillRepos(env);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM skills WHERE name = ?').get('demo-tool').n,0);
+  const imported=await syncSkillRepo(env,repo,{importMissing:true});
+  assert.equal(imported.added,1);
+  assert.equal(db.prepare('SELECT content FROM skill_resources WHERE skill = ? AND path = ?').get('demo-tool','scripts/test.py').content,"print('version a')\n");
+  assert.match(db.prepare('SELECT body FROM skills WHERE name = ?').get('demo-tool').body,/Exact official source/);
+  await setSkillRepoSync(env,repo,true);
+  restore();restore=githubMock(sha2);
+  await syncEnabledSkillRepos(env);
+  assert.equal(db.prepare('SELECT content FROM skill_resources WHERE skill = ? AND path = ?').get('demo-tool','scripts/test.py').content,"print('version b')\n");
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM skill_resources WHERE skill = ?').get('demo-tool').n,3);
+  await deleteSkill(env,'demo-tool');
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM skill_resources WHERE skill = ?').get('demo-tool').n,0);
+  // Deletion is respected by automatic sync without creating a blacklist.
+  restore();restore=githubMock(sha1);
+  await syncEnabledSkillRepos(env);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM skills WHERE name = ?').get('demo-tool').n,0);
+  const again=await syncSkillRepo(env,repo,{importMissing:true});
+  assert.equal(again.added,1);
+  await setSkillRepoSync(env,repo,false);
+  restore();restore=githubMock(sha2);
+  await syncEnabledSkillRepos(env);
+  assert.equal(db.prepare('SELECT content FROM skill_resources WHERE skill = ? AND path = ?').get('demo-tool','scripts/test.py').content,"print('version a')\n");
+ }finally{restore();}
+});

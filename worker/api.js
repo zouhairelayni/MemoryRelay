@@ -13,6 +13,7 @@ import { json, now } from "./util.js";
 import { COMPAT } from "./providers.js";
 import { delegate, getDelegation, saveDelegation } from "./delegate.js";
 import { BRIEF_FORM, GUIDE } from "./delegateguide.js";
+import { addSkillRepo, listSkillRepos, removeSkillRepo, setSkillRepoSync, syncSkillRepo } from "./githubSkills.js";
 
 export async function settings(env) {
   const last = await env.DB.prepare("SELECT MAX(last_seen) AS last FROM services").first();
@@ -78,6 +79,23 @@ export async function api(request, env, url) {
   if (p === "/api/skill-scripts" && m === "GET") return json({ scripts: (await env.DB.prepare(
     "SELECT name, skill, description, code FROM skill_scripts ORDER BY skill, name").all()).results });
 
+  if (p === "/api/skill-resources" && m === "GET") return json({ resources: (await env.DB.prepare(
+    "SELECT skill, path, kind, LENGTH(content) AS bytes, url FROM skill_resources ORDER BY skill, path").all()).results });
+  if (p === "/api/skill-resource" && m === "GET") {
+    const skill = url.searchParams.get("skill") || "", path = url.searchParams.get("path") || "";
+    const row = await env.DB.prepare("SELECT skill, path, kind, content, url FROM skill_resources WHERE skill = ? AND path = ?").bind(skill, path).first();
+    return row ? json(row) : json({ error: "resource not found" }, 404);
+  }
+  // GitHub repositories/skill sets: owner controls automatic daily update checks.
+  if (p === "/api/skill-repos" && m === "GET") return json({repositories:await listSkillRepos(env)});
+  if (p === "/api/skill-repos" && m === "POST") return withStatus(await addSkillRepo(env,await body(request)));
+  const repoRoute=p.match(/^\/api\/skill-repos\/([^/]+)(?:\/(sync|enabled))?$/);
+  if(repoRoute){
+    const id=dec(repoRoute[1]), action=repoRoute[2];
+    if(action==='enabled' && m==='PUT') return withStatus(await setSkillRepoSync(env,id,!!(await body(request)).enabled));
+    if(action==='sync' && m==='POST') return withStatus(await syncSkillRepo(env,id,{importMissing:true}));
+    if(!action && m==='DELETE') return json(await removeSkillRepo(env,id));
+  }
   // skills (Skill Genie)
   if (p === "/api/skills" && m === "GET") return json({ skills: await listSkills(env), settings: await getSkillSettings(env), template: SKILL_TEMPLATE, max_tokens: MAX_TOKENS });
   if (p === "/api/skills" && m === "POST") {

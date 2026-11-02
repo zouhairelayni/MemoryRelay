@@ -55,8 +55,18 @@ export const backup = {
   },
 };
 
+export const skillRepos = {
+  list: () => get("/api/skill-repos").then(d=>d.repositories),
+  add: (repo, root, ref, names) => post("/api/skill-repos", {repo,root,ref,names}),
+  toggle: (id, enabled) => put("/api/skill-repos/"+encodeURIComponent(id)+"/enabled",{enabled}),
+  sync: (id) => post("/api/skill-repos/"+encodeURIComponent(id)+"/sync"),
+  remove: (id) => del("/api/skill-repos/"+encodeURIComponent(id)),
+};
+
 export const skills = {
   scripts: () => get("/api/skill-scripts").then((d) => d.scripts),
+  resources: () => get("/api/skill-resources").then((d) => d.resources),
+  resource: (skill, path) => get("/api/skill-resource?skill=" + encodeURIComponent(skill) + "&path=" + encodeURIComponent(path)),
   list: () => get("/api/skills"),
   add: (text, source = "paste") => post("/api/skills", { text, source }),
   setFlag: (name, flag, value) => put("/api/skills/" + encodeURIComponent(name) + "/" + flag, { value }),

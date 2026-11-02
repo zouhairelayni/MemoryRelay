@@ -15,7 +15,7 @@ import Icon from "../../components/Icon.jsx";
 import SkillStudio from "./SkillStudio.jsx";
 
 // The Skill Genie. Agents send their request; the Genie returns only the skills that fit.
-export default function SkillSelector({ active }) {
+export default function SkillSelector({ active, onDeleted }) {
   const { loadCounts } = useApp();
   const sk = useSkills();
   const [q, setQ] = useState("");
@@ -113,8 +113,8 @@ export default function SkillSelector({ active }) {
                     { key: "edit", label: "Edit skill", icon: "pencil", onClick: () => setStudio({ name: s.name }) },
                     { key: "core", label: s.core ? "Stop always sending it" : "Always send it", icon: "bolt", on: s.core,
                       onClick: () => sk.toggle(s.name, "core", !s.core) },
-                    { key: "del", label: "Delete skill", icon: "trash", variant: "danger", onClick: () => sk.remove(s.name),
-                      confirm: { text: "Delete the skill " + s.name + "?", yes: "Yes, delete" } },
+                    { key: "del", label: "Delete skill", icon: "trash", variant: "danger", onClick: async () => { if (await sk.remove(s.name)) onDeleted?.(); },
+                      confirm: { text: "Delete " + s.name + " and all of its linked scripts and resources?", yes: "Yes, delete" } },
                   ]} />
                 </div>
               </Collapse>

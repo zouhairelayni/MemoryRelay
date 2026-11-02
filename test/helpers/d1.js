@@ -9,5 +9,5 @@ export function createD1() {
     first: async () => db.prepare(sql).get(...params) ?? null,
     all: async () => ({ results: db.prepare(sql).all(...params) }),
   });
-  return { db, DB: { prepare: (s) => stmt(s), batch: async (l) => { for (const s of l) await s.run(); } } };
+  return { db, DB: { prepare: (s) => stmt(s), batch: async (l) => { const out = []; for (const s of l) out.push(await s.run()); return out; } } };
 }

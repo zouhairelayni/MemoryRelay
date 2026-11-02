@@ -76,10 +76,10 @@ function readHeader(head) {
 }
 
 // Parses "---\nname: x\ndescription: y\n---\nbody". Returns { name, description, body }.
-export function parseSkill(text) {
+export function parseSkill(text, { limit = MAX_TOKENS, allowOriginalDescription = false } = {}) {
   const raw = stripFences(text);
   if (!raw) throw new Error("empty skill");
-  if (estimateTokens(raw) > MAX_TOKENS) throw new Error("skill is about " + estimateTokens(raw) + " tokens; the limit is " + MAX_TOKENS + ". Shorten it or move detail out.");
+  if (estimateTokens(raw) > limit) throw new Error("skill is about " + estimateTokens(raw) + " tokens; the limit is " + limit + ". Shorten it or move detail out.");
   const m = raw.match(/^---[ \t]*\n([\s\S]*?)\n---[ \t]*(?:\n([\s\S]*))?$/);
   const head = m ? readHeader(m[1]) : {};
   const name = head.name || "", description = head.description || "";
@@ -87,14 +87,14 @@ export function parseSkill(text) {
   if (RESERVED.has(name.toLowerCase())) throw new Error("the name " + name + " is reserved. Pick another name.");
   if (description.length < 8) throw new Error("the SKILL.md header needs a description that says when to use it (starting with \"Use when\" works well)");
   if (description.length > 1024) throw new Error("the description is too long (1024 characters at most). Keep it to the trigger.");
-  if (!/\buse[ds]?\b|\bwhen\b/i.test(description)) throw new Error("the description should start with \"Use when ...\" so agents know when to load the skill");
+  if (!allowOriginalDescription && !/\buse[ds]?\b|\bwhen\b/i.test(description)) throw new Error("the description should start with \"Use when ...\" so agents know when to load the skill");
   const body = (m ? m[2] || "" : raw).trim();
   if (!body) throw new Error("the skill has no instructions after the header");
   return { name, description, body };
 }
 
 // The full SKILL.md text for a stored skill (header rebuilt from the columns).
-export const toSkillMd = (s) => "---\nname: " + s.name + "\ndescription: " + String(s.description).replace(/\s+/g, " ").trim() + "\n---\n" + String(s.body).trim() + "\n";
+export const toSkillMd = (s) => (String(s.source || "").startsWith("builtin:anthropic-official") || String(s.body).startsWith("---\n")) ? String(s.body) : "---\nname: " + s.name + "\ndescription: " + String(s.description).replace(/\s+/g, " ").trim() + "\n---\n" + String(s.body).trim() + "\n";
 
 // Invisible and direction-changing characters can hide instructions from the owner who reviews a skill.
 export const HIDDEN_RE = /[\u200B-\u200F\u202A-\u202E\u2060-\u2069\uFEFF]/;
@@ -161,7 +161,7 @@ export async function getSkill(env, name) {
   const v = await env.DB.prepare("SELECT COUNT(*) AS n FROM skill_history WHERE name = ?").bind(row.name).first();
   const text = toSkillMd(row);
   return { name: row.name, text, tokens: estimateTokens(text), enabled: !!row.enabled, core: !!row.core, source: row.source,
-    pending: !row.enabled && String(row.source).startsWith("agent"), warnings: scanSkill(text), versions: v.n, max_tokens: MAX_TOKENS };
+    pending: !row.enabled && String(row.source).startsWith("agent"), warnings: scanSkill(text), versions: v.n, max_tokens: row.source === "builtin:anthropic-official" || row.source.startsWith("github:") ? 250000 : MAX_TOKENS };
 }
 
 // Replaces the text of a skill. The name cannot change. The previous version is kept so the edit can be undone.
@@ -169,14 +169,15 @@ export async function updateSkill(env, name, text, by = "owner") {
   const row = await env.DB.prepare("SELECT * FROM skills WHERE name = ?").bind(String(name)).first();
   if (!row) return { error: "skill not found" };
   let s;
-  try { s = parseSkill(text); } catch (e) { return { error: e.message }; }
+  const isOfficial = row.source === "builtin:anthropic-official" || row.source.startsWith("github:");
+  try { s = parseSkill(text, { limit: isOfficial ? 250000 : MAX_TOKENS, allowOriginalDescription: isOfficial }); } catch (e) { return { error: e.message }; }
   if (s.name !== row.name) return { error: "the name must stay " + row.name + ". To rename, add a new skill and delete this one." };
-  const prev = toSkillMd(row), next = toSkillMd(s);
+  const prev = toSkillMd(row), next = isOfficial ? stripFences(text) + "\n" : toSkillMd(s);
   if (prev === next) return { ok: true, name: row.name, unchanged: true, text: next, tokens: estimateTokens(next), warnings: scanSkill(next) };
   const t = now();
   await env.DB.batch([
     env.DB.prepare("INSERT INTO skill_history (name, text, saved, by) VALUES (?, ?, ?, ?)").bind(row.name, prev, t, String(by).slice(0, 40)),
-    env.DB.prepare("UPDATE skills SET description = ?, body = ?, updated = ? WHERE name = ?").bind(s.description, s.body, t, row.name),
+    env.DB.prepare("UPDATE skills SET description = ?, body = ?, source = ?, updated = ? WHERE name = ?").bind(s.description, isOfficial ? next : s.body, String(by) === "owner" && (row.source.startsWith("builtin:anthropic") || row.source.startsWith("github:")) ? "owner:modified" : row.source, t, row.name),
     env.DB.prepare("DELETE FROM skill_history WHERE name = ? AND id NOT IN (SELECT id FROM skill_history WHERE name = ? ORDER BY id DESC LIMIT ?)")
       .bind(row.name, row.name, HISTORY_KEEP),
   ]);
@@ -205,9 +206,17 @@ export async function setSkillFlag(env, name, flag, value) {
 }
 
 export async function deleteSkill(env, name) {
-  const r = await env.DB.prepare("DELETE FROM skills WHERE name = ?").bind(String(name)).run();
-  await env.DB.prepare("DELETE FROM skill_history WHERE name = ?").bind(String(name)).run();
-  return { deleted: r.meta.changes };
+  const skill = String(name);
+  const exists = await env.DB.prepare("SELECT name FROM skills WHERE name = ?").bind(skill).first();
+  if (!exists) return { deleted: 0, scripts_deleted: 0, resources_deleted: 0 };
+  // D1 batches are transactional: never leave orphan scripts/resources after deletion.
+  const changes = await env.DB.batch([
+    env.DB.prepare("DELETE FROM skill_scripts WHERE skill = ?").bind(skill),
+    env.DB.prepare("DELETE FROM skill_resources WHERE skill = ?").bind(skill),
+    env.DB.prepare("DELETE FROM skill_history WHERE name = ?").bind(skill),
+    env.DB.prepare("DELETE FROM skills WHERE name = ?").bind(skill),
+  ]);
+  return { deleted: changes[3].meta.changes, scripts_deleted: changes[0].meta.changes, resources_deleted: changes[1].meta.changes };
 }
 
 async function skillSettings(env) {
@@ -242,7 +251,7 @@ function rank(prompt, skills) {
 export async function selectSkills(env, { request = "", files = [], functions = [] } = {}, { useGemini = true } = {}) {
   const t0 = Date.now();
   const { max } = await skillSettings(env);
-  const all = (await env.DB.prepare("SELECT name, description, body, core FROM skills WHERE enabled = 1 ORDER BY name").all()).results;
+  const all = (await env.DB.prepare("SELECT name, description, body, core, source FROM skills WHERE enabled = 1 ORDER BY name").all()).results;
   const core = all.filter((s) => s.core);
   const pool = all.filter((s) => !s.core);
   const extra = [...files.map((f) => String(f).split("/").pop()), ...functions].join(" ");
@@ -290,7 +299,12 @@ export async function selectSkills(env, { request = "", files = [], functions = 
   });
   if (out.length) {
     const scripts = (await env.DB.prepare("SELECT name, skill, description, code FROM skill_scripts ORDER BY name").all()).results;
-    for (const s of out) s.scripts = scripts.filter((x) => x.skill === s.name);
+    const resources = (await env.DB.prepare("SELECT skill, path, kind, content, url FROM skill_resources ORDER BY skill, path").all()).results;
+    for (const sk of out) {
+      const official = (byName.get(sk.name).source || "").startsWith("builtin:anthropic-official");
+      sk.scripts = official ? [] : scripts.filter((x) => x.skill === sk.name);
+      sk.resources = official ? resources.filter((x) => x.skill === sk.name).map((x) => ({path: x.path,kind:x.kind,bytes:x.content?.length || 0,url:x.url, content:x.content})) : [];
+    }
   }
   return { mode, note, ms: Date.now() - t0, skills: out };
 }
@@ -302,5 +316,10 @@ export function formatForAgent(result) {
     "Follow ONLY the skills below. Do not look for other skills.\n";
   return head + result.skills.map((s) => "\n===== SKILL: " + s.name + " =====\n" + s.body +
     (s.scripts || []).map((x) => "\n\n===== PYTHON SCRIPT BANK: " + x.name + " =====\n" + x.description +
-      "\nThis is source code, not executed. If the host has authorized file and Python tools, create a file from this template, adapt it and run the checks. If no tools exist, deliver the source only and state that it was not run.\n```python\n" + x.code + "\n```").join("")) .join("\n");
+      "\nThis is source code, not executed. If the host has authorized file and Python tools, create a file from this template, adapt it and run the checks. If no tools exist, deliver the source only and state that it was not run.\n```python\n" + x.code + "\n```").join("") +
+    (s.resources?.length ? "\n\n===== ORIGINAL UPSTREAM RESOURCES FOR " + s.name + " =====\n" +
+      "These are the original files, not rewrites. When a resource is relevant call MemoryRelay get_skill_resource with skill='"+s.name+"' and path. Scripts are source only; recreate them as files in an authorized environment, never assume execution. Assets are linked to the pinned upstream commit.\n" +
+      s.resources.map(x=>"- " + x.path + " (" + x.kind + (x.content ? ", " + x.bytes + " chars" : ", immutable asset URL") + ")").join("\n") +
+      // Hand short source scripts directly with their skill; keep long sources available verbatim on demand.
+      s.resources.filter(x=>x.kind==='script' && x.content && x.bytes<=7000).slice(0,4).map(x=>"\n\n===== SOURCE SCRIPT: "+x.path+" =====\n```"+(x.path.endsWith('.py')?'python':'sh')+"\n"+x.content+"\n```").join("") : "")) .join("\n");
 }

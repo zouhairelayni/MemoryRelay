@@ -6,10 +6,11 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "dev:worker": "wrangler dev --local",
-    "build": "vite build",
+    "build": "npm run sync:anthropic && vite build",
     "deploy": "npm run build && wrangler deploy",
     "test": "node --experimental-sqlite --test test/*.test.js",
-    "test:core": "node --experimental-sqlite --test test/anthropic-adaptations.test.js test/hardening.test.js test/skills.test.js test/worker.test.js"
+    "test:core": "node --experimental-sqlite --test test/anthropic-adaptations.test.js test/hardening.test.js test/skills.test.js test/worker.test.js test/sync-official-generator.test.js test/upstream-import.test.js test/skill-cleanup.test.js test/github-repo-sync.test.js",
+    "sync:anthropic": "node scripts/sync-anthropic.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

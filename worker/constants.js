@@ -18,7 +18,7 @@ export const ACCESS_RANK = { read: 1, write: 2, full: 3 };
 export const ACCESS_LABEL = { read: "Read only", write: "Read and write", full: "Full access" };
 // The lowest access level that may call each tool.
 export const TOOL_LEVEL = { search: "read", recent: "read", get_skill_template: "read", select_skills: "read", draft_skill: "read",
-  get_skill_script: "read", remember: "write", update_memory: "write", upload_skill: "write", delegate: "write", get_delegation_brief: "read", forget: "full", housekeep: "full" };
+  get_skill_script: "read", get_skill_resource: "read", remember: "write", update_memory: "write", upload_skill: "write", delegate: "write", get_delegation_brief: "read", forget: "full", housekeep: "full" };
 
 const T = (title, o) => ({ title, readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false, ...o });
 export const TOOLS = [
@@ -49,6 +49,9 @@ export const TOOLS = [
   { name: "get_skill_script", annotations: T("Fetch a Python skill script", { readOnlyHint: true, idempotentHint: true }),
     description: "Fetch a source-only Python script template from MemoryRelay's script bank. Scripts are included automatically when the matching skill is selected; they are never executed by the server.",
     inputSchema: { type: "object", properties: { name: { type: "string" } }, required: ["name"] } },
+  { name: "get_skill_resource", annotations: T("Fetch an original skill resource", { readOnlyHint: true, idempotentHint: true }),
+    description: "Fetch the complete original script or reference file for a selected official Anthropic skill, or the pinned upstream download URL for a binary asset. Never executes the file.",
+    inputSchema: { type: "object", properties: { skill: { type: "string" }, path: { type: "string" } }, required: ["skill", "path"] } },
   { name: "get_delegation_brief", annotations: T("Delegation guide and brief form", { readOnlyHint: true, idempotentHint: true }),
     description: "Returns the guide for delegating work to sub-agents and the brief form to fill in. Read it once before your first delegate call.",
     inputSchema: { type: "object", properties: {} } },

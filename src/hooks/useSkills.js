@@ -32,7 +32,13 @@ export function useSkills() {
   }, [load]);
 
   const remove = useCallback(async (name) => {
-    try { await skills.remove(name); await load(); say("Deleted " + name + "."); } catch (e) { say(e.message, "bad"); }
+    try {
+      const result = await skills.remove(name);
+      if (!result.deleted) { say("Skill not found.", "bad"); return false; }
+      await load();
+      say("Deleted " + name + " and " + (result.scripts_deleted + result.resources_deleted) + " linked script/resource files.", "ok");
+      return true;
+    } catch (e) { say(e.message, "bad"); return false; }
   }, [load]);
 
   const saveMax = useCallback(async (n) => {

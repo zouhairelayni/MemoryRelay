@@ -14,3 +14,7 @@ run_worker_first = ["/mcp", "/mcp/*", "/auth/*", "/api/*", "/oauth/*", "/.well-k
 binding = "DB"
 database_name = "memory-db"
 database_id = "d174349a-58ac-4603-8196-16ec19dec2db"
+
+# Refresh GitHub skills and scripts only for repositories with sync enabled.
+[triggers]
+crons = ["0 5 * * *"]

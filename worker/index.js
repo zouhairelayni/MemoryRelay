@@ -10,6 +10,7 @@ import { meter } from "./metering.js";
 import { CORS, bearerChallenge, isOauthPath, oauth, serviceByBearer } from "./oauth.js";
 import { serviceBySecret } from "./services.js";
 import { json } from "./util.js";
+import { syncEnabledSkillRepos } from "./githubSkills.js";
 
 // Headers for the app itself: no framing (clickjacking), no MIME sniffing, no referrer leaks, strict scripts.
 function withSecurityHeaders(res) {
@@ -37,6 +38,11 @@ async function serveMcp(request, env, ctx, svc, extraHeaders) {
 }
 
 export default {
+  async scheduled(event, env, ctx) {
+    await ensureSchema(env);
+    await seedBuiltins(env);
+    ctx.waitUntil(syncEnabledSkillRepos(env));
+  },
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const p = url.pathname;

@@ -489,6 +489,24 @@ test("OAuth consent accepts valid CSRF even from embedded app browsers; forged s
   assert.equal(forged.status, 403);
 });
 
+test("OAuth consent CSP permits only the registered external callback after form submission", async () => {
+  const ctx = await setup();
+  const f = await oauthFlow(ctx, { redirect: "https://claude.ai/api/mcp/auth_callback" });
+  const consent = await ctx.call("/oauth/authorize?" + f.q, { headers: { cookie: ctx.cookie } });
+  const csp = consent.headers.get("content-security-policy");
+  assert.match(csp, /form-action 'self' https:\/\/claude\.ai(?:;|$)/);
+  assert.doesNotMatch(csp.split("form-action")[1], /unsafe-inline|evil\.example/);
+  assert.match(csp, /default-src 'none'/);
+  const approved = await f.approve();
+  assert.equal(approved.status, 302);
+  assert.equal(new URL(approved.headers.get("location")).origin, "https://claude.ai");
+  const custom = await oauthFlow(ctx, { redirect: "claude://callback" });
+  const customConsent = await ctx.call("/oauth/authorize?" + custom.q, { headers: { cookie: ctx.cookie } });
+  assert.match(customConsent.headers.get("content-security-policy"), /form-action 'self' claude:(?:;|$)/);
+  const login = await ctx.call("/oauth/authorize?" + f.q); // without a session cookie
+  assert.match(login.headers.get("content-security-policy"), /form-action 'self'(?:;|$)/);
+});
+
 test("OAuth page shows the connecting app's logo and the M mark", async () => {
   const ctx = await setup();
   for (const [name, mark] of [["Claude", "#D97757"], ["ChatGPT", "#10A37F"], ["Gemini CLI", "mr-gem"]]) {
