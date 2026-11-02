@@ -118,11 +118,11 @@ export function scanSkill(body) {
 
 export async function listSkills(env) {
   const { results } = await env.DB.prepare(
-    "SELECT name, description, body, enabled, core, source, created, updated FROM skills ORDER BY name"
+    "SELECT sk.name,sk.description,sk.body,sk.enabled,sk.core,sk.source,sk.created,sk.updated,COALESCE(u.uses,0) uses FROM skills sk LEFT JOIN (SELECT detail,COUNT(*) uses FROM activity_events WHERE category='skill' AND action='selected' GROUP BY detail) u ON u.detail=sk.name ORDER BY sk.name"
   ).all();
   return results.map((s) => ({ name: s.name, description: s.description, enabled: !!s.enabled, core: !!s.core,
     source: s.source, pending: !s.enabled && String(s.source).startsWith("agent"),
-    created: s.created, updated: s.updated, tokens: estimateTokens(toSkillMd(s)),
+    created: s.created, updated: s.updated, uses:s.uses||0, tokens: estimateTokens(toSkillMd(s)),
     warnings: scanSkill(s.name + "\n" + s.description + "\n" + s.body) }));
 }
 

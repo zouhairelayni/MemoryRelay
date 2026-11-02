@@ -114,7 +114,7 @@ const PAGE_HEADERS = {
 const M_MARK = (size) => `<svg width="${size}" height="${size}" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7.2" fill="#2F54EB"/><path d="M8.5 22V11.5l7.5 6.5 7.5-6.5V22" fill="none" stroke="#fff" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="16" cy="8.2" r="2.5" fill="#fff"/></svg>`;
 const appTile = (name) => {
   const id = detectBrand(name);
-  const inner = id ? brandSvg(id, 34) : `<span style="font:700 26px system-ui;color:#2F54EB">${esc(String(name || "?").trim().charAt(0).toUpperCase() || "?")}</span>`;
+  const inner = id ? brandSvg(id, 34) : `<span style="font:700 26px system-ui;color:#345BCB">${esc(String(name || "?").trim().charAt(0).toUpperCase() || "?")}</span>`;
   return `<span class="tile">${inner}</span>`;
 };
 // Chromium checks form-action across 302 redirects after submitting the consent form.
@@ -125,28 +125,28 @@ const callbackSource = (redirectUri) => {
 };
 const page = (title, inner, status = 200, callbackUri = "") => new Response(
   `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>${esc(title)}</title><style>
-:root{--bg:#EEF1F5;--card:#FFFFFF;--ink:#0D1626;--ink2:#475268;--line:#D5DCE7;--cobalt:#2F54EB;--soft:#E3E9FD;--rose:#B92A44;--paper2:#E2E7EF}
-@media(prefers-color-scheme:dark){:root{--bg:#0A1020;--card:#111A2E;--ink:#E8EDF7;--ink2:#AAB5C9;--line:#26324A;--cobalt:#8EA3FF;--soft:#1B2547;--rose:#FF8696;--paper2:#0E1830}}
+:root{--bg:#F3F6F8;--card:#FFFFFF;--ink:#162635;--ink2:#425569;--line:#DCE4EC;--cobalt:#345BCB;--soft:#E9EEFF;--rose:#B5364C;--paper2:#E9EFF3}
+@media(prefers-color-scheme:dark){:root{--bg:#0D1723;--card:#152232;--ink:#EDF4FA;--ink2:#BECBDA;--line:#2C3D51;--cobalt:#9CAEFF;--soft:#25385D;--rose:#FF93A2;--paper2:#0A1320}}
 *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:20px;background:var(--bg);color:var(--ink);font:16px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-.c{width:100%;max-width:440px;background:var(--card);border-radius:28px;padding:28px;box-shadow:0 0 0 1px var(--line),0 24px 60px -30px rgba(0,0,0,.45)}
+.c{width:100%;max-width:440px;background:var(--card);border-radius:18px;padding:clamp(22px,6vw,34px);border:1px solid var(--line);box-shadow:0 18px 48px -32px rgba(0,0,0,.38)}
 .pair{display:flex;align-items:center;justify-content:center;gap:0;margin:2px 0 22px}
-.tile{width:60px;height:60px;border-radius:18px;background:var(--bg);box-shadow:inset 0 0 0 1px var(--line);display:grid;place-items:center;flex:none}
+.tile{width:60px;height:60px;border-radius:14px;background:var(--bg);box-shadow:inset 0 0 0 1px var(--line);display:grid;place-items:center;flex:none}
 .pair .tile.m{background:none;box-shadow:none}
 .cable{height:3px;width:46px;border-radius:3px;background:var(--cobalt);opacity:.55;margin:0 6px}
-h1{font:700 24px/1.15 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:-.025em;margin:0 0 8px;text-align:center}
+h1{font:750 27px/1.17 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:-.025em;margin:0 0 8px;text-align:center}
 p{margin:0 0 14px;color:var(--ink2);font-size:15px;text-align:center}b{color:var(--ink)}
 label{display:block;font-size:13px;font-weight:600;color:var(--ink2);margin:14px 0 6px}
-input[type=text],input[type=email],input[type=password]{width:100%;font:inherit;color:var(--ink);background:var(--bg);border:0;box-shadow:inset 0 0 0 1px var(--line);border-radius:14px;padding:12px 14px;min-height:46px}
+input[type=text],input[type=email],input[type=password]{width:100%;font:inherit;color:var(--ink);background:var(--bg);border:0;box-shadow:inset 0 0 0 1px var(--line);border-radius:11px;padding:12px 14px;min-height:46px}
 input:focus-visible{outline:2px solid var(--cobalt);outline-offset:1px}
 .opts{display:flex;flex-direction:column;gap:8px;margin-top:8px}
-.opt{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-radius:14px;box-shadow:inset 0 0 0 1px var(--line);cursor:pointer;margin:0;font-weight:400;color:var(--ink)}
+.opt{display:flex;gap:12px;align-items:flex-start;padding:13px 14px;border-radius:12px;box-shadow:inset 0 0 0 1px var(--line);cursor:pointer;margin:0;font-weight:400;color:var(--ink)}
 .opt input{margin-top:4px;accent-color:var(--cobalt)}.opt span{display:block;font-size:13px;color:var(--ink2)}.opt b{display:block;font-size:15px}
 .opt:has(input:checked){box-shadow:inset 0 0 0 2px var(--cobalt);background:var(--soft)}
-.row{display:flex;gap:10px;margin-top:22px}button{flex:1;font:600 15px inherit;font-family:inherit;border-radius:999px;padding:12px 16px;min-height:46px;cursor:pointer;border:0;background:var(--ink);color:var(--bg);transition:transform .14s cubic-bezier(.23,1,.32,1)}
+.row{display:flex;gap:10px;margin-top:22px}button{flex:1;font:650 15px/1.25 ui-sans-serif,system-ui,sans-serif;border-radius:11px;padding:12px 16px;min-height:46px;cursor:pointer;border:0;background:var(--ink);color:var(--bg);transition:transform .14s cubic-bezier(.23,1,.32,1)}
 button:active{transform:scale(.97)}button.g{background:transparent;color:var(--ink);box-shadow:inset 0 0 0 1px var(--line)}
 button.link{background:none;color:var(--ink2);font-weight:500;text-decoration:underline;min-height:40px;margin-top:6px;width:100%;flex:none}
 .err{color:var(--rose);font-size:14px;margin:12px 0 0;text-align:center}.fine{font-size:13px;color:var(--ink2);margin:16px 0 0;text-align:center}
-.tag{display:block;width:fit-content;margin:0 auto 14px;background:var(--soft);color:var(--cobalt);font:600 13px system-ui;border-radius:8px;padding:5px 11px}
+.tag{display:block;width:fit-content;margin:0 auto 16px;background:var(--soft);color:var(--cobalt);font:600 13px system-ui;border-radius:8px;padding:5px 11px}
 @media(prefers-reduced-motion:reduce){button{transition:none}}
 </style></head><body><main class="c">${inner}</main></body></html>`,
   { status, headers: callbackUri ? {
@@ -187,7 +187,7 @@ function oauthKey(name, redirectUri) {
   try { const u = new URL(redirectUri); host = ["localhost", "127.0.0.1", "[::1]"].includes(u.hostname) ? "loopback" : (u.host || u.protocol); } catch { /* empty */ }
   return (String(name || "").trim().toLowerCase() + "@" + host).slice(0, 200);
 }
-const findReconnect = (env, client, p) => env.DB.prepare("SELECT id, name, access FROM services WHERE revoked = 0 AND oauth_key = ? ORDER BY created DESC LIMIT 1").bind(oauthKey(client.name, p.redirect_uri)).first();
+const findReconnect = async (env, client, p) => (await env.DB.prepare("SELECT id, name, access FROM services WHERE revoked = 0 AND oauth_key = ? ORDER BY created DESC LIMIT 30").bind(oauthKey(client.name, p.redirect_uri)).all()).results;
 
 function loginPage(client, p, csrf, { error = "", email = "" } = {}, status = 200) {
   return page("Sign in", `<div class="pair">${appTile(client.name)}<span class="cable"></span><span class="tile m">${M_MARK(60)}</span></div>
@@ -201,21 +201,19 @@ ${error ? `<p class="err" role="alert">${esc(error)}</p>` : ""}
 <p class="fine">Nothing is shared until you approve it on the next step.</p>`, status);
 }
 
-function consentPage(client, p, csrf, user, reconnect, error = "") {
+function consentPage(client, p, csrf, user, matches, error = "") {
   const host = hostOf(p.redirect_uri);
-  const label = ACCESS_LABEL[reconnect ? reconnect.access : "write"];
-  const access = reconnect ? `<p class="fine" style="margin:0 0 6px"><b>${esc(reconnect.name)}</b> keeps its access level (${esc(label)}) and its history.</p>` : `
-<label>Access for this connection</label><div class="opts">${[["read", "Reads memory and skills. Cannot change anything."], ["write", "Also saves memories, uploads skills and hands jobs to sub-agents."], ["full", "Also deletes memories and cleans up duplicates."]].map(([v, hint]) =>
-  `<label class="opt"><input type="radio" name="access" value="${v}"${v === "write" ? " checked" : ""}><div><b>${esc(ACCESS_LABEL[v])}</b><span>${esc(hint)}</span></div></label>`).join("")}</div>
-<label for="name">Connection name</label><input id="name" name="name" type="text" maxlength="60" value="${esc(client.name)}">`;
+  const access = `<label>Access for this connection</label><div class="opts">${[["read", "Read memory and skills only."], ["write", "Also save memories, upload skills and delegate tasks."], ["full", "Also delete memories and apply housekeeping."]].map(([v, hint]) =>
+    `<label class="opt"><input type="radio" name="access" value="${v}"${v === "write" ? " checked" : ""}><div><b>${esc(ACCESS_LABEL[v])}</b><span>${esc(hint)}</span></div></label>`).join("")}</div>
+<label for="name">Connection name</label><input id="name" name="name" type="text" maxlength="60" value="${esc(client.name)}" required>`;
+  const reuse = matches.length ? `<label for="reconnect_id">Use an existing connection (optional)</label><select id="reconnect_id" name="reconnect_id" style="width:100%;border:1px solid var(--line);border-radius:14px;min-height:44px;padding:10px;background:var(--bg);color:var(--ink)"><option value="">Create a new connection</option>${matches.map(x=>`<option value="${esc(x.id)}">${esc(x.name)} · ${esc(ACCESS_LABEL[x.access]||x.access)}</option>`).join('')}</select><p class="fine">Choose an existing connection only for the same app account. New is the default.</p>` : '';
   return page("Allow access", `<div class="pair">${appTile(client.name)}<span class="cable"></span><span class="tile m">${M_MARK(60)}</span></div>
-<span class="tag">${reconnect ? "Refreshing an existing connection" : "New connection"}</span>
-<h1>${reconnect ? "Reconnect" : "Connect"} ${esc(client.name)}?</h1>
-<p>${reconnect ? `This app was connected before, so this refreshes <b>${esc(reconnect.name)}</b> instead of making a new one.` : `This creates a new connection with its own access level, activity and kill switch.`} It returns to <b>${esc(host)}</b>.</p>
-<form method="post" action="/oauth/authorize">${hiddenFields(p, csrf)}<input type="hidden" name="step" value="consent">${access}
+<span class="tag">New connection</span>
+<h1>Connect ${esc(client.name)}?</h1>
+<p>This creates a separate connection for each app account. It returns to <b>${esc(host)}</b>. MemoryRelay cannot read the account signed into ${esc(client.name)}.</p>
+<form method="post" action="/oauth/authorize">${hiddenFields(p, csrf)}<input type="hidden" name="step" value="consent">${access}${reuse}
 ${error ? `<p class="err" role="alert">${esc(error)}</p>` : ""}
-<div class="row"><button class="g" name="decision" value="deny" type="submit">Deny</button><button name="decision" value="approve" type="submit">${reconnect ? "Reconnect" : "Allow"}</button></div>
-${reconnect ? `<button class="link" name="decision" value="new" type="submit">Create a separate new connection instead</button>` : ""}</form>
+<div class="row"><button class="g" name="decision" value="deny" type="submit">Deny</button><button name="decision" value="approve" type="submit">Allow</button></div></form>
 <p class="fine">Signed in as ${esc(user.email)}. Only continue if you started this connection yourself.</p>`, 200, p.redirect_uri);
 }
 
@@ -249,24 +247,28 @@ async function authorize(request, env, url) {
   if (!user) return rendered(loginPage(client, p, csrf));
 
   // step 2: approve (new connection, or refresh of the same app's connection)
-  const reconnect = await findReconnect(env, client, p);
-  if (!post) return rendered(consentPage(client, p, csrf, user, reconnect));
+  const matches = await findReconnect(env, client, p);
+  if (!post) return rendered(consentPage(client, p, csrf, user, matches));
   const decision = String(form.get("decision") || "");
   if (decision === "deny") return back(p, { error: "access_denied", state: p.state, iss: url.origin });
-  if (decision !== "approve" && decision !== "new") return consentPage(client, p, csrf, user, reconnect);
+  if (decision !== "approve") return consentPage(client, p, csrf, user, matches);
 
   let serviceId;
-  if (reconnect && decision === "approve") {
-    serviceId = reconnect.id;
-  } else {
-    const access = ACCESS.includes(String(form.get("access"))) ? String(form.get("access")) : "write";
-    let name = String(form.get("name") || client.name).trim().slice(0, 60) || client.name;
-    const taken = new Set((await env.DB.prepare("SELECT name FROM services WHERE revoked = 0").all()).results.map((x) => x.name));
-    for (let n = 2, base = name; taken.has(name) && n < 50; n++) name = (base + " " + n).slice(0, 60);
-    const made = await createService(env, name, access);
-    if (made.error) return consentPage(client, p, csrf, user, reconnect, made.error);
-    await env.DB.prepare("UPDATE services SET oauth_key = ? WHERE id = ?").bind(oauthKey(client.name, p.redirect_uri), made.id).run();
-    serviceId = made.id;
+  const access = ACCESS.includes(String(form.get('access'))) ? String(form.get('access')) : 'write';
+  let name = String(form.get('name') || client.name).trim().slice(0,60) || client.name;
+  const chosen = String(form.get('reconnect_id')||'');
+  const match = chosen && matches.find(x=>x.id===chosen);
+  if(chosen && !match)return consentPage(client,p,csrf,user,matches,'The selected connection is no longer available.');
+  if(match){
+    serviceId=match.id;
+    await env.DB.prepare('UPDATE services SET name=?,access=? WHERE id=?').bind(name,access,serviceId).run();
+  }else{
+    const taken = new Set((await env.DB.prepare('SELECT name FROM services WHERE revoked = 0').all()).results.map(x=>x.name));
+    for(let n=2,base=name; taken.has(name)&&n<50;n++)name=(base+' '+n).slice(0,60);
+    const made=await createService(env,name,access);
+    if(made.error)return consentPage(client,p,csrf,user,matches,made.error);
+    await env.DB.prepare('UPDATE services SET oauth_key=? WHERE id=?').bind(oauthKey(client.name,p.redirect_uri),made.id).run();
+    serviceId=made.id;
   }
   const code = randomHex(32);
   await env.DB.prepare("DELETE FROM oauth_codes WHERE expires < ?").bind(Date.now()).run();

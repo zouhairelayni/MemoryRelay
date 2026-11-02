@@ -1,5 +1,6 @@
 // The MCP JSON-RPC endpoint agents talk to.
 import { ACCESS_LABEL, ACCESS_RANK, MAX_ARG_CHARS, PROTOCOLS, SERVER_VERSION, TOOLS, TOOL_LEVEL } from "./constants.js";
+import { activity } from "./monitor.js";
 import { json, readJson } from "./util.js";
 import { forget, recent, remember, search, updateMemory } from "./memories.js";
 import { housekeep } from "./housekeep.js";
@@ -127,9 +128,14 @@ async function dispatch(msg, env, stats, svc) {
     try {
       const out = await callTool(env, params.name, v.args, stats ? stats.app : "", svc);
       if (stats) tally(stats, params.name, out);
+      await activity(env,{service:svc?.id,category:'mcp',action:params.name,ok:true}).catch(()=>{});
+      if(params.name==='select_skills')for(const chosen of (out.picks||[])){
+        await activity(env,{service:svc?.id,category:'skill',action:'selected',detail:chosen,ok:true}).catch(()=>{});
+      }
       const text = ["select_skills", "delegate", "get_delegation_brief"].includes(params.name) ? out.text : typeof out === "string" ? out : JSON.stringify(out, null, 2);
       return ok({ content: [{ type: "text", text }] });
     } catch (e) {
+      await activity(env,{service:svc?.id,category:'mcp',action:params.name,ok:false,code:e instanceof ToolError?'TOOL_REJECTED':'TOOL_FAILED',message:e instanceof ToolError?e.message:'Internal tool error'}).catch(()=>{});
       if (e instanceof ToolError) return toolError(id, e.message);
       console.error("tool failed:", params.name, e && e.stack || e); // details stay in the logs, not in the reply
       return toolError(id, "internal error, please try again");

@@ -6,6 +6,7 @@ export default function TabBar({ tabs, activeId, onSelect }) {
   return (
     <nav className="tabbar" aria-label="Main">
       <div className="tabbar-in" style={{ "--n": tabs.length, "--i": idx }}>
+        <span className="nav-caption" aria-hidden="true">Workspace</span>
         <span className="tab-pill" aria-hidden="true" />
         {tabs.map((t) => (
           <button key={t.id} type="button" className={"tab" + (t.id === activeId ? " on" : "")} data-tab={t.id}

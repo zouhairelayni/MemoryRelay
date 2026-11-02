@@ -1,44 +1,50 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { skills } from "../../api/endpoints.js";
-
+const licenses=/^(?:license|licence|notice|copying)(?:\.|$)/i;
 export default function ScriptBank({ active, revision }) {
-  const [legacy, setLegacy] = useState([]);
-  const [resources, setResources] = useState([]);
-  const [opened, setOpened] = useState({});
+  const [legacy,setLegacy]=useState([]),[resources,setResources]=useState([]),[opened,setOpened]=useState({}),[limit,setLimit]=useState({scripts:8,resources:8});
+  const [filter,setFilter]=useState('');
   useEffect(() => {
     if (!active) return;
     setOpened({});
-    skills.scripts().then(setLegacy).catch(() => {});
-    skills.resources().then(setResources).catch(() => {});
+    Promise.all([skills.scripts(), skills.resources()])
+      .then(([s, r]) => {
+        setLegacy(s);
+        setResources(r.filter(x => !licenses.test(x.path.split('/').at(-1))));
+      })
+      .catch(() => {});
   }, [active, revision]);
-  const load = async (item) => {
-    const key = item.skill + "/" + item.path;
-    if (opened[key] !== undefined || item.kind === "asset") return;
-    try {
-      const data = await skills.resource(item.skill, item.path);
-      setOpened(prev => ({...prev, [key]: data.content ?? "Binary asset: " + data.url}));
-    } catch (err) {
-      setOpened(prev => ({...prev, [key]: "Unable to fetch: " + String(err.message || err)}));
-    }
+  const source=useMemo(()=>{
+    const original=resources.filter(x=>x.kind==='script').map(x=>({...x,origin:'official'}));
+    return [...original,...legacy.map(x=>({...x,path:x.name,kind:'script',origin:'custom',content:x.code}))];
+  },[legacy,resources]);
+  const references=resources.filter(x=>x.kind!=='script');
+  const load=async item=>{
+    const key=item.skill+'/'+item.path;
+    if(opened[key]!==undefined||item.kind==='asset'||item.origin==='custom')return;
+    try{const data=await skills.resource(item.skill,item.path);setOpened(prev=>({...prev,[key]:data.content??'Binary asset: '+data.url}));}
+    catch(e){setOpened(prev=>({...prev,[key]:'Unable to fetch: '+e.message}));}
   };
-  if (!legacy.length && !resources.length) return null;
-  return (
-    <section className="card stack" aria-label="Skill resource bank">
-      <div className="chead"><div className="grow"><h3>Skill resource bank</h3>
-        <div className="sub">Original scripts, examples, references and assets. Source is returned to the agent, never executed by MemoryRelay.</div>
-      </div></div>
-      {resources.map(item => {
-        const key = item.skill + "/" + item.path;
-        return <details key={key} onToggle={e => { if (e.currentTarget.open) load(item); }}>
-          <summary><strong>{item.path}</strong> <span className="muted small">· {item.skill} · {item.kind}</span></summary>
-          {item.kind === "asset" ? <p><a href={item.url} rel="noreferrer" target="_blank">Original upstream asset</a></p> :
-          <pre style={{whiteSpace: "pre", overflowX: "auto", maxHeight: 320, padding: 12, borderRadius: 10, background: "var(--paper2, #eef0f4)", fontSize: 12}}><code>{opened[key] ?? "Loading source…"}</code></pre>}
+  const section=(title,items,key)=>{
+    const shown=items.filter(x=>(x.skill+' '+x.path).toLowerCase().includes(filter.toLowerCase()));
+    return <details className="resource-set" key={key}>
+      <summary><strong>{title}</strong><span className="muted small">{shown.length} files</span></summary>
+      <div className="resource-content">{shown.slice(0,limit[key]).map(item=>{
+        const k=item.skill+'/'+item.path;
+        return <details className="resource-file" key={k} onToggle={e=>{if(e.currentTarget.open)load(item);}}>
+          <summary><strong>{item.path}</strong><small>{item.skill}{item.origin==='custom'?' · custom':''}</small></summary>
+          {item.kind==='asset'?<p><a href={item.url} target="_blank" rel="noreferrer">Open asset source</a></p>:
+          <pre><code>{item.origin==='custom'?item.content:opened[k]??'Loading…'}</code></pre>}
         </details>;
       })}
-      {legacy.map(item => <details key={item.name}>
-        <summary><strong>{item.name}</strong> <span className="muted small">· {item.skill} · MemoryRelay custom helper (not Anthropic)</span></summary>
-        <pre style={{whiteSpace: "pre", overflowX: "auto", maxHeight: 320, padding: 12}}><code>{item.code}</code></pre>
-      </details>)}
-    </section>
-  );
+      {shown.length>limit[key]?<button className="fld" onClick={()=>setLimit(p=>({...p,[key]:p[key]+12}))}>Show 12 more ({shown.length-limit[key]} remaining)</button>:null}
+      {!shown.length?<p className="muted small">No matching files.</p>:null}</div>
+    </details>;
+  };
+  if(!source.length&&!references.length)return null;
+  return <section className="card stack" aria-label="Skill resource bank">
+    <h3>Skill files</h3><p className="muted small">Scripts and reference files stay separate. Files are provided as source, never executed by MemoryRelay.</p>
+    <input className="fld" type="search" aria-label="Filter skill files" placeholder="Find script or reference" value={filter} onChange={e=>setFilter(e.target.value)}/>
+    {section('Scripts',source,'scripts')}{section('References and assets',references,'resources')}
+  </section>;
 }

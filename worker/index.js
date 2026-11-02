@@ -7,6 +7,7 @@ import { seedBuiltins } from "./builtins.js";
 import { rateLimit } from "./limits.js";
 import { handleMcp } from "./mcp.js";
 import { meter } from "./metering.js";
+import { activity } from "./monitor.js";
 import { CORS, bearerChallenge, isOauthPath, oauth, serviceByBearer } from "./oauth.js";
 import { serviceBySecret } from "./services.js";
 import { json } from "./util.js";
@@ -81,7 +82,14 @@ export default {
           return await serveMcp(request, env, ctx, svc, {});
         }
         if (p.startsWith("/auth/")) return await auth(request, env, url);
-        return await api(request, env, url);
+        const response = await api(request, env, url);
+        if(!p.startsWith('/api/monitor') && !p.startsWith('/api/build')){
+          ctx.waitUntil((async()=>{
+            let msg='';if(response.status>=400){const data=await response.clone().json().catch(()=>({}));msg=String(data.error||'Request failed');}
+            await activity(env,{category:'api',action:request.method+' '+p.replace(/[a-f0-9]{12,}/ig,':id'),ok:response.status<400,code:response.status>=400?'HTTP_'+response.status:'',message:msg});
+          })().catch(()=>{}));
+        }
+        return response;
       }
       if (env.ASSETS) return withSecurityHeaders(await env.ASSETS.fetch(request));
       return new Response("not found", { status: 404 });

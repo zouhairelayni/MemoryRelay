@@ -78,3 +78,10 @@ export async function deleteService(env, id) {
   await signOutSessions(env, id);
   return { deleted: r.meta.changes };
 }
+
+export async function renameService(env,id,name){
+  const clean=String(name??'').trim().slice(0,60);
+  if(!clean)return {error:'Enter a connection name.'};
+  const result=await env.DB.prepare('UPDATE services SET name=? WHERE id=? AND revoked=0').bind(clean,String(id)).run();
+  return result.meta.changes?{ok:true,name:clean}:{error:'Connection not found.'};
+}

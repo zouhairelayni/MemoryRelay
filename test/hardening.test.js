@@ -451,25 +451,28 @@ test("OAuth approval: no password, no list of other connections, new connection 
   assert.equal(made.access, "read");
 });
 
-test("OAuth: every handshake is new; the same app coming back refreshes its own connection", async () => {
+test("OAuth: same app may connect a different account, with optional explicit reuse", async () => {
   const ctx = await setup();
   const count = () => ctx.db.prepare("SELECT COUNT(*) AS n FROM services").get().n;
-  const a = await oauthFlow(ctx);                       // "Test App" at app.example
-  const start = count();
-  assert.ok(codeOf(await a.approve()));
-  assert.equal(count(), start + 1, "first time: a new connection");
-  const again = await oauthFlow(ctx);                   // same app name, same site, registered again
-  const page = await (await ctx.call("/oauth/authorize?" + again.q, { headers: { cookie: ctx.cookie } })).text();
-  assert.match(page, /Refreshing an existing connection/);
-  assert.match(page, /Reconnect Test App\?/);
-  assert.ok(codeOf(await again.approve()));
-  assert.equal(count(), start + 1, "refresh: no second connection");
-  assert.ok(codeOf(await again.approve({ decision: "new" })));
-  assert.equal(count(), start + 2, "asking for a separate one creates it");
-  const other = await oauthFlow(ctx, { redirect: "https://other.example/cb" });   // same name, different site: not a refresh
-  assert.match(await (await ctx.call("/oauth/authorize?" + other.q, { headers: { cookie: ctx.cookie } })).text(), /New connection/);
-  const names = ctx.db.prepare("SELECT name FROM services WHERE name LIKE 'OAuth agent%' OR name LIKE 'Test App%'").all().map((r) => r.name);
-  assert.equal(new Set(names).size, names.length, "names stay unique");
+  const first=await oauthFlow(ctx);
+  const before=count();
+  assert.ok(codeOf(await first.approve({name:'Claude personal',access:'read'})));
+  assert.equal(count(),before+1);
+  const second=await oauthFlow(ctx);
+  const html=await (await ctx.call('/oauth/authorize?'+second.q,{headers:{cookie:ctx.cookie}})).text();
+  assert.match(html,/New connection/);
+  assert.match(html,/Create a new connection/);
+  assert.match(html,/Claude personal/);
+  assert.ok(codeOf(await second.approve({name:'Claude work',access:'write'})));
+  assert.equal(count(),before+2,'separate external account may use same app callback');
+  const services=ctx.db.prepare("SELECT id,name,access FROM services WHERE name LIKE 'Claude %'").all();
+  const personal=services.find(s=>s.name==='Claude personal');
+  assert.equal(personal.access,'read');
+  const third=await oauthFlow(ctx);
+  assert.ok(codeOf(await third.approve({reconnect_id:personal.id,name:'Claude personal',access:'read'})));
+  assert.equal(count(),before+2,'user explicitly selected existing connection');
+  const other=await oauthFlow(ctx,{redirect:'https://other.example/cb'});
+  assert.match(await (await ctx.call('/oauth/authorize?'+other.q,{headers:{cookie:ctx.cookie}})).text(),/New connection/);
 });
 
 test("OAuth consent accepts valid CSRF even from embedded app browsers; forged submissions are refused", async () => {

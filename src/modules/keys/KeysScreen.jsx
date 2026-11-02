@@ -13,7 +13,7 @@ export default function KeysScreen({ active }) {
   const provider = PROVIDERS.find((p) => p.id === id) || PROVIDERS[0];
   const { Panel } = provider;
   return (
-    <div className="screen">
+    <div className="screen models-screen">
       <PageHead icon="models" title="Models" sub="Your AI keys rotate, so one rate limit never stops an agent." />
       <div>
         <Segmented label="Models" value={view} onChange={setView} options={[

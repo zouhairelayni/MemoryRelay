@@ -39,6 +39,10 @@ export function useServices({ onChange } = {}) {
     } catch (e) { setMessage(e.message); return false; }
   }, [done]);
 
+  const rename = useCallback(async (id,name)=>{
+    try{await services.rename(id,name);await done('Connection renamed.');return true;}
+    catch(e){setMessage(e.message);return false;}
+  },[done]);
   const revoke = useCallback(async (id) => {
     try { await services.revoke(id); await done("Revoked."); } catch (e) { setMessage(e.message); load(); }
   }, [done, load]);
@@ -61,5 +65,5 @@ export function useServices({ onChange } = {}) {
     setMessage(ok ? "Address copied." : "Could not copy. Long-press the address to copy it manually.");
   }, []);
 
-  return { items, loaded, message, focusId, load, create, revoke, remove, copyAddress, setAccess, signOut };
+  return { items, loaded, message, focusId, load, create, rename, revoke, remove, copyAddress, setAccess, signOut };
 }

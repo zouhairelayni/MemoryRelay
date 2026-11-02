@@ -34,6 +34,9 @@ export async function ensureSchema(env) {
     env.DB.prepare("CREATE TABLE IF NOT EXISTS skill_scripts (name TEXT PRIMARY KEY, skill TEXT NOT NULL, description TEXT NOT NULL, code TEXT NOT NULL)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS skill_resources (skill TEXT NOT NULL, path TEXT NOT NULL, kind TEXT NOT NULL, content TEXT, url TEXT NOT NULL, PRIMARY KEY (skill, path))"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS skill_repos (id TEXT PRIMARY KEY, owner TEXT NOT NULL, repo TEXT NOT NULL, root TEXT NOT NULL, ref TEXT NOT NULL, names TEXT NOT NULL DEFAULT '[]', enabled INTEGER NOT NULL DEFAULT 0, last_sha TEXT NOT NULL DEFAULT '', last_checked TEXT NOT NULL DEFAULT '', last_error TEXT NOT NULL DEFAULT '')"),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS skill_repo_stage (repo_id TEXT NOT NULL, skill TEXT NOT NULL, path TEXT NOT NULL, kind TEXT NOT NULL, content TEXT, url TEXT NOT NULL, PRIMARY KEY (repo_id,skill,path))"),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS activity_events (id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL, service_id TEXT NOT NULL DEFAULT '', category TEXT NOT NULL, action TEXT NOT NULL, detail TEXT NOT NULL DEFAULT '', provider TEXT NOT NULL DEFAULT '', model TEXT NOT NULL DEFAULT '', tokens_in INTEGER NOT NULL DEFAULT 0, tokens_out INTEGER NOT NULL DEFAULT 0, ok INTEGER NOT NULL DEFAULT 1, error_code TEXT NOT NULL DEFAULT '', error_message TEXT NOT NULL DEFAULT '')"),
+    env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_activity_ts ON activity_events (ts)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS memories (id TEXT PRIMARY KEY, text TEXT NOT NULL, tags TEXT NOT NULL DEFAULT '', source TEXT NOT NULL DEFAULT '', created TEXT NOT NULL, updated TEXT NOT NULL, history TEXT NOT NULL DEFAULT '[]')"),
   ]);
   await env.DB.prepare(
@@ -78,6 +81,18 @@ export async function ensureSchema(env) {
     if (have.has(col)) continue;
     try { await env.DB.prepare("ALTER TABLE services ADD COLUMN " + ddl).run(); }
     catch (e) { if (!/duplicate column/i.test(String(e && e.message))) throw e; }
+  }
+  const delegationCols=new Set((await env.DB.prepare("SELECT name FROM pragma_table_info('delegations')").all()).results.map(r=>r.name));
+  for(const [col,ddl] of [['state',"state TEXT NOT NULL DEFAULT 'completed'"],['task_summary',"task_summary TEXT NOT NULL DEFAULT ''"]])
+    if(!delegationCols.has(col))try{await env.DB.prepare('ALTER TABLE delegations ADD COLUMN '+ddl).run();}catch(e){if(!/duplicate column/i.test(String(e))){throw e;}}
+  const repoCols = new Set((await env.DB.prepare("SELECT name FROM pragma_table_info('skill_repos')").all()).results.map(r=>r.name));
+  for (const [key,ddl] of [
+    ['sync_sha',"sync_sha TEXT NOT NULL DEFAULT ''"], ['sync_todo',"sync_todo TEXT NOT NULL DEFAULT ''"],
+    ['sync_done',"sync_done INTEGER NOT NULL DEFAULT 0"], ['sync_total',"sync_total INTEGER NOT NULL DEFAULT 0"],
+    ['sync_status',"sync_status TEXT NOT NULL DEFAULT ''"]
+  ]) if(!repoCols.has(key)) {
+    try { await env.DB.prepare('ALTER TABLE skill_repos ADD COLUMN '+ddl).run(); }
+    catch(e) {if(!/duplicate column/i.test(String(e)))throw e;}
   }
   await env.DB.prepare(
     "CREATE TABLE IF NOT EXISTS gemini_keys (id TEXT PRIMARY KEY, label TEXT NOT NULL, key TEXT NOT NULL UNIQUE, enabled INTEGER NOT NULL DEFAULT 1, created TEXT NOT NULL)"

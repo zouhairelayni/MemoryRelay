@@ -10,7 +10,7 @@ import Notice from "../../components/Notice.jsx";
 import Switch from "../../components/Switch.jsx";
 import ActionRow from "../../components/ActionRow.jsx";
 import Collapse from "../../components/Collapse.jsx";
-import Segmented from "../../components/Segmented.jsx";
+
 import Icon from "../../components/Icon.jsx";
 import SkillStudio from "./SkillStudio.jsx";
 
@@ -19,7 +19,8 @@ export default function SkillSelector({ active, onDeleted }) {
   const { loadCounts } = useApp();
   const sk = useSkills();
   const [q, setQ] = useState("");
-  const [filter, setFilter] = useState("all");
+  const [filter, setFilter] = useState("new");
+  const [shown,setShown]=useState(10);
   const [adding, setAdding] = useState(false);
   const [text, setText] = useState("");
   const [tryText, setTryText] = useState("");
@@ -37,7 +38,7 @@ export default function SkillSelector({ active, onDeleted }) {
     if (filter === "off" && s.enabled) return false;
     const hay = (s.name + " " + s.description).toLowerCase();
     return !q || hay.includes(q.toLowerCase());
-  }), [sk.items, filter, q]);
+  }).sort((a,b)=>filter==='used'?b.uses-a.uses:filter==='updated'?b.updated.localeCompare(a.updated):filter==='new'?b.created.localeCompare(a.created):a.name.localeCompare(b.name)), [sk.items,filter,q]);
   const enabledCount = sk.items.filter((s) => s.enabled).length;
   const pendingCount = sk.items.filter((s) => s.pending).length;
 
@@ -77,10 +78,9 @@ export default function SkillSelector({ active, onDeleted }) {
           ) : null}
         </Collapse>
         <div className="filter">
-          <Segmented label="Filter skills" value={filter} onChange={setFilter} options={[
-            { value: "all", label: "All", count: sk.items.length }, { value: "on", label: "On", count: enabledCount },
-            { value: "off", label: "Off", count: sk.items.length - enabledCount },
-          ]} />
+          <select aria-label="Sort and filter skills" className="fld" style={{width:'auto',maxWidth:'65%',fontSize:13}} value={filter} onChange={e=>{setFilter(e.target.value);setShown(10);}}>
+            <option value="new">Newly added</option><option value="updated">Recently updated</option><option value="used">Most used</option><option value="all">All A–Z</option><option value="on">Enabled</option><option value="off">Disabled</option>
+          </select>
           <div className="cluster">
             {pendingCount ? <Badge tone="rule">{pendingCount} to review</Badge> : null}
             <label className="count-pill" htmlFor="sk-max" title="Skills sent per request">
@@ -91,9 +91,9 @@ export default function SkillSelector({ active, onDeleted }) {
         <Notice tone={sk.message.tone} id="sk-msg">{sk.message.text}</Notice>
       </div>
 
-      <div id="sk-list" className="stack list">
+<div id="sk-list" className="stack list">
         {!sk.loaded ? [0, 1, 2].map((k) => <div className="skel" key={k} />) : null}
-        {list.map((s) => {
+        {list.slice(0,q?list.length:shown).map((s) => {
           const key = s.name, isOpen = !!open[key];
           return (
             <div className={"dcard" + (isOpen ? " open" : "")} key={s.name}>
@@ -121,6 +121,7 @@ export default function SkillSelector({ active, onDeleted }) {
             </div>
           );
         })}
+        {!q && list.length>shown?<button type="button" className="fld" onClick={()=>setShown(n=>n+10)}>Show 10 more skills ({list.length-shown} remaining)</button>:null}
         {!list.length && sk.loaded ? <p className="empty">{sk.items.length ? "No skill matches." : "No skills yet. Add one above."}</p> : null}
       </div>
 

@@ -1,7 +1,7 @@
 // Owner API (/api/*). Every route needs a logged-in session.
 import { currentUser } from "./auth.js";
 import { addMemory, deleteMemory, editMemory, exportMemories, importMemories, listMemories } from "./memories.js";
-import { createService, deleteService, listServices, revokeService, setAccess, signOutSessions, testConnector } from "./services.js";
+import { renameService, createService, deleteService, listServices, revokeService, setAccess, signOutSessions, testConnector } from "./services.js";
 import { geminiOp, geminiState, listGeminiModels } from "./gemini.js";
 import { housekeep } from "./housekeep.js";
 import { listStats } from "./metering.js";
@@ -13,6 +13,7 @@ import { json, now } from "./util.js";
 import { COMPAT } from "./providers.js";
 import { delegate, getDelegation, saveDelegation } from "./delegate.js";
 import { BRIEF_FORM, GUIDE } from "./delegateguide.js";
+import { monitor } from "./monitor.js";
 import { addSkillRepo, listSkillRepos, removeSkillRepo, setSkillRepoSync, syncSkillRepo } from "./githubSkills.js";
 
 export async function settings(env) {
@@ -37,6 +38,7 @@ export async function api(request, env, url) {
   if (!user) return json({ error: "log in first" }, 401);
   const p = url.pathname, m = request.method;
 
+  if (p === '/api/monitor' && m === 'GET') return json(await monitor(env,url.searchParams.get('days')));
   if (p === "/api/settings" && m === "GET") return json(await settings(env));
 
   // connections
@@ -45,6 +47,8 @@ export async function api(request, env, url) {
     const b = await body(request);
     return withStatus(await createService(env, b.name, b.access || "full"));
   }
+  const svcRename = p.match(/^\/api\/services\/([^/]+)\/name$/);
+  if (svcRename && m === 'PUT') return withStatus(await renameService(env,dec(svcRename[1]),(await body(request)).name));
   const svcAccess = p.match(/^\/api\/services\/([^/]+)\/access$/);
   if (svcAccess && m === "PUT") return withStatus(await setAccess(env, dec(svcAccess[1]), (await body(request)).access));
   const svcSignOut = p.match(/^\/api\/services\/([^/]+)\/sessions\/revoke$/);
@@ -80,11 +84,11 @@ export async function api(request, env, url) {
     "SELECT name, skill, description, code FROM skill_scripts ORDER BY skill, name").all()).results });
 
   if (p === "/api/skill-resources" && m === "GET") return json({ resources: (await env.DB.prepare(
-    "SELECT skill, path, kind, LENGTH(content) AS bytes, url FROM skill_resources ORDER BY skill, path").all()).results });
+    "SELECT skill, path, kind, LENGTH(content) AS bytes, url FROM skill_resources WHERE LOWER(path) NOT LIKE '%license.%' AND LOWER(path) NOT LIKE '%licence.%' ORDER BY skill, path").all()).results });
   if (p === "/api/skill-resource" && m === "GET") {
     const skill = url.searchParams.get("skill") || "", path = url.searchParams.get("path") || "";
     const row = await env.DB.prepare("SELECT skill, path, kind, content, url FROM skill_resources WHERE skill = ? AND path = ?").bind(skill, path).first();
-    return row ? json(row) : json({ error: "resource not found" }, 404);
+    return row && !/(?:^|\/)(?:licen[cs]e|notice|copying)(?:\.[^/]*)?$/i.test(path) ? json(row) : json({ error: "resource not found" }, 404);
   }
   // GitHub repositories/skill sets: owner controls automatic daily update checks.
   if (p === "/api/skill-repos" && m === "GET") return json({repositories:await listSkillRepos(env)});

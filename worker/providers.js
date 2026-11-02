@@ -1,4 +1,5 @@
 // Every AI provider in one place. Gemini has its own protocol; the others share compat.js.
+import { activity } from "./monitor.js";
 import { geminiOp, geminiState, gemini, listGeminiModels } from "./gemini.js";
 import { makeCompat } from "./compat.js";
 import { compat as openrouter } from "./openrouter.js";
@@ -27,9 +28,11 @@ export const PROVIDER_LABEL = { gemini: "Gemini", openrouter: "OpenRouter", nvid
 
 // Calls one provider by id. Same result shape for all: { text, model, key, provider } or { error }.
 export async function callProvider(env, id, prompt, opts = {}) {
-  if (id === "gemini") { const g = await gemini(env, prompt, opts); return g.error ? g : { ...g, provider: "gemini" }; }
-  const c = COMPAT[id];
-  return c ? c.call(env, prompt, opts) : { error: "unknown provider " + id };
+  const c=COMPAT[id], t0=Date.now();
+  const result=id==='gemini'?await gemini(env,prompt,opts):c?await c.call(env,prompt,opts):{error:'unknown provider '+id};
+  // Estimates, not billing figures. Exclude actual prompt/response content from telemetry.
+  await activity(env,{category:'provider',action:'api_call',provider:id,model:result.model||'',tin:Math.ceil(String(prompt||'').length/4),tout:Math.ceil(String(result.text||'').length/4),detail:String(Date.now()-t0)+' ms',ok:!result.error,code:result.error?'UPSTREAM_ERROR':'',message:result.error?String(result.error).replace(/[A-Za-z0-9_-]{28,}/g,'[redacted]'):''}).catch(()=>{});
+  return id==='gemini'&&!result.error?{...result,provider:'gemini'}:result;
 }
 
 export { geminiOp, geminiState, listGeminiModels };

@@ -38,7 +38,8 @@ test('official Github importer preserves complete text, paths and pinned resourc
   assert.ok(code.includes(`https://raw.githubusercontent.com/anthropics/skills/${sha}/skills/canvas-design/canvas-fonts/font.ttf`));
   const manifest=JSON.parse(await fs.readFile(path.join(tmp,'ANTHROPIC-UPSTREAM-MANIFEST.json'),'utf8'));
   assert.equal(manifest.skills.length,11);
-  assert.equal(manifest.resources.length,13);
+  assert.equal(manifest.resources.length,2);
+  assert.ok(manifest.resources.every(r=>!/(?:LICENSE|LICENCE)\.txt$/i.test(r.path)),'licenses are excluded from the script and reference bank');
   assert.ok(requests.some(x=>x.includes(`/git/trees/${treeSha}`)));
   assert.ok(!requests.some(x=>x.includes('/font.ttf')),'binary fonts are delivered through an immutable link');
  } finally {

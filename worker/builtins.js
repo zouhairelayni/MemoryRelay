@@ -28,6 +28,10 @@ export async function seedBuiltins(env) {
     }
     await env.DB.prepare("INSERT OR IGNORE INTO skill_repos (id, owner, repo, root, ref, names, enabled) VALUES (?,?,?,?,?,?,0)")
       .bind(OFFICIAL_REPO.id, OFFICIAL_REPO.owner, OFFICIAL_REPO.repo, OFFICIAL_REPO.root, OFFICIAL_REPO.ref, OFFICIAL_REPO.names).run();
+    if (!(await getConfig(env,'purged_license_resources_v1'))) {
+      await env.DB.prepare("DELETE FROM skill_resources WHERE LOWER(path) LIKE 'license.%' OR LOWER(path) LIKE 'licence.%' OR LOWER(path) LIKE 'copying.%' OR LOWER(path) LIKE 'notice.%' OR LOWER(path) LIKE '%/license.%' OR LOWER(path) LIKE '%/licence.%' OR LOWER(path) LIKE '%/copying.%' OR LOWER(path) LIKE '%/notice.%'").run();
+      await setConfig(env,'purged_license_resources_v1','1');
+    }
     if (OFFICIAL_SHA && !(await getConfig(env, "seed_official_anthropic_sha"))) {
       // Initial official import once; subsequent GitHub updates obey the repository sync switch.
       for (const sk of OFFICIAL_SKILLS) {

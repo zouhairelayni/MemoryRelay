@@ -1,4 +1,5 @@
 import { useState } from "react";
+import MonitorPanel from "./MonitorPanel.jsx";
 import { useApp } from "../../shell/AppContext.js";
 import { services as servicesApi, skills as skillsApi } from "../../api/endpoints.js";
 import { usePolling } from "../../hooks/usePolling.js";
@@ -41,8 +42,9 @@ export default function HomeScreen({ active }) {
   const step = () => ({ "--i": i++ });
 
   return (
-    <div className="screen enter">
-      <section className="status" style={step()}>
+    <div className="screen enter home-screen">
+      <header className="phead home-title"><div className="grow"><h2>Live overview</h2><p>Your agents, knowledge, and activity at a glance.</p></div></header>
+      <section className="status" aria-live="polite" style={step()}>
         <div className={"ring " + tone} aria-hidden="true">
           <svg viewBox="0 0 64 64"><circle className="ring-bg" cx="32" cy="32" r="28" /><circle className="ring-fg" cx="32" cy="32" r="28" /></svg>
           <span className="mark"><Icon name={live === false ? "x" : "check"} size={28} /></span>
@@ -75,7 +77,8 @@ export default function HomeScreen({ active }) {
         </section>
       ) : null}
 
-      <section style={step()}>
+      <div className="home-columns">
+      <section className="home-agents" style={step()}>
         <h3 className="section-title">Agents</h3>
         <div className="stack list" style={{ marginTop: 8 }}>
           {agents === null ? [0, 1].map((k) => <div className="skel" key={k} />) : null}
@@ -100,7 +103,7 @@ export default function HomeScreen({ active }) {
         </div>
       </section>
 
-      <section style={step()}>
+      <section className="home-library" style={step()}>
         <h3 className="section-title">Library</h3>
         <div className="stack list" style={{ marginTop: 8 }}>
           {[
@@ -119,6 +122,7 @@ export default function HomeScreen({ active }) {
         </div>
       </section>
 
+      </div>
       {install.canInstall ? (
         <section className="card tip" style={step()}>
           <div className="tip-t"><span className="chip"><Icon name="phone" size={18} /></span> Install Memory Relay</div>
@@ -126,6 +130,7 @@ export default function HomeScreen({ active }) {
           <Button small onClick={install.install}>Install app</Button>
         </section>
       ) : null}
+      <MonitorPanel active={active}/>
     </div>
   );
 }

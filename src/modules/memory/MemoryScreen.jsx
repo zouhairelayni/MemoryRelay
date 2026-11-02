@@ -44,7 +44,7 @@ export default function MemoryScreen({ active }) {
   const saveEdit = async (id, body) => { await mem.edit(id, body, q); setEditing(null); };
 
   return (
-    <div className="screen">
+    <div className="screen memory-screen">
       <PageHead icon="memory" title="Memory" sub="What your agents know. Rules are yours alone." />
 
       <SearchBar id="q" type="search" placeholder="Search memories" value={q} onChange={(e) => setQ(e.target.value)}>

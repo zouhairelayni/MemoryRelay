@@ -7,7 +7,7 @@ import GithubSources from "./GithubSources.jsx";
 export default function SkillsScreen({ active }) {
   const [revision, setRevision] = useState(0);
   return (
-    <div className="screen">
+    <div className="screen skills-screen">
       <PageHead icon="skills" title="Skills" sub="Add a skill once. Each agent gets only the ones that fit its request." />
       <SkillSelector active={active} onDeleted={() => setRevision(v => v + 1)} />
       <GithubSources active={active} onUpdated={() => setRevision(v => v + 1)} />

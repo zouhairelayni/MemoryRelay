@@ -11,10 +11,10 @@ export default function GithubSources({active,onUpdated}) {
   const [busy,setBusy]=useState("");
   const [message,setMessage]=useState("");
   const load=()=>skillRepos.list().then(setRows).catch(e=>setMessage(e.message));
-  useEffect(()=>{if(active)load();},[active]);
+  useEffect(()=>{if(!active)return;load();const timer=setInterval(load,12000);return()=>clearInterval(timer);},[active]);
   async function perform(key,work){
     setBusy(key);setMessage("");
-    try{const result=await work(); await load();onUpdated?.();setMessage(result.unchanged?"Already up to date.":result.sha?`Synced: ${result.added} added, ${result.updated} updated, ${result.skipped} skipped.`:"Saved.");}
+    try{const result=await work();if(result.error)throw Error(result.error);await load();onUpdated?.();setMessage(result.unchanged?"Already up to date.":result.running?`Sync started: ${result.done} of ${result.total} files checked. Updates continue on Cloudflare.`:result.complete?`Sync complete: ${result.total} files checked.`:"Saved.");}
     catch(e){setMessage(e.message)}finally{setBusy("")}
   }
   return <section className="card stack" aria-label="GitHub skill repositories">
@@ -28,9 +28,11 @@ export default function GithubSources({active,onUpdated}) {
         </div>
         <Switch checked={r.enabled} disabled={!!busy} title="Enable automatic GitHub sync" onChange={v=>perform(r.id,()=>skillRepos.toggle(r.id,v))}/>
       </div>
-      {r.last_error?<div className="small" style={{color:"var(--danger, #b92a44)"}}>Last check: {r.last_error}</div>:null}
+      {r.sync_status==='running'&&r.sync_total>0?<div className="repo-progress" aria-live="polite"><div className="row" style={{justifyContent:'space-between'}}><span className="muted small">Syncing on Cloudflare</span><b className="small">{r.sync_done} / {r.sync_total} files</b></div><progress max={r.sync_total} value={r.sync_done} style={{width:'100%'}}/><p className="muted small">Continues automatically even when the app is closed.</p></div>:null}
+      {r.last_error?<div className="small" role="alert" style={{color:"var(--danger, #b92a44)"}}>Last check failed: {r.last_error}</div>:null}
+      {r.sync_status==='complete'||r.sync_status==='up-to-date'?<p className="muted small">{r.sync_status==='complete'?'Sync completed':'Up to date'}{r.last_checked?' · '+r.last_checked+' UTC':''}</p>:null}
       <div className="row" style={{gap:8}}>
-        <button className="fld" type="button" disabled={!!busy} onClick={()=>perform(r.id,()=>skillRepos.sync(r.id))}>Sync now</button>
+        <button className="fld" type="button" disabled={!!busy} onClick={()=>perform(r.id,()=>skillRepos.sync(r.id))}>{busy===r.id?"Checking…":"Sync now"}</button>
         <button className="fld" type="button" disabled={!!busy} onClick={()=>{if(window.confirm(`Stop tracking ${r.id}? Installed skills will remain.`))perform(r.id,()=>skillRepos.remove(r.id));}}>Remove repo</button>
       </div>
     </div>)}

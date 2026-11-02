@@ -44,7 +44,7 @@ export default function AgentsScreen({ active }) {
   const copyOauth = async () => { setCopied(await copyText(oauthUrl)); setTimeout(() => setCopied(false), 1800); };
 
   return (
-    <div className="screen">
+    <div className="screen agents-screen">
       <PageHead icon="agents" title="Connections" sub="One connection per agent, each with its own access." />
 
       <div className="card">
@@ -72,7 +72,7 @@ export default function AgentsScreen({ active }) {
         {cur ? (
           <AgentCard key={cur.id} s={cur} open={!!open[cur.id]} onToggle={() => toggle(cur.id)}
             onCopy={() => svc.copyAddress(cur.url)} onRevoke={() => svc.revoke(cur.id)} onDelete={() => svc.remove(cur.id)}
-            onAccess={(a) => svc.setAccess(cur.id, a)} onSignOut={() => svc.signOut(cur.id)} />
+            onRename={(n)=>svc.rename(cur.id,n)} onAccess={(a) => svc.setAccess(cur.id, a)} onSignOut={() => svc.signOut(cur.id)} />
         ) : (
           <p className="empty">{svc.loaded ? "No connections yet. Add one above." : "Loading..."}</p>
         )}
@@ -92,7 +92,7 @@ export default function AgentsScreen({ active }) {
         <ol className="steps">
           <li>Paste this address into the app as a remote MCP server.</li>
           <li>The app opens a page here. Sign in if you are not signed in, then approve. No password is asked again.</li>
-          <li>Each sign-in is a new connection with its own access level. The same app signing in again refreshes its connection instead of adding another. Revoke it any time.</li>
+          <li>Each sign-in is a new connection with its own access level. For each sign-in, name the new connection and choose its access. Reuse an existing connection only if you explicitly choose it. Revoke it any time.</li>
         </ol>
       </div>
     </div>

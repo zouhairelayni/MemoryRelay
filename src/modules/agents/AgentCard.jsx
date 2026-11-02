@@ -1,3 +1,4 @@
+import {useState} from "react";
 import Badge from "../../components/Badge.jsx";
 import Collapse from "../../components/Collapse.jsx";
 import Icon from "../../components/Icon.jsx";
@@ -9,7 +10,8 @@ import { fmtBytes, pct } from "../../lib/format.js";
 import { cableColor } from "../../lib/cable.js";
 
 // One connection: who it is, what it did, what it may do, and its few actions.
-export default function AgentCard({ s, open, onToggle, onCopy, onRevoke, onDelete, onAccess, onSignOut }) {
+export default function AgentCard({ s, open, onToggle, onCopy, onRevoke, onDelete, onAccess, onSignOut, onRename }) {
+  const [draft,setDraft]=useState(s.name);
   const total = s.n_read + s.n_write + s.n_delete;
   const actions = s.revoked
     ? [{ key: "delete", label: "Delete connection", icon: "trash", variant: "danger", onClick: onDelete,
@@ -48,6 +50,7 @@ export default function AgentCard({ s, open, onToggle, onCopy, onRevoke, onDelet
       <Collapse open={open}>
         <div className="pad">
           <dl className="kv">
+            <dt>Name</dt><dd><form onSubmit={e=>{e.preventDefault();if(draft.trim()!==s.name)onRename(draft.trim());}} style={{display:'flex',gap:6}}><input className="fld" aria-label="Connection name" maxLength={60} value={draft} onChange={e=>setDraft(e.target.value)} /><button className="fld" type="submit" disabled={!draft.trim()||draft.trim()===s.name}>Save</button></form></dd>
             <dt>ID</dt><dd className="mono">{s.id}</dd>
             <dt>Requests</dt><dd>{s.requests}</dd>
             <dt>Data in</dt><dd>{fmtBytes(s.bytes_in)}</dd>

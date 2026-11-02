@@ -46,11 +46,12 @@ test('GitHub repo switch controls automatic sync; scripts update, delete with sk
   await syncEnabledSkillRepos(env);
   assert.equal(db.prepare('SELECT COUNT(*) n FROM skills WHERE name = ?').get('demo-tool').n,0);
   const imported=await syncSkillRepo(env,repo,{importMissing:true});
-  assert.equal(imported.added,1);
+  assert.equal(imported.complete,true);
   assert.equal(db.prepare('SELECT content FROM skill_resources WHERE skill = ? AND path = ?').get('demo-tool','scripts/test.py').content,"print('version a')\n");
   assert.match(db.prepare('SELECT body FROM skills WHERE name = ?').get('demo-tool').body,/Exact official source/);
   await setSkillRepoSync(env,repo,true);
   restore();restore=githubMock(sha2);
+  await env.DB.prepare("UPDATE skill_repos SET last_checked='2026-10-01 00:00' WHERE id=?").bind(repo).run();
   await syncEnabledSkillRepos(env);
   assert.equal(db.prepare('SELECT content FROM skill_resources WHERE skill = ? AND path = ?').get('demo-tool','scripts/test.py').content,"print('version b')\n");
   assert.equal(db.prepare('SELECT COUNT(*) n FROM skill_resources WHERE skill = ?').get('demo-tool').n,3);
@@ -61,7 +62,7 @@ test('GitHub repo switch controls automatic sync; scripts update, delete with sk
   await syncEnabledSkillRepos(env);
   assert.equal(db.prepare('SELECT COUNT(*) n FROM skills WHERE name = ?').get('demo-tool').n,0);
   const again=await syncSkillRepo(env,repo,{importMissing:true});
-  assert.equal(again.added,1);
+  assert.equal(again.complete,true);
   await setSkillRepoSync(env,repo,false);
   restore();restore=githubMock(sha2);
   await syncEnabledSkillRepos(env);

@@ -9,7 +9,7 @@ const output = path.resolve("worker/anthropicUpstream.generated.js");
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function fetchText(url, attempts=4) {
   for (let i=0; i<attempts; i++) {
-    const r = await fetch(url,{headers:{"User-Agent":"MemoryRelay-SkillImporter/2.0","Accept":"application/vnd.github+json"},signal:AbortSignal.timeout(45000)});
+    const r = await fetch(url,{headers:{"User-Agent":"MemoryRelay-SkillImporter/2.0","Accept":"application/vnd.github+json",...(process.env.GITHUB_TOKEN ? {Authorization:`Bearer ${process.env.GITHUB_TOKEN}`} : {})},signal:AbortSignal.timeout(45000)});
     if (r.ok) return r.text();
     if (i===attempts-1 || ![429,500,502,503,504].includes(r.status)) throw new Error(`upstream fetch failed ${r.status}: ${url}`);
     await sleep(1500*(i+1));
@@ -52,7 +52,7 @@ for(const name of names){
 const resources=[];
 for(const file of entries){
  const seg=file.path.split('/');const name=seg[1], rel=seg.slice(2).join('/');
- if(rel==='SKILL.md') continue;
+ if(rel==='SKILL.md' || /^(?:license|licence|copying|notice)(?:\.[^/]*)?$/i.test(rel.split('/').at(-1))) continue;
  const url=sourceFor(file.path);
  // Some Anthropic resource bundles include large binary fonts/media. Preserve their paths/URLs;
  // never inline or alter the binary assets, and never truncate textual instructions/scripts.

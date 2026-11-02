@@ -17,6 +17,7 @@ export const overview = {
 export const services = {
   list: () => get("/api/services").then((d) => d.services),
   create: (name, access) => post("/api/services", { name, access }),
+  rename: (id,name) => put("/api/services/" + encodeURIComponent(id) + "/name",{name}),
   setAccess: (id, access) => put("/api/services/" + id + "/access", { access }),
   signOut: (id) => post("/api/services/" + id + "/sessions/revoke"),
   revoke: (id) => post("/api/services/" + id + "/revoke"),
@@ -88,6 +89,8 @@ export const provider = (id) => ({
 });
 
 // Sub-agents: switch, hourly limit, routing, usage.
+export const monitoring = { get: (days=30) => get("/api/monitor?days="+days) };
+
 export const delegation = {
   get: () => get("/api/delegation"),
   save: (patch) => put("/api/delegation", patch),
