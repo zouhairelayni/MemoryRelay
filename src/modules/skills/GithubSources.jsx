@@ -4,13 +4,14 @@ import Switch from "../../components/Switch.jsx";
 
 export default function GithubSources({active,onUpdated}) {
   const [rows,setRows]=useState([]);
+  const [tokenConfigured,setTokenConfigured]=useState(null);
   const [repo,setRepo]=useState("");
   const [root,setRoot]=useState("skills");
   const [branch,setBranch]=useState("main");
   const [names,setNames]=useState("");
   const [busy,setBusy]=useState("");
   const [message,setMessage]=useState("");
-  const load=()=>skillRepos.list().then(setRows).catch(e=>setMessage(e.message));
+  const load=()=>skillRepos.info().then(({repositories,token_configured})=>{setRows(repositories);setTokenConfigured(token_configured);}).catch(e=>setMessage(e.message));
   useEffect(()=>{if(!active)return;load();const timer=setInterval(load,12000);return()=>clearInterval(timer);},[active]);
   async function perform(key,work){
     setBusy(key);setMessage("");
@@ -19,8 +20,12 @@ export default function GithubSources({active,onUpdated}) {
   }
   return <section className="card stack" aria-label="GitHub skill repositories">
     <div className="chead"><div className="grow"><h3>GitHub skill sync</h3>
-      <div className="sub">Enable automatic daily updates for each skill set, or sync manually. Scripts and references update with the skill.</div>
+      <div className="sub">Sync skills and their scripts daily or on demand. GitHub access: {tokenConfigured===null?'Checking…':tokenConfigured?'Token configured':'No token configured'}.</div>
     </div></div>
+    <details className="repo-guide"><summary>GitHub token setup</summary>
+      <p className="muted small">Create a <a href="https://github.com/settings/personal-access-tokens/new?name=MemoryRelay%20Skill%20Sync&amp;contents=read&amp;expires_in=90" target="_blank" rel="noopener noreferrer">fine-grained personal access token</a> in GitHub with <strong>Contents: Read-only</strong> and <strong>Metadata: Read-only</strong> (automatic). Use 90-day expiry or your preferred rotation. Public repositories are readable; select private repositories only if necessary.</p>
+      <p className="muted small">Cloudflare → Workers &amp; Pages → MemoryRelay Worker → Settings → Variables and Secrets → Add. Name <code>GITHUB_TOKEN</code>, type <strong>Secret</strong>, paste your token, then deploy the setting. Never paste a token here or commit it to GitHub. Authenticated GitHub API calls have a higher rate limit.</p>
+    </details>
     {rows.map(r=><div key={r.id} className="stack" style={{borderTop:"1px solid var(--line)",paddingTop:12,gap:6}}>
       <div className="row" style={{justifyContent:"space-between",alignItems:"center"}}>
         <div className="grow"><strong>{r.owner}/{r.repo}</strong> <small className="muted">/ {r.root}</small>

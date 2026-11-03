@@ -64,9 +64,14 @@ export async function api(request, env, url) {
   if (p === "/api/gemini" && m === "GET") return json(await geminiState(env));
   if (p === "/api/gemini" && m === "POST") return withStatus(await geminiOp(env, request));
   if (p === "/api/gemini/models" && m === "GET") {
-    const row = await env.DB.prepare("SELECT key FROM gemini_keys WHERE enabled = 1 LIMIT 1").first();
-    if (!row) return json({ error: "add an enabled key first" }, 400);
-    return withStatus(await listGeminiModels(row.key));
+    const rows = (await env.DB.prepare("SELECT key FROM gemini_keys WHERE enabled = 1 ORDER BY created LIMIT 5").all()).results;
+    if (!rows.length) return json({ error: "enable a saved Gemini key first" }, 400);
+    let result;
+    for (const row of rows) {
+      result = await listGeminiModels(row.key);
+      if (result.models) break;
+    }
+    return withStatus(result);
   }
 
   // memories
@@ -91,7 +96,7 @@ export async function api(request, env, url) {
     return row && !/(?:^|\/)(?:licen[cs]e|notice|copying)(?:\.[^/]*)?$/i.test(path) ? json(row) : json({ error: "resource not found" }, 404);
   }
   // GitHub repositories/skill sets: owner controls automatic daily update checks.
-  if (p === "/api/skill-repos" && m === "GET") return json({repositories:await listSkillRepos(env)});
+  if (p === "/api/skill-repos" && m === "GET") return json({repositories:await listSkillRepos(env),token_configured:!!env.GITHUB_TOKEN});
   if (p === "/api/skill-repos" && m === "POST") return withStatus(await addSkillRepo(env,await body(request)));
   const repoRoute=p.match(/^\/api\/skill-repos\/([^/]+)(?:\/(sync|enabled))?$/);
   if(repoRoute){
@@ -136,8 +141,14 @@ export async function api(request, env, url) {
     if (!pv[2] && m === "GET") return json(await c.state(env));
     if (!pv[2] && m === "POST") { const out = await c.op(env, request); return json(out, out.error ? 400 : 200); }
     if (pv[2] && m === "GET") {
-      const row = await env.DB.prepare(`SELECT key FROM ${c.tables.keys} WHERE enabled = 1 LIMIT 1`).first();
-      return withStatus(await c.list(row ? row.key : ""));
+      const rows = (await env.DB.prepare(`SELECT key FROM ${c.tables.keys} WHERE enabled = 1 ORDER BY created LIMIT 5`).all()).results;
+      if (!rows.length && pv[1] !== "openrouter") return json({ error: "enable a saved " + c.label + " key first" }, 400);
+      let result;
+      for (const row of rows.length ? rows : [{key:""}]) {
+        result = await c.list(row.key);
+        if (result.models) break;
+      }
+      return withStatus(result);
     }
   }
 

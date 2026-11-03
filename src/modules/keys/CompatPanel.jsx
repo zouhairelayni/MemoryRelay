@@ -19,6 +19,7 @@ export default function CompatPanel({ id, title, intro, keyHint, browseLabel = "
   const [label, setLabel] = useState("");
   const [key, setKey] = useState("");
   const [list, setList] = useState(null);      // null = not loaded yet
+  const [loading, setLoading] = useState(false);
   const [q, setQ] = useState("");
   const [typed, setTyped] = useState("");
   const [message, setMessage] = useState({ text: "", tone: "muted" });
@@ -34,10 +35,22 @@ export default function CompatPanel({ id, title, intro, keyHint, browseLabel = "
   };
 
   const browse = async () => {
-    say("Loading models...");
-    try { const m = await api.models(); setList(m); say(m.length + " models. Tap + on the ones you want."); }
-    catch (e) { say(e.message, "bad"); }
+    setLoading(true); say("Loading saved-key models...");
+    try { const m = await api.models(); setList(m); say(m.length + " models available."); }
+    catch (e) { setList([]); say(e.message, "bad"); }
+    finally { setLoading(false); }
   };
+
+  const enabledKeyIds = state.keys.filter(k=>k.enabled).map(k=>k.id).join(',');
+  useEffect(() => {
+    if (!active || pane !== "models" || (!enabledKeyIds && id !== "openrouter")) return;
+    let current = true;
+    setLoading(true); setList(null); say("Loading models from saved keys...");
+    api.models().then(m => { if (current) { setList(m); say(m.length + " models available."); } })
+      .catch(e => { if (current) { setList([]); say(e.message, "bad"); } })
+      .finally(() => { if (current) setLoading(false); });
+    return () => { current = false; };
+  }, [active, pane, id, enabledKeyIds, api]);
 
   const shown = useMemo(() => (list || []).filter((m) => !q || (m.id + " " + m.name).toLowerCase().includes(q.toLowerCase())), [list, q]);
   const have = new Set(state.models.map((m) => m.name));
@@ -76,7 +89,7 @@ export default function CompatPanel({ id, title, intro, keyHint, browseLabel = "
       ) : (
         <div>
           <div className="row">
-            <Button variant="ghost" icon="download" onClick={browse}>{browseLabel}</Button>
+            <Button variant="ghost" icon="download" onClick={browse} disabled={loading || (!enabledKeyIds && id !== "openrouter")}>{loading ? "Loading…" : "Refresh models"}</Button>
           </div>
           <div style={{ marginTop: 10 }}>
             <SearchBar id={id + "-model"} icon="skills" placeholder="Or type a model name" value={typed} onChange={(e) => setTyped(e.target.value)}
@@ -84,6 +97,8 @@ export default function CompatPanel({ id, title, intro, keyHint, browseLabel = "
               <IconButton icon="plus" label="Add model" variant="solid" onClick={addTyped} />
             </SearchBar>
           </div>
+          {!enabledKeyIds && id !== "openrouter" ? <p className="muted small">Enable a saved {title} key to browse models. You do not need to add it again.</p> : null}
+          {loading ? <p className="muted small" role="status">Fetching available models…</p> : null}
           {list ? (
             <>
               <div style={{ marginTop: 10 }}>

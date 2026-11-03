@@ -305,3 +305,8 @@ button:focus-visible, a:focus-visible, select:focus-visible, summary:focus-visib
 .monitor-metrics b{font-size:24px;font-weight:600}
 .monitor-figure{gap:16px}
 .monitor-chart-title{align-items:center}
+
+/* GitHub credential setup: a quiet disclosure, not another dashboard panel. */
+.skills-screen .repo-guide {margin:12px 0 4px;padding:12px 14px;background:var(--paper2);border-radius:12px}
+.skills-screen .repo-guide summary {font-size:13px;font-weight:600;cursor:pointer}
+.skills-screen .repo-guide p {margin:10px 0 0;line-height:1.55;overflow-wrap:anywhere}

@@ -6,6 +6,7 @@ export function useGemini({ onChange } = {}) {
   const [state, setState] = useState({ keys: [], models: [] });
   const [message, setMessage] = useState("");
   const [available, setAvailable] = useState([]);
+  const [loadingAvailable, setLoadingAvailable] = useState(false);
 
   const load = useCallback(async () => {
     try { setState(await gemini.state()); } catch (e) { setMessage(e.message); }
@@ -21,13 +22,14 @@ export function useGemini({ onChange } = {}) {
   }, [load, onChange]);
 
   const loadAvailable = useCallback(async () => {
-    setMessage("Loading models...");
+    setLoadingAvailable(true); setMessage("Loading models from saved keys...");
     try {
       const list = await gemini.models();
       setAvailable(list);
-      setMessage(list.length + " models available. Type or pick one, then Add.");
-    } catch (e) { setMessage(e.message); }
+      setMessage(list.length + " models available.");
+    } catch (e) { setAvailable([]); setMessage(e.message); }
+    finally { setLoadingAvailable(false); }
   }, []);
 
-  return { ...state, message, available, load, op, loadAvailable };
+  return { ...state, message, available, loadingAvailable, load, op, loadAvailable };
 }

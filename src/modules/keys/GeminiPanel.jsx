@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useApp } from "../../shell/AppContext.js";
 import { useGemini } from "../../hooks/useGemini.js";
 import Button from "../../components/Button.jsx";
+import IconButton from "../../components/IconButton.jsx";
+import SearchBar from "../../components/SearchBar.jsx";
 import Icon from "../../components/Icon.jsx";
 import Notice from "../../components/Notice.jsx";
 import Segmented from "../../components/Segmented.jsx";
@@ -14,9 +16,16 @@ export default function GeminiPanel({ active }) {
   const [label, setLabel] = useState("");
   const [key, setKey] = useState("");
   const [model, setModel] = useState("");
+  const [q,setQ] = useState("");
 
   useEffect(() => { if (active) g.load(); }, [active]); // eslint-disable-line react-hooks/exhaustive-deps
+  const enabledKeyIds = g.keys.filter(k=>k.enabled).map(k=>k.id).join(',');
+  useEffect(() => {
+    if (active && pane === "models" && enabledKeyIds) g.loadAvailable();
+  }, [active, pane, enabledKeyIds, g.loadAvailable]);
 
+  const shown = g.available.filter(n=>n.toLowerCase().includes(q.toLowerCase()));
+  const selected = new Set(g.models.map(m=>m.name));
   const addKey = async () => { if (await g.op({ op: "add_key", label, key })) setKey(""); };
   const addModel = async () => { if (await g.op({ op: "add_model", name: model.trim() })) setModel(""); };
 
@@ -56,9 +65,23 @@ export default function GeminiPanel({ active }) {
           <div className="row">
             <input id="gm-name" className="fld grow" list="gm-opts" placeholder="Model name" value={model} onChange={(e) => setModel(e.target.value)} />
             <datalist id="gm-opts">{g.available.map((n) => <option key={n} value={n} />)}</datalist>
-            <Button id="gm-load" variant="ghost" onClick={g.loadAvailable}>Load list</Button>
+            <Button id="gm-load" variant="ghost" onClick={g.loadAvailable} disabled={!enabledKeyIds || g.loadingAvailable}>{g.loadingAvailable ? "Loading…" : "Refresh models"}</Button>
             <Button id="gm-add" icon="plus" onClick={addModel}>Add</Button>
           </div>
+          {!enabledKeyIds ? <p className="muted small">Enable a saved Gemini key to browse models. You do not need to paste it again.</p> : null}
+          {g.loadingAvailable ? <p className="muted small" role="status">Fetching available models…</p> : null}
+          {g.available.length > 0 ? <>
+            <div style={{marginTop:10}}><SearchBar id="gm-filter" type="search" placeholder="Filter available models" value={q} onChange={e=>setQ(e.target.value)} /></div>
+            <div className="stack list" style={{marginTop:10}}>
+              {shown.slice(0,150).map(n=><div className="dcard" key={n}>
+                <div className="dhead"><div className="dmain" style={{cursor:"default"}}><span className="tt"><code>{n}</code></span></div>
+                  {selected.has(n) ? <span className="badge ok">Added</span> : <IconButton icon="plus" label={"Add " + n} onClick={()=>g.op({op:"add_model",name:n})} />}
+                </div>
+              </div>)}
+            </div>
+            {shown.length>150 ? <p className="muted small">Showing 150 models. Filter to narrow the list.</p> : null}
+          </> : null}
+          <h3 style={{marginTop:18}}>Your models</h3>
           <div id="gm-list" className="stack list">
             {g.models.map((m, i) => (
               <KeyRow key={m.name} enabled={m.enabled} onToggle={() => g.op({ op: "toggle_model", name: m.name })}
