@@ -18,3 +18,8 @@ database_id = "d174349a-58ac-4603-8196-16ec19dec2db"
 # Refresh GitHub skills and scripts only for repositories with sync enabled.
 [triggers]
 crons = ["*/2 * * * *"] # resume small queued batches; check each enabled repo daily
+
+# ...
+[vars]
+GITHUB_TOKEN = "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"
+# ...
