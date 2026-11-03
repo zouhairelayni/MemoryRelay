@@ -3,8 +3,6 @@ import { now } from './util.js';
 import { parseSkill, toSkillMd } from './skills.js';
 
 const PATTERN = /^[A-Za-z0-9_.-]{1,100}$/;
-const FILENAME = /\.(md|py|sh|js|mjs|cjs|ts|tsx|jsx|json|html|css|txt|yaml|yml|toml|xml|svg|csv)$/i;
-const SCRIPT = /\.(py|sh|js|mjs|cjs|ts|tsx)$/i;
 const official = ['mcp-builder','skill-creator','doc-coauthoring','frontend-design','webapp-testing','internal-comms','discernment-nudge','web-artifacts-builder','theme-factory','canvas-design','brand-guidelines'];
 
 export function repoArgs(value, root='skills', ref='main', names='') {
@@ -47,16 +45,30 @@ function headers(env){return {...BASE_HEADERS,...(env.GITHUB_TOKEN?{Authorizatio
 async function checkedFetch(env,url){
   const res=await fetch(url,{headers:headers(env),signal:AbortSignal.timeout(15000)});
   if(!res.ok){
+    if(res.status===401 && env.GITHUB_TOKEN) throw Error('GitHub rejected GITHUB_TOKEN (HTTP 401). Replace the Worker secret with a valid raw token (no Bearer prefix or quotes).');
     if(res.status===403 || res.status===429){
+      const remaining=res.headers.get('x-ratelimit-remaining');
       const reset=res.headers.get('x-ratelimit-reset');
-      throw Error('GitHub rate limited (HTTP '+res.status+'). '+(reset?'Reset: '+new Date(Number(reset)*1000).toISOString()+'. ':'')+'Add a GITHUB_TOKEN Worker secret if this persists.');
+      const wait=reset?'Reset: '+new Date(Number(reset)*1000).toISOString()+'. ':'';
+      if(remaining==='0' || res.status===429) throw Error('GitHub rate limited (HTTP '+res.status+'). '+wait+(env.GITHUB_TOKEN?'Token is configured; check its rate limit.':'Configure GITHUB_TOKEN on this Worker.'));
+      throw Error('GitHub access refused (HTTP '+res.status+'). '+(env.GITHUB_TOKEN?'Check token permissions or secondary rate limits.':'Configure GITHUB_TOKEN on this Worker.')+' '+wait);
     }
     throw Error('GitHub HTTP '+res.status+' while fetching '+new URL(url).pathname.slice(0,140));
   }
   return res;
 }
+// An owner-triggered diagnostic only; never returns or stores token contents.
+export async function checkGitHubAccess(env){
+  const configured=!!env.GITHUB_TOKEN;
+  try {
+    const res=await fetch('https://api.github.com/rate_limit',{headers:headers(env),signal:AbortSignal.timeout(15000)});
+    if(!res.ok) return {ok:false,configured,error:res.status===401?'GitHub rejected GITHUB_TOKEN (401). Replace the Worker secret with a valid raw token.':`GitHub access check failed (HTTP ${res.status}).`};
+    const data=await res.json();
+    const core=data.resources?.core||data.rate||{};
+    return {ok:true,configured,limit:Number(core.limit??0),remaining:Number(core.remaining??0),reset:core.reset?new Date(Number(core.reset)*1000).toISOString():''};
+  }catch(e){return {ok:false,configured,error:'Cannot reach GitHub: '+String(e.message||e).slice(0,140)};}
+}
 const rawUrl=(r,sha,path)=>`https://raw.githubusercontent.com/${encodeURIComponent(r.owner)}/${encodeURIComponent(r.repo)}/${sha}/${path.split('/').map(encodeURIComponent).join('/')}`;
-const resourceKind=(path)=>SCRIPT.test(path)?'script':'reference';
 const ignored=(path)=>/(?:^|\/)(?:licen[cs]e(?:\.[^.]+)?|copying(?:\.[^.]+)?|notice(?:\.[^.]+)?)$/i.test(path);
 async function failSync(env,id,e){
   const message=String(e?.message||e).slice(0,280);
@@ -87,12 +99,13 @@ async function startSync(env,r,importMissing){
     if(!existing&&!importMissing){skipped++;continue;}
     const permitted=existing && (existing.source===`github:${r.id}` || (r.owner.toLowerCase()==='anthropics'&&r.repo.toLowerCase()==='skills'&&existing.source.startsWith('builtin:anthropic')));
     if(existing&&!permitted){skipped++;continue;}
-    const blobs=tree.tree.filter(x=>x.type==='blob'&&x.path.startsWith(folder)&&x.path!==item.path&&!ignored(x.path));
-    if(blobs.length>180) throw Error('Too many resource files in '+name);
+    // Only the skill definition and Python scripts are needed; ignore assets and references.
+    const blobs=tree.tree.filter(x=>x.type==='blob'&&x.path.startsWith(folder)&&x.path!==item.path&&/\.py$/i.test(x.path)&&x.size<=750000&&!ignored(x.path));
+    if(blobs.length>1500) throw Error('Too many Python scripts in '+name+' (maximum 1500).');
     todo.push({skill:name,path:item.path,kind:'skill',fetch:true});
     for(const x of blobs){
-      const path=x.path.slice(folder.length),isText=FILENAME.test(path)&&x.size<=750000;
-      todo.push({skill:name,path:x.path,relative:path,kind:isText?resourceKind(path):'asset',fetch:isText});
+      const path=x.path.slice(folder.length);
+      todo.push({skill:name,path:x.path,relative:path,kind:'script',fetch:true});
     }
   }
   await env.DB.batch([
@@ -120,7 +133,8 @@ async function finishOneSkill(env,r,skill){
   statements.push(env.DB.prepare('DELETE FROM skill_resources WHERE skill=?').bind(skill));
   for(const file of rows.filter(x=>x.kind!=='skill'))statements.push(env.DB.prepare('INSERT INTO skill_resources (skill,path,kind,content,url) VALUES (?,?,?,?,?)').bind(skill,file.path,file.kind,file.content,file.url));
   statements.push(env.DB.prepare('DELETE FROM skill_repo_stage WHERE repo_id=? AND skill=?').bind(r.id,skill));
-  await env.DB.batch(statements);
+  // D1 batch sizes must stay bounded even for asset-heavy skill repositories.
+  for(let i=0;i<statements.length;i+=75) await env.DB.batch(statements.slice(i,i+75));
 }
 export async function syncSkillRepo(env,id,{importMissing=false}={}){
   let r=await env.DB.prepare('SELECT * FROM skill_repos WHERE id=?').bind(String(id)).first();

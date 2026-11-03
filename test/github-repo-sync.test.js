@@ -59,7 +59,7 @@ test('GitHub repo switch controls automatic sync; scripts update, delete with sk
   await env.DB.prepare("UPDATE skill_repos SET last_checked='2026-10-01 00:00' WHERE id=?").bind(repo).run();
   await syncEnabledSkillRepos(env);
   assert.equal(db.prepare('SELECT content FROM skill_resources WHERE skill = ? AND path = ?').get('demo-tool','scripts/test.py').content,"print('version b')\n");
-  assert.equal(db.prepare('SELECT COUNT(*) n FROM skill_resources WHERE skill = ?').get('demo-tool').n,3);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM skill_resources WHERE skill = ?').get('demo-tool').n,1);
   await deleteSkill(env,'demo-tool');
   assert.equal(db.prepare('SELECT COUNT(*) n FROM skill_resources WHERE skill = ?').get('demo-tool').n,0);
   // Deletion is respected by automatic sync without creating a blacklist.
@@ -73,4 +73,53 @@ test('GitHub repo switch controls automatic sync; scripts update, delete with sk
   await syncEnabledSkillRepos(env);
   assert.equal(db.prepare('SELECT content FROM skill_resources WHERE skill = ? AND path = ?').get('demo-tool','scripts/test.py').content,"print('version a')\n");
  }finally{restore();}
+});
+
+test('Adding a GitHub skill repository is stored without making any GitHub request',async()=>{
+ const {env}=await fixture();
+ const original=globalThis.fetch;
+ globalThis.fetch=async()=>{throw Error('GitHub unavailable');};
+ try{
+  const response=await addSkillRepo(env,{repo:'demo/new-repository',root:'skills',ref:'main'});
+  assert.equal(response.ok,true);
+  assert.equal((await listSkillRepos(env)).find(r=>r.id==='demo/new-repository:skills').enabled,false);
+ }finally{globalThis.fetch=original;}
+});
+
+test('GitHub HTTP 403 distinguishes a missing token from an already configured token',async()=>{
+ const {env}=await fixture();
+ const repo=(await addSkillRepo(env,{repo:'demo/limited'})).id;
+ const original=globalThis.fetch;
+ globalThis.fetch=async()=>new Response('rate limit',{status:403,headers:{'x-ratelimit-remaining':'0','x-ratelimit-reset':'1793749200'}});
+ try{
+  const unauthenticated=await syncSkillRepo(env,repo,{importMissing:true});
+  assert.match(unauthenticated.error,/Configure GITHUB_TOKEN/);
+  env.GITHUB_TOKEN='github_pat_fake_test';
+  const authenticated=await syncSkillRepo(env,repo,{importMissing:true});
+  assert.match(authenticated.error,/Token is configured/);
+  assert.doesNotMatch(authenticated.error,/github_pat_fake_test/);
+ }finally{globalThis.fetch=original;}
+});
+
+test('Large skill repositories ignore unrelated assets and keep only Python scripts',async()=>{
+ const {env,db}=await fixture();
+ const repo=(await addSkillRepo(env,{repo:'demo/large',names:'large-tool'})).id;
+ const old=globalThis.fetch;
+ const tree=[{type:'blob',path:'skills/large-tool/SKILL.md',size:1200},...Array.from({length:1801},(_,i)=>({type:'blob',path:`skills/large-tool/assets/image-${i}.png`,size:500})),{type:'blob',path:'skills/large-tool/scripts/render.py',size:120}];
+ globalThis.fetch=async url=>{
+  const u=String(url);
+  const data=u.includes('/commits/')?{sha:sha1,commit:{tree:{sha:treeSha}}}:u.includes('/git/trees/')?{truncated:false,tree}:null;
+  return {ok:true,headers:new Headers(),json:async()=>data,text:async()=>fn('large-tool')};
+ };
+ try{
+  let result;
+  for(let i=0;i<25;i++){
+   result=await syncSkillRepo(env,repo,{importMissing:true});
+   assert.equal(result.error,undefined,result.error);
+   if(result.complete)break;
+  }
+  assert.equal(result.complete,true);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM skill_resources WHERE skill=?').get('large-tool').n,1);
+  assert.equal(db.prepare('SELECT kind FROM skill_resources WHERE skill=? AND path=?').get('large-tool','scripts/render.py').kind,'script');
+ }finally{globalThis.fetch=old;}
 });
