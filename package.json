@@ -8,7 +8,7 @@
     "dev:worker": "wrangler dev --local",
     "build:local": "vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "build": "npm run vite build",
+    "build": "vite build",
     "deploy": "npm run build && wrangler deploy",
     "test": "node --experimental-sqlite --test test/*.test.js",
     "test:core": "node --experimental-sqlite --test test/anthropic-adaptations.test.js test/hardening.test.js test/skills.test.js test/worker.test.js test/sync-official-generator.test.js test/upstream-import.test.js test/skill-cleanup.test.js test/github-repo-sync.test.js test/monitoring.test.js test/workspace-ui.test.js test/saved-model-catalog.test.js",
@@ -17,9 +17,9 @@
     "preview:live": "MEMORYRELAY_DEV_BACKEND=https://memoryrelay.zouhairelayni.workers.dev vite preview --host 127.0.0.1"
   },
   "dependencies": {
+    "chart.js": "^4.6.1",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "chart.js": "^4.6.1"
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.4.1",
