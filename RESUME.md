@@ -14,3 +14,9 @@
 - [x] P3 (tests in test/perf-audit.test.js) performance (builtins, listSkills, monitor/activity, db indexes, pick timeout, gemini/compat)
 - [x] P4 (tests in test/security-audit.test.js) security (auth lockout, import cap, server.js, local.db, .gitignore, gemini 403)
 Deliver zip after every 2 patches, then continue without asking.
+
+## Round 2 (2026-11-12) requests
+- sync must say what happened: added/updated/unchanged/adopted/skipped per repo, skill counter + file counters per repo, detect existing repo and pasted skills with same name (adopt option), say when repo/branch/folder not found
+- import scripts + .mjs/.js/.ts/.sh tests + fonts (woff/woff2/ttf/otf, base64) and deliver to agents (chunked get_skill_resource, FILES section)
+- per-repo filters: file types, path globs, max size
+Patches: [x] P5 backend (db cols, githubSkills filters/binary/adopt/summary/counters, api route) [x] P6 agent delivery + UI + tests; zip after P6

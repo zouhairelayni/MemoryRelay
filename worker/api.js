@@ -14,7 +14,7 @@ import { COMPAT } from "./providers.js";
 import { delegate, getDelegation, saveDelegation } from "./delegate.js";
 import { BRIEF_FORM, GUIDE } from "./delegateguide.js";
 import { monitor } from "./monitor.js";
-import { addSkillRepo, githubBlockedUntil, listSkillRepos, removeSkillRepo, setSkillRepoSync, syncSkillRepo } from "./githubSkills.js";
+import { addSkillRepo, githubBlockedUntil, listSkillRepos, removeSkillRepo, setSkillRepoFilter, setSkillRepoSync, syncSkillRepo } from "./githubSkills.js";
 
 export async function settings(env) {
   const last = await env.DB.prepare("SELECT MAX(last_seen) AS last FROM services").first();
@@ -101,10 +101,11 @@ export async function api(request, env, url) {
     return json({repositories:await listSkillRepos(env),token_configured:!!env.GITHUB_TOKEN,blocked_until:until?new Date(until).toISOString():""});
   }
   if (p === "/api/skill-repos" && m === "POST") return withStatus(await addSkillRepo(env,await body(request)));
-  const repoRoute=p.match(/^\/api\/skill-repos\/([^/]+)(?:\/(sync|enabled))?$/);
+  const repoRoute=p.match(/^\/api\/skill-repos\/([^/]+)(?:\/(sync|enabled|filter))?$/);
   if(repoRoute){
     const id=dec(repoRoute[1]), action=repoRoute[2];
     if(action==='enabled' && m==='PUT') return withStatus(await setSkillRepoSync(env,id,!!(await body(request)).enabled));
+    if(action==='filter' && m==='PUT') return withStatus(await setSkillRepoFilter(env,id,await body(request)));
     if(action==='sync' && m==='POST') return withStatus(await syncSkillRepo(env,id,{importMissing:true}));
     if(!action && m==='DELETE') return json(await removeSkillRepo(env,id));
   }

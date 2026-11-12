@@ -59,7 +59,8 @@ export const backup = {
 export const skillRepos = {
   list: () => get("/api/skill-repos").then(d=>d.repositories),
   info: () => get("/api/skill-repos"),
-  add: (repo, root, ref, names) => post("/api/skill-repos", {repo,root,ref,names}),
+  add: (repo, root, ref, names, options={}) => post("/api/skill-repos", {repo,root,ref,names,...options}),
+  filter: (id, settings) => put("/api/skill-repos/"+encodeURIComponent(id)+"/filter", settings),
   toggle: (id, enabled) => put("/api/skill-repos/"+encodeURIComponent(id)+"/enabled",{enabled}),
   sync: (id) => post("/api/skill-repos/"+encodeURIComponent(id)+"/sync"),
   remove: (id) => del("/api/skill-repos/"+encodeURIComponent(id)),

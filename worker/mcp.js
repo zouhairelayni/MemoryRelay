@@ -67,9 +67,27 @@ export async function callTool(env, name, a, agentName = "", svc = null) {
       return row;
     }
     case "get_skill_resource": {
-      const row = await env.DB.prepare("SELECT r.skill, r.path, r.kind, r.content, r.url FROM skill_resources r JOIN skills s ON s.name = r.skill AND s.enabled = 1 WHERE r.skill = ? AND r.path = ?").bind(a.skill, a.path).first();
+      const skill = String(a.skill || ""), path = String(a.path || "");
+      // No path: list every file of the skill (kind and size), because the skill text only shows the first few.
+      if (!path) {
+        const files = (await env.DB.prepare("SELECT r.path, r.kind, LENGTH(r.content) chars FROM skill_resources r JOIN skills s ON s.name = r.skill AND s.enabled = 1 WHERE r.skill = ? ORDER BY r.path").bind(skill).all()).results;
+        if (!files.length) throw new ToolError("resource not found");
+        return { skill, files: files.map((f) => ({ path: f.path, kind: f.kind, size: f.kind === "font" ? Math.floor((f.chars || 0) * 3 / 4) + " bytes" : (f.chars || 0) + " chars" })) };
+      }
+      const row = await env.DB.prepare("SELECT r.skill, r.path, r.kind, r.url, LENGTH(r.content) total FROM skill_resources r JOIN skills s ON s.name = r.skill AND s.enabled = 1 WHERE r.skill = ? AND r.path = ?").bind(skill, path).first();
       if (!row) throw new ToolError("resource not found");
-      return row;
+      if (!row.total) return { skill: row.skill, path: row.path, kind: row.kind, url: row.url, content: null, note: "This file is only linked, not stored. Use the pinned url." };
+      // Big files come in parts so one call never floods the agent: repeat with next_offset until done. Fonts are base64 (4 chars per 3 bytes).
+      const binary = row.kind === "font";
+      let limit = Math.min(binary ? 90000 : 200000, Math.max(4, Math.floor(Number(a.limit)) || (binary ? 60000 : 100000)));
+      let offset = Math.max(0, Math.floor(Number(a.offset)) || 0);
+      if (binary) { limit -= limit % 4; offset -= offset % 4; }
+      const part = await env.DB.prepare("SELECT substr(content, ?, ?) c FROM skill_resources WHERE skill = ? AND path = ?").bind(offset + 1, limit, skill, path).first();
+      const next = offset + limit < row.total ? offset + limit : null;
+      return { skill: row.skill, path: row.path, kind: row.kind, encoding: binary ? "base64" : "text", total_chars: row.total,
+        bytes: binary ? Math.floor(row.total * 3 / 4) : undefined, offset, next_offset: next, done: next === null, url: row.url, content: part ? part.c : "",
+        note: (next !== null ? "Part of the file. Call get_skill_resource again with offset=" + next + " and join the parts in order. " : "") +
+          (binary ? "Base64: decode to bytes before saving as " + row.path + "." : "Save as " + row.path + " inside the skill folder.") };
     }
     case "get_delegation_brief": return { text: GUIDE + "\n\n## Brief form\n" + BRIEF_FORM };
     case "delegate": {

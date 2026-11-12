@@ -95,7 +95,13 @@ export async function ensureSchema(env) {
     ['sync_etag',"sync_etag TEXT NOT NULL DEFAULT ''"],
     ['sync_note',"sync_note TEXT NOT NULL DEFAULT ''"],  // skipped / held back skills from the last sync, shown to the owner
     ['sync_manual',"sync_manual INTEGER NOT NULL DEFAULT 0"],
-    ['sync_lock',"sync_lock INTEGER NOT NULL DEFAULT 0"] // lease so cron and the dashboard never run one repo at the same time
+    ['sync_lock',"sync_lock INTEGER NOT NULL DEFAULT 0"], // lease so cron and the dashboard never run one repo at the same time
+    ['file_types',"file_types TEXT NOT NULL DEFAULT '[\"script\",\"test\"]'"], // which kinds of files besides SKILL.md are imported
+    ['path_filter',"path_filter TEXT NOT NULL DEFAULT ''"],   // glob include/exclude lines, relative to each skill folder
+    ['max_kb',"max_kb INTEGER NOT NULL DEFAULT 750"],         // largest single file imported
+    ['adopt',"adopt INTEGER NOT NULL DEFAULT 0"],             // let this repo take over pasted skills with the same name
+    ['sync_summary',"sync_summary TEXT NOT NULL DEFAULT ''"], // outcome being collected while a sync runs
+    ['last_summary',"last_summary TEXT NOT NULL DEFAULT ''"]  // outcome of the last finished sync, shown in the app
   ]) if(!repoCols.has(key)) {
     try { await env.DB.prepare('ALTER TABLE skill_repos ADD COLUMN '+ddl).run(); }
     catch(e) {if(!/duplicate column/i.test(String(e)))throw e;}

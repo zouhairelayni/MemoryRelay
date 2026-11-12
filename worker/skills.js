@@ -269,7 +269,7 @@ async function attachExtras(env, out, byName) {
   const scripts = (await env.DB.prepare(`SELECT name, skill, description, code FROM skill_scripts WHERE skill IN (${placeholders}) ORDER BY name`).bind(...slots).all()).results;
   // Only inline short scripts. Full source remains available through get_skill_resource.
   const resources = (await env.DB.prepare(`SELECT skill, path, kind, LENGTH(content) bytes, url,
-    CASE WHEN kind = 'script' AND LENGTH(content) <= 7000 THEN content ELSE NULL END content
+    CASE WHEN kind IN ('script', 'test') AND LENGTH(content) <= 7000 THEN content ELSE NULL END content
     FROM skill_resources WHERE skill IN (${placeholders}) ORDER BY skill, path`).bind(...slots).all()).results;
   for (const sk of out) {
     const src = byName.get(sk.name).source || "";
@@ -373,6 +373,32 @@ export async function getSkillByName(env, name) {
   return { skills: out };
 }
 
+// How the files that ship with a skill (scripts, tests, fonts, reference docs) reach the agent.
+const LANG = { py: "python", mjs: "javascript", cjs: "javascript", js: "javascript", ts: "typescript", sh: "bash", bash: "bash", json: "json", md: "markdown" };
+function fileSize(x) {
+  if (!x.bytes) return "linked file";
+  return x.kind === "font" ? Math.round(x.bytes * 3 / 4 / 1000) + " KB binary, base64" : x.bytes + " chars";
+}
+function filesSection(s) {
+  const all = s.resources, shown = all.slice(0, 80);
+  let budget = 20000, inline = 0;
+  const bodies = [];
+  for (const x of all) { // short scripts and tests travel with the skill itself
+    if ((x.kind === "script" || x.kind === "test") && x.content && x.bytes <= 7000 && inline < 4 && budget - x.bytes >= 0) {
+      inline++; budget -= x.bytes;
+      bodies.push("\n\n===== SOURCE " + x.kind.toUpperCase() + ": " + x.path + " =====\n```" + (LANG[x.path.split(".").pop().toLowerCase()] || "") + "\n" + x.content + "\n```");
+    }
+  }
+  return "\n\n===== ORIGINAL UPSTREAM RESOURCES FOR " + s.name + " (" + all.length + " files that ship with the skill) =====\n" +
+    "These are the original files from the skill's repository, not rewrites. Fetch any file with get_skill_resource (skill='" + s.name + "', path='<path below>'); leave path out to list all files. " +
+    "Big files and fonts arrive in parts: repeat with offset=next_offset until done. Fonts are base64: decode to bytes before saving. " +
+    "Scripts and tests are source only: recreate them at the same relative path inside the skill folder in an environment where you are allowed to write files and run code, " +
+    "run tests only if you can really run them, and never say a script or test ran when it did not.\n" +
+    shown.map((x) => "- " + x.path + " (" + x.kind + ", " + fileSize(x) + ")").join("\n") +
+    (all.length > shown.length ? "\n- ... " + (all.length - shown.length) + " more: call get_skill_resource with only skill to list them" : "") +
+    bodies.join("");
+}
+
 // The text an agent receives: a short header, then each chosen SKILL.md, nothing else.
 export function formatForAgent(result) {
   const offNote = result.off && result.off.length ? " NOTE: " + result.off.join(", ") + (result.off.length > 1 ? " exist but are" : " exists but is") + " switched off by the owner." : "";
@@ -383,9 +409,5 @@ export function formatForAgent(result) {
   return head + result.skills.map((s) => "\n===== SKILL: " + s.name + " =====\n" + s.body +
     (s.scripts || []).map((x) => "\n\n===== PYTHON SCRIPT BANK: " + x.name + " =====\n" + x.description +
       "\nThis is source code, not executed. If the host has authorized file and Python tools, create a file from this template, adapt it and run the checks. If no tools exist, deliver the source only and state that it was not run.\n```python\n" + x.code + "\n```").join("") +
-    (s.resources?.length ? "\n\n===== ORIGINAL UPSTREAM RESOURCES FOR " + s.name + " =====\n" +
-      "These are the original files, not rewrites. When a resource is relevant call MemoryRelay get_skill_resource with skill='"+s.name+"' and path. Scripts are source only; recreate them as files in an authorized environment, never assume execution. Assets are linked to the pinned upstream commit.\n" +
-      s.resources.map(x=>"- " + x.path + " (" + x.kind + (x.content ? ", " + x.bytes + " chars" : ", immutable asset URL") + ")").join("\n") +
-      // Hand short source scripts directly with their skill; keep long sources available verbatim on demand.
-      s.resources.filter(x=>x.kind==='script' && x.content && x.bytes<=7000).slice(0,4).map(x=>"\n\n===== SOURCE SCRIPT: "+x.path+" =====\n```"+(x.path.endsWith('.py')?'python':'sh')+"\n"+x.content+"\n```").join("") : "")) .join("\n") + offNote;
+    (s.resources?.length ? filesSection(s) : ""))  .join("\n") + offNote;
 }
