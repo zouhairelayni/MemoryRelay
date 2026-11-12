@@ -5,6 +5,7 @@
 //   totalMs  a safety cap against a stream that never ends
 // Every chunk that arrives restarts the idle clock, so a model that is producing output is never cut off.
 export const AI_FAST = { firstMs: 60000, idleMs: 30000, totalMs: 120000, deadlineMs: 150000 };   // picks, housekeeping
+export const AI_PICK = { firstMs: 8000, idleMs: 6000, totalMs: 12000, deadlineMs: 14000 };   // select_skills: an agent must never wait minutes for a pick
 export const AI_LONG = { firstMs: 180000, idleMs: 90000, totalMs: 420000, deadlineMs: 450000 };  // Skill Studio (long answers, thinking models)
 
 export async function fetchIdle(url, init, t = AI_FAST) {

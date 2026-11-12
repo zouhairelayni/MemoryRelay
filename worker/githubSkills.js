@@ -1,6 +1,7 @@
 // Owner-managed GitHub skill sets. Sync never executes downloaded code.
 import { now } from './util.js';
-import { parseSkill, toSkillMd } from './skills.js';
+import { getConfig, setConfig } from './db.js';
+import { parseSkill, scanSkill, toSkillMd } from './skills.js';
 
 const PATTERN = /^[A-Za-z0-9_.-]{1,100}$/;
 const official = ['mcp-builder','skill-creator','doc-coauthoring','frontend-design','webapp-testing','internal-comms','discernment-nudge','web-artifacts-builder','theme-factory','canvas-design','brand-guidelines'];
@@ -17,6 +18,14 @@ export function repoArgs(value, root='skills', ref='main', names='') {
 
 export async function listSkillRepos(env) {
   return (await env.DB.prepare('SELECT * FROM skill_repos ORDER BY id').all()).results.map(r=>({...r,enabled:!!r.enabled,names:JSON.parse(r.names)}));
+}
+// When GitHub told us to wait, every repo pauses until then (the limit is per token or per shared Worker IP, not per repo).
+const BLOCK_KEY='github_blocked_until';
+// The pause is remembered together with whether a token was set, so adding a token lifts it at once (a token has its own quota).
+const tokenFlag=(env)=>env.GITHUB_TOKEN?'1':'0';
+export async function githubBlockedUntil(env){
+  const [until,flag]=String(await getConfig(env,BLOCK_KEY)||'').split(':');
+  return flag===tokenFlag(env)&&Number(until)>Date.now()?Number(until):0;
 }
 
 export async function addSkillRepo(env, data) {
@@ -40,20 +49,38 @@ export async function removeSkillRepo(env,id){
 }
 // A sync is a resumable D1 queue: at most eight GitHub files per invocation.
 // This stays under Cloudflare Free Workers' 50 external subrequests/invocation.
-const BASE_HEADERS={'User-Agent':'MemoryRelay/3.2 (skills updater)','Accept':'application/vnd.github+json'};
+// The queue is resumed by cron (even when auto sync is off, because the owner started it) and by the dashboard.
+const MAX_PER_RUN=8, LOCK_MS=120000;
+const BASE_HEADERS={'User-Agent':'MemoryRelay/3.3 (skills updater)','Accept':'application/vnd.github+json'};
 function headers(env){return {...BASE_HEADERS,...(env.GITHUB_TOKEN?{Authorization:'Bearer '+env.GITHUB_TOKEN}:{})};}
-async function checkedFetch(env,url){
-  const res=await fetch(url,{headers:headers(env),signal:AbortSignal.timeout(15000)});
+const iso=(ms)=>new Date(ms).toISOString().slice(0,16).replace('T',' ')+' UTC';
+// Thrown when GitHub asks us to slow down: nothing else is sent until `until`.
+class SyncBlocked extends Error{constructor(message,until){super(message);this.until=until;}}
+// Thrown for one skill or file that can never import (bad name, too big...). It is reported and skipped, never retried forever.
+class SkillProblem extends Error{}
+async function checkedFetch(env,url,extra={}){
+  const waiting=await githubBlockedUntil(env);
+  if(waiting)throw new SyncBlocked('GitHub rate limit: paused until '+iso(waiting)+'. No requests are sent before then.'+(env.GITHUB_TOKEN?'':' Configure GITHUB_TOKEN on this Worker to raise the limit.'),waiting);
+  const res=await fetch(url,{headers:{...headers(env),...extra},signal:AbortSignal.timeout(15000)});
+  if(res.status===304)return res;
   if(!res.ok){
     if(res.status===401 && env.GITHUB_TOKEN) throw Error('GitHub rejected GITHUB_TOKEN (HTTP 401). Replace the Worker secret with a valid raw token (no Bearer prefix or quotes).');
     if(res.status===403 || res.status===429){
       const remaining=res.headers.get('x-ratelimit-remaining');
-      const reset=res.headers.get('x-ratelimit-reset');
-      const wait=reset?'Reset: '+new Date(Number(reset)*1000).toISOString()+'. ':'';
-      if(remaining==='0' || res.status===429) throw Error('GitHub rate limited (HTTP '+res.status+'). '+wait+(env.GITHUB_TOKEN?'Token is configured; check its rate limit.':'Configure GITHUB_TOKEN on this Worker.'));
-      throw Error('GitHub access refused (HTTP '+res.status+'). '+(env.GITHUB_TOKEN?'Check token permissions or secondary rate limits.':'Configure GITHUB_TOKEN on this Worker.')+' '+wait);
+      const reset=Number(res.headers.get('x-ratelimit-reset')||0)*1000;
+      const retry=Number(res.headers.get('retry-after')||0)*1000;
+      if(remaining==='0' || res.status===429 || retry>0){
+        // Wait for the reset GitHub announced (at least a minute, at most two hours), and remember it for every repo.
+        const guess=reset>Date.now()?reset:retry?Date.now()+retry:Date.now()+10*60000;
+        const until=Math.min(Date.now()+2*3600000,Math.max(Date.now()+60000,guess));
+        await setConfig(env,BLOCK_KEY,until+':'+tokenFlag(env));
+        throw new SyncBlocked('GitHub rate limited (HTTP '+res.status+'). Paused until '+iso(until)+'. '+(env.GITHUB_TOKEN?'Token is configured; check its rate limit.':'Configure GITHUB_TOKEN on this Worker: without a token GitHub allows only 60 requests/hour for a shared address.'),until);
+      }
+      throw Error('GitHub access refused (HTTP '+res.status+'). '+(env.GITHUB_TOKEN?'Check token permissions.':'The repository may be private: add a GITHUB_TOKEN secret.'));
     }
-    throw Error('GitHub HTTP '+res.status+' while fetching '+new URL(url).pathname.slice(0,140));
+    const err=Error('GitHub HTTP '+res.status+' while fetching '+new URL(url).pathname.slice(0,140));
+    err.status=res.status;
+    throw err;
   }
   return res;
 }
@@ -70,18 +97,30 @@ export async function checkGitHubAccess(env){
 }
 const rawUrl=(r,sha,path)=>`https://raw.githubusercontent.com/${encodeURIComponent(r.owner)}/${encodeURIComponent(r.repo)}/${sha}/${path.split('/').map(encodeURIComponent).join('/')}`;
 const ignored=(path)=>/(?:^|\/)(?:licen[cs]e(?:\.[^.]+)?|copying(?:\.[^.]+)?|notice(?:\.[^.]+)?)$/i.test(path);
+// Direction overrides and zero-width characters can hide text from the owner (Trojan Source). Emoji joiners stay allowed.
+const TROJAN_RE=/[\u202A-\u202E\u2066-\u2069\u200B\u2060\uFEFF]/;
+// New wording like these in an unattended update means a human should look before agents receive it.
+const RISKY=new Set(['tries to override other instructions','asks the agent to hide things from the user','asks the agent to bypass safeguards','pipes a download into a shell','runs hidden or encoded code']);
+const addNote=(env,id,note)=>env.DB.prepare("UPDATE skill_repos SET sync_note=substr(CASE WHEN sync_note='' THEN ? ELSE sync_note||' | '||? END,1,700) WHERE id=?").bind(note,note,id).run();
 async function failSync(env,id,e){
   const message=String(e?.message||e).slice(0,280);
   await env.DB.prepare('UPDATE skill_repos SET last_error=?,last_checked=? WHERE id=?').bind(message,now(),id).run();
-  return {error:message};
+  return e instanceof SyncBlocked?{error:message,blocked_until:iso(e.until)}:{error:message};
 }
 async function startSync(env,r,importMissing){
   const prefix=`https://api.github.com/repos/${encodeURIComponent(r.owner)}/${encodeURIComponent(r.repo)}`;
-  const commit=await (await checkedFetch(env,prefix+'/commits/'+encodeURIComponent(r.ref))).json();
+  // An unchanged branch answers 304, which GitHub does not count against the quota.
+  const conditional=!importMissing&&r.etag&&r.last_sha?{'If-None-Match':r.etag}:{};
+  const first=await checkedFetch(env,prefix+'/commits/'+encodeURIComponent(r.ref),conditional);
+  if(first.status===304){
+    await env.DB.prepare("UPDATE skill_repos SET last_checked=?,last_error='',sync_status='up-to-date' WHERE id=?").bind(now(),r.id).run();
+    return {ok:true,unchanged:true,sha:r.last_sha,updated:0,added:0,skipped:0};
+  }
+  const commit=await first.json(), etag=first.headers.get('etag')||'';
   const sha=commit.sha, treeSha=commit.commit?.tree?.sha;
   if(!/^[a-f0-9]{40}$/.test(sha||'')||!/^[a-f0-9]{40}$/.test(treeSha||'')) throw Error('Invalid GitHub revision.');
   if(!importMissing && r.last_sha===sha){
-    await env.DB.prepare("UPDATE skill_repos SET last_checked=?,last_error='',sync_status='up-to-date' WHERE id=?").bind(now(),r.id).run();
+    await env.DB.prepare("UPDATE skill_repos SET last_checked=?,last_error='',sync_status='up-to-date',etag=? WHERE id=?").bind(now(),etag,r.id).run();
     return {ok:true,unchanged:true,sha,updated:0,added:0,skipped:0};
   }
   const tree=await (await checkedFetch(env,prefix+'/git/trees/'+treeSha+'?recursive=1')).json();
@@ -91,38 +130,48 @@ async function startSync(env,r,importMissing){
   const skills=tree.tree.filter(x=>x.type==='blob'&&x.path.startsWith(root)&&x.path.endsWith('/SKILL.md')&&x.path.slice(root.length).split('/').length===2);
   const chosen=skills.filter(x=>!selected.size||selected.has(x.path.slice(root.length).split('/')[0]));
   if(chosen.length>50) throw Error('Too many skills. Specify individual skill names.');
-  const todo=[];
+  const have=new Map((await env.DB.prepare('SELECT name,source FROM skills').all()).results.map(x=>[x.name,x.source]));
+  const todo=[], conflicts=[];
   let skipped=0;
   for(const item of chosen){
     const folder=item.path.slice(0,-'SKILL.md'.length), name=folder.slice(root.length,-1);
-    const existing=await env.DB.prepare('SELECT source FROM skills WHERE name=?').bind(name).first();
-    if(!existing&&!importMissing){skipped++;continue;}
-    const permitted=existing && (existing.source===`github:${r.id}` || (r.owner.toLowerCase()==='anthropics'&&r.repo.toLowerCase()==='skills'&&existing.source.startsWith('builtin:anthropic')));
-    if(existing&&!permitted){skipped++;continue;}
+    const source=have.get(name);
+    if(source===undefined&&!importMissing){skipped++;continue;}
+    const permitted=source!==undefined && (source===`github:${r.id}` || (r.owner.toLowerCase()==='anthropics'&&r.repo.toLowerCase()==='skills'&&source.startsWith('builtin:anthropic')));
+    if(source!==undefined&&!permitted){skipped++;conflicts.push(name);continue;}
     // Only the skill definition and Python scripts are needed; ignore assets and references.
     const blobs=tree.tree.filter(x=>x.type==='blob'&&x.path.startsWith(folder)&&x.path!==item.path&&/\.py$/i.test(x.path)&&x.size<=750000&&!ignored(x.path));
     if(blobs.length>1500) throw Error('Too many Python scripts in '+name+' (maximum 1500).');
     todo.push({skill:name,path:item.path,kind:'skill',fetch:true});
-    for(const x of blobs){
-      const path=x.path.slice(folder.length);
-      todo.push({skill:name,path:x.path,relative:path,kind:'script',fetch:true});
-    }
+    for(const x of blobs)todo.push({skill:name,path:x.path,relative:x.path.slice(folder.length),kind:'script',fetch:true});
   }
+  const note=conflicts.length?'Not imported, the name is already used by a skill from another source: '+conflicts.slice(0,8).join(', ')+(conflicts.length>8?'…':''):'';
   await env.DB.batch([
     env.DB.prepare('DELETE FROM skill_repo_stage WHERE repo_id=?').bind(r.id),
-    env.DB.prepare("UPDATE skill_repos SET sync_sha=?,sync_todo=?,sync_done=0,sync_total=?,sync_status='running',last_error='',last_checked=? WHERE id=?").bind(sha,JSON.stringify(todo),todo.length,now(),r.id),
+    env.DB.prepare("UPDATE skill_repos SET sync_sha=?,sync_etag=?,sync_todo=?,sync_done=0,sync_total=?,sync_status='running',sync_manual=?,sync_note=?,last_error='',last_checked=? WHERE id=?").bind(sha,etag,JSON.stringify(todo),todo.length,importMissing?1:0,note,now(),r.id),
   ]);
   return {ok:true,started:true,sha,total:todo.length,done:0,skipped};
 }
-async function finishOneSkill(env,r,skill){
+// Installs one fully downloaded skill. Returns a note for the owner, or null. Throws SkillProblem when it can never import.
+async function finishOneSkill(env,r,skill,{manual}){
+  const drop=()=>env.DB.prepare('DELETE FROM skill_repo_stage WHERE repo_id=? AND skill=?').bind(r.id,skill).run();
   const rows=(await env.DB.prepare('SELECT path,kind,content,url FROM skill_repo_stage WHERE repo_id=? AND skill=? ORDER BY path').bind(r.id,skill).all()).results;
   const head=rows.find(x=>x.kind==='skill');
-  if(!head) throw Error('Missing SKILL.md for '+skill);
-  const parsed=parseSkill(head.content,{limit:250000,allowOriginalDescription:true});
-  if(parsed.name!==skill) throw Error('Skill filename/name mismatch: '+skill);
+  if(!head){await drop();throw new SkillProblem(skill+': SKILL.md could not be downloaded');}
+  let parsed;
+  try{parsed=parseSkill(head.content,{limit:250000,allowOriginalDescription:true});}
+  catch(e){await drop();throw new SkillProblem(skill+': '+String(e.message||e).slice(0,160));}
+  if(parsed.name!==skill){await drop();throw new SkillProblem(skill+': SKILL.md declares name "'+parsed.name+'" but its folder is "'+skill+'", so it was not imported');}
+  if(TROJAN_RE.test(head.content)){await drop();throw new SkillProblem(skill+': contains hidden direction-changing or zero-width characters, not imported');}
   const existing=await env.DB.prepare('SELECT * FROM skills WHERE name=?').bind(skill).first();
   const permitted=existing && (existing.source===`github:${r.id}`||(r.owner.toLowerCase()==='anthropics'&&r.repo.toLowerCase()==='skills'&&existing.source.startsWith('builtin:anthropic')));
-  if(existing&&!permitted)return;
+  if(existing&&!permitted){await drop();return null;}
+  const before=new Set(existing?scanSkill(toSkillMd(existing)):[]);
+  const added=scanSkill(head.content).filter(w=>RISKY.has(w)&&!before.has(w));
+  if(existing&&!manual&&added.length){
+    await drop();
+    return skill+': update held back, new risky wording ('+added.join('; ')+'). Press Sync now to review and accept it.';
+  }
   const statements=[];
   const changed=!existing||toSkillMd(existing)!==head.content;
   if(!existing) statements.push(env.DB.prepare('INSERT INTO skills (name,description,body,enabled,core,source,created,updated) VALUES (?,?,?,1,0,?,?,?)').bind(skill,parsed.description,head.content,`github:${r.id}`,now(),now()));
@@ -135,50 +184,70 @@ async function finishOneSkill(env,r,skill){
   statements.push(env.DB.prepare('DELETE FROM skill_repo_stage WHERE repo_id=? AND skill=?').bind(r.id,skill));
   // D1 batch sizes must stay bounded even for asset-heavy skill repositories.
   for(let i=0;i<statements.length;i+=75) await env.DB.batch(statements.slice(i,i+75));
+  return added.length?skill+': installed, check it ('+added.join('; ')+')':null;
+}
+async function fetchItem(env,r,item){
+  // A file listed in the pinned commit that answers 404 will never appear: report it and move on.
+  const res=await checkedFetch(env,rawUrl(r,r.sync_sha,item.path)).catch(e=>{
+    if(e&&e.status===404)throw new SkillProblem(item.path+' was not found on GitHub and was skipped');
+    throw e;
+  });
+  if(Number(res.headers.get('content-length')||0)>750000)throw new SkillProblem(item.path+' is over 750 KB and was skipped');
+  const content=await res.text();
+  if(content.length>750000)throw new SkillProblem(item.path+' is over 750 KB and was skipped');
+  return content;
 }
 export async function syncSkillRepo(env,id,{importMissing=false}={}){
   let r=await env.DB.prepare('SELECT * FROM skill_repos WHERE id=?').bind(String(id)).first();
   if(!r)return {error:'Repository not found.'};
+  // Lease: cron and the dashboard may both try; only one works on a repository at a time.
+  const t=Date.now();
+  const lease=await env.DB.prepare('UPDATE skill_repos SET sync_lock=? WHERE id=? AND sync_lock<?').bind(t,r.id,t-LOCK_MS).run();
+  if(!lease.meta.changes)return {ok:true,running:true,busy:true,sha:r.sync_sha,done:Number(r.sync_done||0),total:Number(r.sync_total||0)};
   try{
     if(!r.sync_todo || r.sync_status!=='running'){
       const state=await startSync(env,r,importMissing);
       if(state.unchanged)return state;
       r=await env.DB.prepare('SELECT * FROM skill_repos WHERE id=?').bind(r.id).first();
     }
+    const manual=!!Number(r.sync_manual);
     const todo=JSON.parse(r.sync_todo||'[]');
     let done=Number(r.sync_done||0), processed=0;
-    const max=8;
-    for(;done<todo.length&&processed<max;done++,processed++){
+    for(;done<todo.length&&processed<MAX_PER_RUN;done++,processed++){
       const item=todo[done];
-      const url=rawUrl(r,r.sync_sha,item.path);
-      let content=null;
+      let content=null, skip=false;
       if(item.fetch){
-        const res=await checkedFetch(env,url);
-        const size=Number(res.headers.get('content-length')||0);
-        if(size>750000)throw Error('File exceeds 750 KB: '+item.path);
-        content=await res.text();
-        if(content.length>750000)throw Error('File exceeds 750 KB: '+item.path);
+        try{content=await fetchItem(env,r,item);}
+        catch(e){if(!(e instanceof SkillProblem))throw e;await addNote(env,r.id,e.message);skip=true;}
       }
-      await env.DB.prepare('INSERT OR REPLACE INTO skill_repo_stage (repo_id,skill,path,kind,content,url) VALUES (?,?,?,?,?,?)').bind(r.id,item.skill,item.relative||'SKILL.md',item.kind,content,url).run();
+      if(!skip)await env.DB.prepare('INSERT OR REPLACE INTO skill_repo_stage (repo_id,skill,path,kind,content,url) VALUES (?,?,?,?,?,?)').bind(r.id,item.skill,item.relative||'SKILL.md',item.kind,content,rawUrl(r,r.sync_sha,item.path)).run();
       const next=todo[done+1];
-      if(!next || next.skill!==item.skill)await finishOneSkill(env,r,item.skill);
+      if(!next || next.skill!==item.skill){
+        // One bad skill is reported and skipped; it must never freeze the whole queue.
+        try{const note=await finishOneSkill(env,r,item.skill,{manual});if(note)await addNote(env,r.id,note);}
+        catch(e){if(!(e instanceof SkillProblem))throw e;await addNote(env,r.id,e.message);}
+      }
       await env.DB.prepare('UPDATE skill_repos SET sync_done=? WHERE id=?').bind(done+1,r.id).run();
     }
-    if(done===todo.length){
-      await env.DB.prepare("UPDATE skill_repos SET last_sha=sync_sha,last_checked=?,last_error='',sync_todo='',sync_done=0,sync_total=0,sync_status='complete' WHERE id=?").bind(now(),r.id).run();
+    if(done>=todo.length){
+      await env.DB.prepare("UPDATE skill_repos SET last_sha=sync_sha,etag=sync_etag,last_checked=?,last_error='',sync_todo='',sync_done=0,sync_total=0,sync_status='complete',sync_manual=0 WHERE id=?").bind(now(),r.id).run();
       return {ok:true,complete:true,sha:r.sync_sha,done,total:todo.length};
     }
     return {ok:true,running:true,sha:r.sync_sha,done,total:todo.length};
   }catch(e){return failSync(env,r.id,e);}
+  finally{await env.DB.prepare('UPDATE skill_repos SET sync_lock=0 WHERE id=?').bind(r.id).run().catch(()=>{});}
 }
+// Cron: continue any queue that was started (even with auto sync off), and check enabled repos once a day.
 export async function syncEnabledSkillRepos(env){
-  const rows=(await env.DB.prepare('SELECT * FROM skill_repos WHERE enabled=1 ORDER BY id').all()).results;
+  if(await githubBlockedUntil(env))return; // GitHub asked us to wait: send nothing at all
+  const rows=(await env.DB.prepare("SELECT * FROM skill_repos WHERE enabled=1 OR (sync_status='running' AND sync_todo<>'') ORDER BY (sync_status='running') DESC, id").all()).results;
+  const stamp=(s)=>s?new Date(s.replace(' ','T')+'Z').getTime():0;
   for(const r of rows){
-    const active=r.sync_status==='running'&&r.sync_todo;
-    // A failing queue remains retryable, but is not retried on every cron tick.
-    const recentError=r.last_error&&r.last_checked&&Date.now()-new Date(r.last_checked.replace(' ','T')+'Z').getTime()<30*60000;
-    const last=r.last_checked?new Date(r.last_checked.replace(' ','T')+'Z').getTime():0;
-    if(recentError || (!active && last && Date.now()-last<86400000))continue;
+    const active=r.sync_status==='running'&&!!r.sync_todo;
+    const last=stamp(r.last_checked);
+    // After a failure retry after a short pause. Only a successful check earns the 24 h wait.
+    if(r.last_error){if(last&&Date.now()-last<10*60000)continue;}
+    else if(!active&&last&&Date.now()-last<86400000)continue;
     await syncSkillRepo(env,r.id,{importMissing:false});
     break; // One repo per cron invocation, bounded Cloudflare subrequests.
   }

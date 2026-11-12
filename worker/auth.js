@@ -83,13 +83,22 @@ export async function locked(env, keys) {
   return false;
 }
 export async function recordFail(env, keys) {
+  const t = Date.now();
   for (const k of keys) {
+    // A lock that has run out starts the count again. Before, one typo after the wait re-locked for another 15 minutes.
     await env.DB.prepare(
       `INSERT INTO login_fails (key, fails, locked_until) VALUES (?, 1, 0)
-       ON CONFLICT(key) DO UPDATE SET fails = fails + 1,
-       locked_until = CASE WHEN fails + 1 >= ? THEN ? ELSE locked_until END`
-    ).bind(k, MAX_FAILS, Date.now() + LOCK_MS).run();
+       ON CONFLICT(key) DO UPDATE SET
+       fails = CASE WHEN locked_until > 0 AND locked_until <= ? THEN 1 ELSE fails + 1 END,
+       locked_until = CASE WHEN (CASE WHEN locked_until > 0 AND locked_until <= ? THEN 1 ELSE fails + 1 END) >= ? THEN ?
+                          ELSE CASE WHEN locked_until <= ? THEN 0 ELSE locked_until END END`
+    ).bind(k, t, t, MAX_FAILS, t + LOCK_MS, t).run();
   }
+}
+// Hourly housekeeping: expired locks go; counters for keys nobody retries are capped so spraying emails cannot grow the table.
+export async function pruneLoginFails(env) {
+  await env.DB.prepare("DELETE FROM login_fails WHERE locked_until > 0 AND locked_until < ?").bind(Date.now()).run();
+  await env.DB.prepare("DELETE FROM login_fails WHERE locked_until = 0 AND (SELECT COUNT(*) FROM login_fails) > 5000").run();
 }
 export async function clearFails(env, keys) {
   for (const k of keys) await env.DB.prepare("DELETE FROM login_fails WHERE key = ?").bind(k).run();

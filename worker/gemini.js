@@ -1,7 +1,6 @@
 // Gemini key and model pools with rotation, cooldowns and retry handling.
 import { MAX_CALLS, RETRYABLE } from "./constants.js";
 import { AI_FAST, AI_LONG, fetchIdle, isSse, sseEvents } from "./aifetch.js";
-import { getConfig, setConfig } from "./db.js";
 import { newId, now, runAll, safeJson, sleep, readObject } from "./util.js";
 
 export async function listGeminiModels(key) {
@@ -34,7 +33,7 @@ export async function callGemini(key, model, prompt, opts = {}) {
       headers: { "content-type": "application/json", "x-goog-api-key": key },
       body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig,
         ...(opts.system ? { systemInstruction: { parts: [{ text: String(opts.system) }] } } : {}) }),
-    }, opts.long ? AI_LONG : AI_FAST);
+    }, opts.timing || (opts.long ? AI_LONG : AI_FAST));
   } catch (e) {
     // Network failure: report it like a failed response so rotation carries on to the next key or model.
     return { ok: false, status: 0, json: async () => ({}), text: async () => String((e && e.message) || e) };
@@ -73,13 +72,13 @@ export async function gemini(env, prompt, opts = {}) {
   const cool = await env.DB.prepare("SELECT key_id, model FROM gemini_cooldowns WHERE until > ?").bind(Date.now()).all();
   const cooling = new Set(cool.results.map((c) => c.key_id + "|" + c.model));
 
-  const rr = Number(await getConfig(env, "gemini_rr")) || 0;
-  await setConfig(env, "gemini_rr", String(rr + 1));
+  // A random start spreads load over the keys without the D1 read and write per call that a stored counter cost.
+  const rr = Math.floor(Math.random() * keys.length);
   const rotated = keys.map((_, i) => keys[(rr + i) % keys.length]);
 
   const log = [];
   let calls = 0;
-  const t0 = Date.now(), budget = (opts.long ? AI_LONG : AI_FAST).deadlineMs;
+  const t0 = Date.now(), budget = (opts.timing || (opts.long ? AI_LONG : AI_FAST)).deadlineMs;
   for (const model of models) {
     for (const k of rotated) {
       const tag = `${k.label}/${model}`;
@@ -107,9 +106,13 @@ export async function gemini(env, prompt, opts = {}) {
         const daily = /PerDay|per.?day|daily/i.test(body);
         await setCooldown(env, k.id, model, daily ? 6 * 3600e3 : 60e3);
         log.push(`${tag}: 429 rate limited${daily ? " (daily quota, cooling 6h)" : ""}`);
-      } else if (r.status === 401 || r.status === 403 || /API_KEY_INVALID/.test(body)) {
+      } else if (r.status === 401 || /API_KEY_INVALID|API key not valid|CONSUMER_SUSPENDED|leaked/i.test(body) || (r.status === 403 && /api.?key|consumer|suspend/i.test(body))) {
         await env.DB.prepare("UPDATE gemini_keys SET enabled = 0 WHERE id = ?").bind(k.id).run();
         log.push(`${tag}: key rejected, disabled`);
+      } else if (r.status === 403) {
+        // A 403 about one model or region must not kill a good key: rest this key+model for an hour and carry on.
+        await setCooldown(env, k.id, model, 3600e3);
+        log.push(`${tag}: 403 not allowed for this model, cooling 1h`);
       } else {
         log.push(`${tag}: ${r.status ? "HTTP " + r.status : "network error (" + body.slice(0, 90) + ")"}${RETRYABLE.has(r.status) ? " (after retry)" : ""}`);
       }

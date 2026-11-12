@@ -254,3 +254,40 @@ test('the selected total, including prioritized skills, respects the configured 
   assert.ok(expanded.skills.length<=3);
   assert.ok(expanded.skills.some(x=>x.name==='priority-two'));
 });
+
+// ---- "ponytail does not exist" audit (2026-11-11) ----
+test("a skill the user names is always sent, even when its words do not rank or the AI would skip it", async () => {
+  const { env, api } = await setup();
+  await api("/api/skills", "POST", { text: SKILL("ponytail-audit", "Use when reviewing a pull request for hair-raising complexity.", "PONYTAIL-AUDIT-BODY") });
+  await api("/api/skills", "POST", { text: SKILL("ponytail", "Use for the base ponytail habits in this repo.", "PONYTAIL-BODY") });
+  for (const request of ["run the ponytail audit on this repo", "use ponytail-audit", "Use PONYTAIL_AUDIT please"]) {
+    const r = await selectSkills(env, { request }, { useGemini: false });
+    assert.equal(r.skills[0].name, "ponytail-audit", request); // longest name first
+  }
+});
+
+test("get_skill finds by exact name, explains unknown and switched-off names, and list_skills shows what exists", async () => {
+  const { api, mcp } = await setup();
+  await api("/api/skills", "POST", { text: SKILL("ponytail-audit", "Use when reviewing a pull request for complexity.", "PONYTAIL-AUDIT-BODY") });
+  await api("/api/skills", "POST", { text: SKILL("ponytail-debt", "Use when tracking technical debt in a ledger.", "DEBT-BODY") });
+  const ok = await mcp("get_skill", { name: "Ponytail Audit" });
+  assert.match(ok.content[0].text, /PONYTAIL-AUDIT-BODY/);
+  assert.match(ok.content[0].text, /requested by name/);
+  const miss = await mcp("get_skill", { name: "ponytail-gain" });
+  assert.equal(miss.isError, true);
+  assert.match(miss.content[0].text, /Similar: ponytail-audit, ponytail-debt/);
+  const list = await mcp("list_skills", { query: "ponytail" });
+  assert.match(list.content[0].text, /ponytail-audit: Use when reviewing a pull request/);
+  assert.doesNotMatch(list.content[0].text, /DEBT-BODY/);
+  await api("/api/skills/ponytail-debt/enabled", "PUT", { value: false });
+  const off = await mcp("get_skill", { name: "ponytail-debt" });
+  assert.match(off.content[0].text, /switched off/);
+});
+
+test("a switched-off skill that the request names is reported instead of looking missing", async () => {
+  const { api, mcp } = await setup();
+  await api("/api/skills", "POST", { text: SKILL("ponytail-help", "Use when explaining the ponytail workflow step by step.") });
+  await api("/api/skills/ponytail-help/enabled", "PUT", { value: false });
+  const res = await mcp("select_skills", { request: "use ponytail-help" });
+  assert.match(res.content[0].text, /ponytail-help exists but is switched off/);
+});

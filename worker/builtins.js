@@ -58,6 +58,7 @@ export async function seedBuiltins(env) {
       await setConfig(env, "seed_official_anthropic_sha", OFFICIAL_SHA);
     }
 
+    seen.add(env.DB); // done: without this every request repeated ~6 D1 reads and a write
   } catch (e) {
     console.error("seeding built-in skills failed:", e && e.message);
   }

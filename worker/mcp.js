@@ -4,7 +4,8 @@ import { activity } from "./monitor.js";
 import { json, readJson } from "./util.js";
 import { forget, recent, remember, search, updateMemory } from "./memories.js";
 import { housekeep } from "./housekeep.js";
-import { formatForAgent, SKILL_TEMPLATE, selectSkills, uploadSkillFromAgent } from "./skills.js";
+import { formatForAgent, getSkillByName, listSkillIndex, SKILL_TEMPLATE, selectSkills, uploadSkillFromAgent } from "./skills.js";
+import { AI_PICK } from "./aifetch.js";
 import { generateSkill } from "./skillstudio.js";
 import { delegate } from "./delegate.js";
 import { BRIEF_FORM, GUIDE } from "./delegateguide.js";
@@ -61,12 +62,12 @@ export async function callTool(env, name, a, agentName = "", svc = null) {
         next: "Review the draft. Then call upload_skill with skill_md. The owner must approve it before any agent can use it." };
     }
     case "get_skill_script": {
-      const row = await env.DB.prepare("SELECT name, skill, description, code FROM skill_scripts WHERE name = ?").bind(a.name).first();
+      const row = await env.DB.prepare("SELECT k.name, k.skill, k.description, k.code FROM skill_scripts k JOIN skills s ON s.name = k.skill AND s.enabled = 1 WHERE k.name = ?").bind(a.name).first();
       if (!row) throw new ToolError("script not found");
       return row;
     }
     case "get_skill_resource": {
-      const row = await env.DB.prepare("SELECT skill, path, kind, content, url FROM skill_resources WHERE skill = ? AND path = ?").bind(a.skill, a.path).first();
+      const row = await env.DB.prepare("SELECT r.skill, r.path, r.kind, r.content, r.url FROM skill_resources r JOIN skills s ON s.name = r.skill AND s.enabled = 1 WHERE r.skill = ? AND r.path = ?").bind(a.skill, a.path).first();
       if (!row) throw new ToolError("resource not found");
       return row;
     }
@@ -89,8 +90,18 @@ export async function callTool(env, name, a, agentName = "", svc = null) {
       // Past the hourly AI budget the pick silently falls back to keywords, so agents keep working.
       const useGemini = !svc || (await rateLimit(env, "pick:" + svc.id, 60, 3600e3)).ok;
       const arr = (x) => (Array.isArray(x) ? x.map(String).slice(0, 40) : []);
-      const r = await selectSkills(env, { request: String(a.request || "").slice(0, 4000), files: arr(a.files), functions: arr(a.functions) }, { useGemini });
+      const r = await selectSkills(env, { request: String(a.request || "").slice(0, 4000), files: arr(a.files), functions: arr(a.functions) }, { useGemini, timing: AI_PICK });
       return { text: formatForAgent(r), picks: r.skills.map((s) => s.name), mode: r.mode };
+    }
+    case "get_skill": {
+      const r = await getSkillByName(env, a.name);
+      if (r.error) throw new ToolError(r.error);
+      return { text: formatForAgent({ mode: "named", skills: r.skills }), picks: r.skills.map((s) => s.name), mode: "named" };
+    }
+    case "list_skills": {
+      const r = await listSkillIndex(env, { query: a.query, limit: a.limit });
+      if (!r.skills.length) return { text: "No enabled skill matches" + (a.query ? " \"" + String(a.query).slice(0, 60) + "\"" : "") + ". Call list_skills without a query to see all." };
+      return { text: "Skills (" + r.shown + " of " + r.total + "):\n" + r.skills.map((x) => "- " + x.name + (x.core ? " [always sent]" : "") + ": " + x.description).join("\n") + (r.total > r.shown ? "\nMore exist: pass a query to narrow the list." : "") };
     }
     default: throw new ToolError("unknown tool " + name);
   }
@@ -113,7 +124,7 @@ async function dispatch(msg, env, stats, svc) {
     if (stats) stats.app = [ci.name, ci.version].filter(Boolean).map(String).join(" ").slice(0, 60);
     const protocolVersion = PROTOCOLS.includes(params.protocolVersion) ? params.protocolVersion : PROTOCOLS[0];
     return ok({ protocolVersion, capabilities: { tools: { listChanged: false } },
-      instructions: "Before starting any task, call select_skills with the user's request word for word. Follow only the skills it returns. To save your own usage limits, hand self-contained coding jobs (snippets, functions, small features, tests, reviews) to delegate (call get_delegation_brief once for the brief form and the review checklist); it runs them on other models and returns a checked result that you must still verify. To add a skill, call draft_skill (AI writes it) or get_skill_template (write it yourself, max 5000 tokens), then call upload_skill. Uploads wait for owner approval.",
+      instructions: "Before starting any task, call select_skills with the user's request word for word. Follow only the skills it returns. If the user names a skill, call get_skill with that exact name; list_skills shows what exists. Never tell the user a skill does not exist before checking list_skills. To save your own usage limits, hand self-contained coding jobs (snippets, functions, small features, tests, reviews) to delegate (call get_delegation_brief once for the brief form and the review checklist); it runs them on other models and returns a checked result that you must still verify. To add a skill, call draft_skill (AI writes it) or get_skill_template (write it yourself, max 5000 tokens), then call upload_skill. Uploads wait for owner approval.",
       serverInfo: { name: "my-memory", version: SERVER_VERSION } });
   }
   if (method === "ping") return ok({});
@@ -129,10 +140,10 @@ async function dispatch(msg, env, stats, svc) {
       const out = await callTool(env, params.name, v.args, stats ? stats.app : "", svc);
       if (stats) tally(stats, params.name, out);
       await activity(env,{service:svc?.id,category:'mcp',action:params.name,ok:true}).catch(()=>{});
-      if(params.name==='select_skills')for(const chosen of (out.picks||[])){
+      if(params.name==='select_skills'||params.name==='get_skill')for(const chosen of (out.picks||[])){
         await activity(env,{service:svc?.id,category:'skill',action:'selected',detail:chosen,ok:true}).catch(()=>{});
       }
-      const text = ["select_skills", "delegate", "get_delegation_brief"].includes(params.name) ? out.text : typeof out === "string" ? out : JSON.stringify(out, null, 2);
+      const text = ["select_skills", "get_skill", "list_skills", "delegate", "get_delegation_brief"].includes(params.name) ? out.text : typeof out === "string" ? out : JSON.stringify(out, null, 2);
       return ok({ content: [{ type: "text", text }] });
     } catch (e) {
       await activity(env,{service:svc?.id,category:'mcp',action:params.name,ok:false,code:e instanceof ToolError?'TOOL_REJECTED':'TOOL_FAILED',message:e instanceof ToolError?e.message:'Internal tool error'}).catch(()=>{});

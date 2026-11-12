@@ -8,13 +8,13 @@ import { listStats } from "./metering.js";
 import { SKILL_TEMPLATE, MAX_TOKENS, addSkill, deleteSkill, getSkill, getSkillSettings, listSkills, revertSkill, selectSkills, setSkillFlag, setSkillMax, updateSkill } from "./skills.js";
 import { generateSkill, improveSkill } from "./skillstudio.js";
 import { rateLimit } from "./limits.js";
-import { RULES_SQL, readObject } from "./util.js";
+import { RULES_SQL, readJson, readObject } from "./util.js";
 import { json, now } from "./util.js";
 import { COMPAT } from "./providers.js";
 import { delegate, getDelegation, saveDelegation } from "./delegate.js";
 import { BRIEF_FORM, GUIDE } from "./delegateguide.js";
 import { monitor } from "./monitor.js";
-import { addSkillRepo, listSkillRepos, removeSkillRepo, setSkillRepoSync, syncSkillRepo } from "./githubSkills.js";
+import { addSkillRepo, githubBlockedUntil, listSkillRepos, removeSkillRepo, setSkillRepoSync, syncSkillRepo } from "./githubSkills.js";
 
 export async function settings(env) {
   const last = await env.DB.prepare("SELECT MAX(last_seen) AS last FROM services").first();
@@ -96,7 +96,10 @@ export async function api(request, env, url) {
     return row && !/(?:^|\/)(?:licen[cs]e|notice|copying)(?:\.[^/]*)?$/i.test(path) ? json(row) : json({ error: "resource not found" }, 404);
   }
   // GitHub repositories/skill sets: owner controls automatic daily update checks.
-  if (p === "/api/skill-repos" && m === "GET") return json({repositories:await listSkillRepos(env),token_configured:!!env.GITHUB_TOKEN});
+  if (p === "/api/skill-repos" && m === "GET") {
+    const until = await githubBlockedUntil(env); // when GitHub asked every repo to wait
+    return json({repositories:await listSkillRepos(env),token_configured:!!env.GITHUB_TOKEN,blocked_until:until?new Date(until).toISOString():""});
+  }
   if (p === "/api/skill-repos" && m === "POST") return withStatus(await addSkillRepo(env,await body(request)));
   const repoRoute=p.match(/^\/api\/skill-repos\/([^/]+)(?:\/(sync|enabled))?$/);
   if(repoRoute){
@@ -170,8 +173,10 @@ export async function api(request, env, url) {
     } });
   }
   if (p === "/api/import" && m === "POST") {
-    let incoming;
-    try { incoming = await request.json(); } catch { return json({ error: "invalid JSON" }, 400); }
+    // Bounded: an unlimited body could exhaust the Worker's memory. 12 MB comfortably holds the 5000-memory cap.
+    const body = await readJson(request, 12 * 1024 * 1024);
+    if (body.error) return json({ error: body.error }, body.status || 400);
+    const incoming = body.value;
     return withStatus(await importMemories(env, incoming, url.searchParams.get("mode") || "merge"));
   }
   return json({ error: "no such api route" }, 404);

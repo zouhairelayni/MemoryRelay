@@ -1,4 +1,9 @@
-node_modules
-dist
-.wrangler
+
+# local dev database / secrets
+*.db
 .dev.vars
+.env
+.wrangler
+dist
+local.db
+node_modules

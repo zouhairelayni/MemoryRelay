@@ -17,7 +17,7 @@ export const ACCESS = ["read", "write", "full"];   // what a connection may do
 export const ACCESS_RANK = { read: 1, write: 2, full: 3 };
 export const ACCESS_LABEL = { read: "Read only", write: "Read and write", full: "Full access" };
 // The lowest access level that may call each tool.
-export const TOOL_LEVEL = { search: "read", recent: "read", get_skill_template: "read", select_skills: "read", draft_skill: "read",
+export const TOOL_LEVEL = { search: "read", recent: "read", get_skill_template: "read", select_skills: "read", get_skill: "read", list_skills: "read", draft_skill: "read",
   get_skill_script: "read", get_skill_resource: "read", remember: "write", update_memory: "write", upload_skill: "write", delegate: "write", get_delegation_brief: "read", forget: "full", housekeep: "full" };
 
 const T = (title, o) => ({ title, readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false, ...o });
@@ -65,6 +65,12 @@ export const TOOLS = [
   { name: "select_skills", annotations: T("Pick skills for a request", { readOnlyHint: true, openWorldHint: true }),
     description: "Call FIRST, before any task. Send the user's request word for word and the files you plan to edit. Returns only the skill instructions to follow (or none).",
     inputSchema: { type: "object", properties: { request: { type: "string" }, files: { type: "array", items: { type: "string" } }, functions: { type: "array", items: { type: "string" } } }, required: ["request"] } },
+  { name: "get_skill", annotations: T("Get one skill by name", { readOnlyHint: true, idempotentHint: true }),
+    description: "Fetch one skill by its exact name (for example when the user says \"use ponytail-audit\"). Returns its instructions, or says why it cannot (unknown name with similar names, or switched off by the owner).",
+    inputSchema: { type: "object", properties: { name: { type: "string" } }, required: ["name"] } },
+  { name: "list_skills", annotations: T("List available skills", { readOnlyHint: true, idempotentHint: true }),
+    description: "List the enabled skills (name and one-line description). Optional query narrows it. Use it to check whether a skill exists before saying it does not.",
+    inputSchema: { type: "object", properties: { query: { type: "string" }, limit: { type: "integer" } } } },
   { name: "housekeep", annotations: T("Find duplicate memories", { destructiveHint: true, openWorldHint: true }),
     description: "Find duplicate or conflicting memories with AI. Without apply it only proposes and returns a proposal_id. To apply, show the proposal to the user, and after they approve call again with apply=true and that proposal_id (valid 10 minutes).",
     inputSchema: { type: "object", properties: { apply: { type: "boolean" }, proposal_id: { type: "string" } } } },

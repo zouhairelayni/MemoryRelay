@@ -49,7 +49,7 @@ export function makeCompat(cfg) {
     if (opts.long) body.stream = true;
     return fetchIdle(base + "/chat/completions", {
       method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + key, ...headers }, body: JSON.stringify(body),
-    }, opts.long ? AI_LONG : AI_FAST).catch((e) => ({ ok: false, status: 0, text: async () => String((e && e.message) || e) }));
+    }, opts.timing || (opts.long ? AI_LONG : AI_FAST)).catch((e) => ({ ok: false, status: 0, text: async () => String((e && e.message) || e) }));
   }
 
   async function cooldown(env, keyId, model, ms) {
@@ -73,7 +73,7 @@ export function makeCompat(cfg) {
 
     const log = [];
     let calls = 0;
-    const t0 = Date.now(), budget = (opts.long ? AI_LONG : AI_FAST).deadlineMs;
+    const t0 = Date.now(), budget = (opts.timing || (opts.long ? AI_LONG : AI_FAST)).deadlineMs;
     for (const model of models) {
       for (const k of rotated) {
         const tag = `${label} ${k.label}/${model}`;

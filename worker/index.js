@@ -1,13 +1,13 @@
 // Entry point: routes MCP, auth and API requests. Everything else is the React app (static assets).
 import { BUILD, MCP_PER_MINUTE } from "./constants.js";
 import { api } from "./api.js";
-import { auth } from "./auth.js";
+import { auth, pruneLoginFails } from "./auth.js";
 import { ensureSchema } from "./db.js";
 import { seedBuiltins } from "./builtins.js";
 import { rateLimit } from "./limits.js";
 import { handleMcp } from "./mcp.js";
 import { meter } from "./metering.js";
-import { activity } from "./monitor.js";
+import { activity, pruneActivity } from "./monitor.js";
 import { CORS, bearerChallenge, isOauthPath, oauth, serviceByBearer } from "./oauth.js";
 import { serviceBySecret } from "./services.js";
 import { json } from "./util.js";
@@ -43,6 +43,7 @@ export default {
     await ensureSchema(env);
     await seedBuiltins(env);
     ctx.waitUntil(syncEnabledSkillRepos(env));
+    if (new Date(event.scheduledTime || Date.now()).getUTCMinutes() < 2) ctx.waitUntil(Promise.all([pruneActivity(env), pruneLoginFails(env)]).catch(() => {})); // about once an hour
   },
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -83,7 +84,8 @@ export default {
         }
         if (p.startsWith("/auth/")) return await auth(request, env, url);
         const response = await api(request, env, url);
-        if(!p.startsWith('/api/monitor') && !p.startsWith('/api/build')){
+        // Polled GETs (dashboard refresh) are not logged unless they fail: they used to add a D1 write per poll and grow the table without limit.
+        if(!p.startsWith('/api/monitor') && !p.startsWith('/api/build') && (request.method!=='GET' || response.status>=400)){
           ctx.waitUntil((async()=>{
             let msg='';if(response.status>=400){const data=await response.clone().json().catch(()=>({}));msg=String(data.error||'Request failed');}
             await activity(env,{category:'api',action:request.method+' '+p.replace(/[a-f0-9]{12,}/ig,':id'),ok:response.status<400,code:response.status>=400?'HTTP_'+response.status:'',message:msg});

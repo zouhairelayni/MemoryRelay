@@ -14,7 +14,10 @@ export async function routingOrder(env) {
 // opts: { json: false } for plain text, { maxTokens, temperature, system, long, onlyModel }.
 export async function complete(env, prompt, opts = {}) {
   const errors = [];
+  const started = Date.now();
   for (const id of await routingOrder(env)) {
+    // With a timing budget (skill picks) the whole fallback chain shares it, instead of each provider taking its own.
+    if (opts.timing && errors.length && Date.now() - started > opts.timing.deadlineMs) { errors.push("time budget used up"); break; }
     const r = await callProvider(env, id, prompt, opts);
     if (!r.error) return r;
     errors.push(PROVIDER_LABEL[id] + ": " + r.error);

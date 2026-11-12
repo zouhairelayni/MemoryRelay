@@ -5,6 +5,11 @@ export async function activity(env, {service='',category,action,detail='',provid
     .bind(Date.now(),String(service).slice(0,64),String(category).slice(0,40),String(action).slice(0,110),String(detail).slice(0,LIMIT),String(provider).slice(0,60),String(model).slice(0,120),Number(tin)||0,Number(tout)||0,ok?1:0,String(code).slice(0,60),String(message).slice(0,LIMIT)).run();
 }
 
+// The dashboard looks back at most 90 days. Older rows only slow every chart and the skill "uses" counts down.
+export async function pruneActivity(env, days = 90) {
+  await env.DB.prepare('DELETE FROM activity_events WHERE ts < ?').bind(Date.now() - days * 86400000).run();
+}
+
 const PERIODS = {
   '1h': {duration:3600000,step:300000,label:'1 hour'},
   '1d': {duration:86400000,step:3600000,label:'1 day'},
