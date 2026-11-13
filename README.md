@@ -135,7 +135,8 @@ Skills tab → **Write with AI** to make a new skill, or open a skill and tap **
 * **Errors:** internal details go to the Worker logs, never to the client.
 * **AI calls** time out after 25 seconds, and AI-powered tools fall back (skill picks use keywords after 60 AI picks per hour per connection).
 * **Memory:** search treats `%` and `_` as normal text; at most 5000 memories; imports are validated (ids, history, tags); the `rules` tag is matched as a whole tag, not as part of another word.
-* **Optional setup lock:** `npx wrangler secret put SETUP_TOKEN` makes the first-run account page ask for that token, so nobody else can claim your instance before you.
+* **Setup lock:** on a deployed Worker the first-run account page is locked until you run `npx wrangler secret put SETUP_TOKEN`; the page then asks for that token, so nobody else can claim your instance before you. Local development on localhost stays open.
+* **Encrypt saved API keys (optional):** `npx wrangler secret put KEY_SECRET` with a long random string. Provider keys are then stored as AES-GCM ciphertext (existing keys are converted on the next request) and the dashboard still shows only the last 4 characters. Keep that secret: if it is lost the saved keys cannot be read and must be added again.
 
 ## MCP sign-in (OAuth) and access levels
 

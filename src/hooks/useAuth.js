@@ -4,14 +4,14 @@ import { setUnauthorizedHandler } from "../api/client.js";
 
 // phase: "loading" | "gate" | "app"
 export function useAuth() {
-  const [state, setState] = useState({ phase: "loading", setup: false, tokenRequired: false, email: "" });
+  const [state, setState] = useState({ phase: "loading", setup: false, tokenRequired: false, setupLocked: false, email: "" });
 
   const refresh = useCallback(async () => {
     try {
       const s = await auth.status();
-      setState({ phase: s.loggedIn ? "app" : "gate", setup: s.setup, tokenRequired: !!s.setup_token, email: s.email || "" });
+      setState({ phase: s.loggedIn ? "app" : "gate", setup: s.setup, tokenRequired: !!s.setup_token, setupLocked: !!s.setup_locked, email: s.email || "" });
     } catch {
-      setState({ phase: "gate", setup: false, tokenRequired: false, email: "" });
+      setState({ phase: "gate", setup: false, tokenRequired: false, setupLocked: false, email: "" });
     }
   }, []);
 

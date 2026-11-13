@@ -2,7 +2,7 @@ import { useState } from "react";
 import Logo from "../components/Logo.jsx";
 import Button from "../components/Button.jsx";
 
-export default function AuthGate({ setup, tokenRequired = false, onSubmit }) {
+export default function AuthGate({ setup, tokenRequired = false, locked = false, onSubmit }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [token, setToken] = useState("");
@@ -32,6 +32,7 @@ export default function AuthGate({ setup, tokenRequired = false, onSubmit }) {
           value={password} onChange={(e) => setPassword(e.target.value)} />
         {setup && tokenRequired ? <input id="setup-token" className="fld" type="password" placeholder="Setup token (from your Worker secret)" autoComplete="off" value={token} onChange={(e) => setToken(e.target.value)} /> : null}
         <Button id="gate-btn" type="submit" disabled={busy}>{setup ? "Create account" : "Log in"}</Button>
+        {setup && locked ? <p className="notice small bad" role="alert">Setup is locked until you add a SETUP_TOKEN secret to this Worker: run <code>npx wrangler secret put SETUP_TOKEN</code>, then reload this page. This stops strangers from claiming your workspace first.</p> : null}
         {setup ? <p className="muted small" style={{ margin: 0 }}>First run: this account becomes the owner. Only one account can be created.</p> : null}
         {error ? <p className="notice small bad" id="gate-err" role="alert">{error}</p> : null}
       </form>

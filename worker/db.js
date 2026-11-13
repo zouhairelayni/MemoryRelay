@@ -101,11 +101,17 @@ export async function ensureSchema(env) {
     ['max_kb',"max_kb INTEGER NOT NULL DEFAULT 750"],         // largest single file imported
     ['adopt',"adopt INTEGER NOT NULL DEFAULT 0"],             // let this repo take over pasted skills with the same name
     ['sync_summary',"sync_summary TEXT NOT NULL DEFAULT ''"], // outcome being collected while a sync runs
-    ['last_summary',"last_summary TEXT NOT NULL DEFAULT ''"]  // outcome of the last finished sync, shown in the app
+    ['last_summary',"last_summary TEXT NOT NULL DEFAULT ''"],  // outcome of the last finished sync, shown in the app
+    ['excluded_files',"excluded_files TEXT NOT NULL DEFAULT '[]'"], // "skill/path" entries the owner removed; later syncs leave them out
+    ['update_mode',"update_mode TEXT NOT NULL DEFAULT 'safe'"],      // unattended updates: safe = hold risky changes, review = hold every change, all = apply everything
+    ['skill_map',"skill_map TEXT NOT NULL DEFAULT '{}'"],            // folder in the repository -> the skill name its SKILL.md declares
+    ['detect_v',"detect_v INTEGER NOT NULL DEFAULT 1"]               // marks repos created or re-checked since skill folders are found automatically
   ]) if(!repoCols.has(key)) {
     try { await env.DB.prepare('ALTER TABLE skill_repos ADD COLUMN '+ddl).run(); }
     catch(e) {if(!/duplicate column/i.test(String(e)))throw e;}
   }
+  // Repos added before folders were detected automatically may have found nothing in "skills/": look at them again once.
+  if (repoCols.size && !repoCols.has('detect_v')) await env.DB.prepare("UPDATE skill_repos SET last_sha='', etag='', last_checked='' WHERE sync_status <> 'running'").run();
   await env.DB.prepare(
     "CREATE TABLE IF NOT EXISTS gemini_keys (id TEXT PRIMARY KEY, label TEXT NOT NULL, key TEXT NOT NULL UNIQUE, enabled INTEGER NOT NULL DEFAULT 1, created TEXT NOT NULL)"
   ).run();

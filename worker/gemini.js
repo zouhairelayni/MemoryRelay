@@ -1,5 +1,6 @@
 // Gemini key and model pools with rotation, cooldowns and retry handling.
 import { MAX_CALLS, RETRYABLE } from "./constants.js";
+import { LOCKED_MESSAGE, hasKey, keyTail, openRows, sealKey } from "./secrets.js";
 import { AI_FAST, AI_LONG, fetchIdle, isSse, sseEvents } from "./aifetch.js";
 import { newId, now, runAll, safeJson, sleep, readObject } from "./util.js";
 
@@ -63,9 +64,10 @@ export async function setCooldown(env, keyId, model, ms) {
 // (starting from a round-robin position). Handles 429 (cooldown), 503/5xx (one retry),
 // and 401/403 (disables the key).
 export async function gemini(env, prompt, opts = {}) {
-  const keys = (await env.DB.prepare("SELECT id, label, key FROM gemini_keys WHERE enabled = 1 ORDER BY created").all()).results;
+  const opened = await openRows(env, (await env.DB.prepare("SELECT id, label, key FROM gemini_keys WHERE enabled = 1 ORDER BY created").all()).results);
+  const keys = opened.rows;
   let models = (await env.DB.prepare("SELECT name FROM gemini_models WHERE enabled = 1 ORDER BY pos, name").all()).results.map((m) => m.name);
-  if (!keys.length) return { error: "no enabled Gemini key (add one in the dashboard)" };
+  if (!keys.length) return { error: opened.locked ? LOCKED_MESSAGE : "no enabled Gemini key (add one in the dashboard)" };
   if (opts.onlyModel) models = models.filter((m) => m === opts.onlyModel);
   if (!models.length) return { error: opts.onlyModel ? "model " + opts.onlyModel + " is not enabled for Gemini" : "no enabled Gemini model (add one in the dashboard)" };
 
@@ -127,7 +129,7 @@ export async function geminiState(env) {
   const cool = (await env.DB.prepare("SELECT key_id, model FROM gemini_cooldowns WHERE until > ?").bind(Date.now()).all()).results;
   return {
     keys: keys.map((k) => ({
-      id: k.id, label: k.label, tail: k.key.slice(-4), enabled: !!k.enabled,
+      id: k.id, label: k.label, tail: keyTail(k.key), enabled: !!k.enabled,
       cooling: cool.filter((c) => c.key_id === k.id).map((c) => c.model),
     })),
     models: models.map((m) => ({ name: m.name, enabled: !!m.enabled })),
@@ -140,8 +142,9 @@ export async function geminiOp(env, request) {
     case "add_key": {
       const key = String(b.key || "").trim();
       if (!key) return { error: "paste a key" };
+      if (await hasKey(env, "gemini_keys", key)) break; // already saved
       await env.DB.prepare("INSERT OR IGNORE INTO gemini_keys (id, label, key, created) VALUES (?, ?, ?, ?)")
-        .bind(newId(), String(b.label || "key").trim().slice(0, 40) || "key", key, now()).run();
+        .bind(newId(), String(b.label || "key").trim().slice(0, 40) || "key", await sealKey(env, key), now()).run();
       break;
     }
     case "delete_key":

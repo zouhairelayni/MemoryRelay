@@ -8,13 +8,14 @@ import { listStats } from "./metering.js";
 import { SKILL_TEMPLATE, MAX_TOKENS, addSkill, deleteSkill, getSkill, getSkillSettings, listSkills, revertSkill, selectSkills, setSkillFlag, setSkillMax, updateSkill } from "./skills.js";
 import { generateSkill, improveSkill } from "./skillstudio.js";
 import { rateLimit } from "./limits.js";
+import { LOCKED_MESSAGE, openRows } from "./secrets.js";
 import { RULES_SQL, readJson, readObject } from "./util.js";
 import { json, now } from "./util.js";
 import { COMPAT } from "./providers.js";
 import { delegate, getDelegation, saveDelegation } from "./delegate.js";
 import { BRIEF_FORM, GUIDE } from "./delegateguide.js";
 import { monitor } from "./monitor.js";
-import { addSkillRepo, githubBlockedUntil, listSkillRepos, removeSkillRepo, setSkillRepoFilter, setSkillRepoSync, syncSkillRepo } from "./githubSkills.js";
+import { addSkillRepo, githubBlockedUntil, githubQuota, listRepoFiles, listSkillRepos, previewRepoFile, removeRepoFile, removeSkillRepo, restoreRepoFile, setSkillRepoFilter, setSkillRepoSync, syncSkillRepo } from "./githubSkills.js";
 
 export async function settings(env) {
   const last = await env.DB.prepare("SELECT MAX(last_seen) AS last FROM services").first();
@@ -67,7 +68,9 @@ export async function api(request, env, url) {
     const rows = (await env.DB.prepare("SELECT key FROM gemini_keys WHERE enabled = 1 ORDER BY created LIMIT 5").all()).results;
     if (!rows.length) return json({ error: "enable a saved Gemini key first" }, 400);
     let result;
-    for (const row of rows) {
+    const usable = (await openRows(env, rows)).rows;
+    if (!usable.length) return json({ error: LOCKED_MESSAGE }, 400);
+    for (const row of usable) {
       result = await listGeminiModels(row.key);
       if (result.models) break;
     }
@@ -98,15 +101,23 @@ export async function api(request, env, url) {
   // GitHub repositories/skill sets: owner controls automatic daily update checks.
   if (p === "/api/skill-repos" && m === "GET") {
     const until = await githubBlockedUntil(env); // when GitHub asked every repo to wait
-    return json({repositories:await listSkillRepos(env),token_configured:!!env.GITHUB_TOKEN,blocked_until:until?new Date(until).toISOString():""});
+    return json({repositories:await listSkillRepos(env),token_configured:!!env.GITHUB_TOKEN,blocked_until:until?new Date(until).toISOString():"",quota:await githubQuota(env)});
   }
   if (p === "/api/skill-repos" && m === "POST") return withStatus(await addSkillRepo(env,await body(request)));
+  const fileRoute=p.match(/^\/api\/skill-repos\/([^/]+)\/(files|file|files\/remove|files\/restore)$/);
+  if(fileRoute){
+    const id=dec(fileRoute[1]), what=fileRoute[2];
+    if(what==='files' && m==='GET') return withStatus(await listRepoFiles(env,id));
+    if(what==='file' && m==='GET'){const q=new URL(request.url).searchParams;return withStatus(await previewRepoFile(env,id,q.get('skill')||'',q.get('path')||''));}
+    if(what==='files/remove' && m==='POST') return withStatus(await removeRepoFile(env,id,await body(request)));
+    if(what==='files/restore' && m==='POST') return withStatus(await restoreRepoFile(env,id,await body(request)));
+  }
   const repoRoute=p.match(/^\/api\/skill-repos\/([^/]+)(?:\/(sync|enabled|filter))?$/);
   if(repoRoute){
     const id=dec(repoRoute[1]), action=repoRoute[2];
     if(action==='enabled' && m==='PUT') return withStatus(await setSkillRepoSync(env,id,!!(await body(request)).enabled));
     if(action==='filter' && m==='PUT') return withStatus(await setSkillRepoFilter(env,id,await body(request)));
-    if(action==='sync' && m==='POST') return withStatus(await syncSkillRepo(env,id,{importMissing:true}));
+    if(action==='sync' && m==='POST'){const b=await request.json().catch(()=>({}));return withStatus(await syncSkillRepo(env,id,{importMissing:true,force:!!(b&&b.force)}));}
     if(!action && m==='DELETE') return json(await removeSkillRepo(env,id));
   }
   // skills (Skill Genie)

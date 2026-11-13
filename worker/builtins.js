@@ -1,4 +1,5 @@
 // Skills that ship with Memory Relay. Each is added once; if you delete or edit it, it is left alone.
+import { sealAllKeys } from "./secrets.js";
 import { getConfig, setConfig } from "./db.js";
 import { SKILL_MD } from "./delegateguide.js";
 import { addSkill, toSkillMd } from "./skills.js";
@@ -58,6 +59,7 @@ export async function seedBuiltins(env) {
       await setConfig(env, "seed_official_anthropic_sha", OFFICIAL_SHA);
     }
 
+    await sealAllKeys(env); // encrypts keys saved before KEY_SECRET was set (no-op without it)
     seen.add(env.DB); // done: without this every request repeated ~6 D1 reads and a write
   } catch (e) {
     console.error("seeding built-in skills failed:", e && e.message);

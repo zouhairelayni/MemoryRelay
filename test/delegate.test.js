@@ -320,3 +320,18 @@ test('requested independent verification cannot pass when reviewer returns no ve
   });
   assert.equal(db.prepare('SELECT ok FROM delegations ORDER BY id DESC LIMIT 1').get().ok,0);
 });
+
+test("delegate: one shared time budget; a review that no longer fits is skipped and reported, never silently passed", async () => {
+  const { api, mcp, env } = await setup();
+  await pool(api);
+  await api("/api/delegation", "PUT", { strategy: "order", order: ["gemini", "openrouter"] });
+  await env.DB.prepare("INSERT INTO config (key, value) VALUES ('dg_budget_ms', '20000') ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(); // 20 s: less than the 30 s a review needs
+  await withProviders({ "generativelanguage": gem(GOOD), "openrouter.ai/api/v1/chat/completions": chat("VERDICT: ACCEPT") }, async (seen) => {
+    const r = await mcp("delegate", { task: "write an add function", kind: "function", verify: true });
+    const text = r.content[0].text;
+    assert.equal(seen.length, 1, "only the answer was requested");
+    assert.match(text, /time budget \(20 s\) ran short: skipped independent review/);
+    assert.match(text, /independent review skipped: the time budget ran out/);
+    assert.doesNotMatch(text, /automatic checks passed.*independent review by/);
+  });
+});

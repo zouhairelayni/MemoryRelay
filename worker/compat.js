@@ -3,6 +3,7 @@
 // A request tries each enabled model in order and, for each model, the keys in turn starting from a
 // round-robin position. 429 cools that key+model down, 5xx and network errors retry once, 401/403 disable the key.
 import { MAX_CALLS, RETRYABLE } from "./constants.js";
+import { LOCKED_MESSAGE, hasKey, keyTail, openRows, sealKey } from "./secrets.js";
 import { AI_FAST, AI_LONG, fetchIdle, isSse, sseEvents } from "./aifetch.js";
 import { getConfig, setConfig } from "./db.js";
 import { newId, now, runAll, safeJson, sleep, readObject } from "./util.js";
@@ -59,9 +60,10 @@ export function makeCompat(cfg) {
 
   // opts: { system, maxTokens, temperature, long, onlyModel }
   async function call(env, prompt, opts = {}) {
-    const keys = (await env.DB.prepare(`SELECT id, label, key FROM ${T.keys} WHERE enabled = 1 ORDER BY created`).all()).results;
+    const opened = await openRows(env, (await env.DB.prepare(`SELECT id, label, key FROM ${T.keys} WHERE enabled = 1 ORDER BY created`).all()).results);
+    const keys = opened.rows;
     let models = (await env.DB.prepare(`SELECT name FROM ${T.models} WHERE enabled = 1 ORDER BY pos, name`).all()).results.map((m) => m.name);
-    if (!keys.length) return { error: "no enabled " + label + " key" };
+    if (!keys.length) return { error: opened.locked ? LOCKED_MESSAGE : "no enabled " + label + " key" };
     if (opts.onlyModel) models = models.filter((m) => m === opts.onlyModel);
     if (!models.length) return { error: opts.onlyModel ? "model " + opts.onlyModel + " is not enabled for " + label : "no enabled " + label + " model (add one in the dashboard)" };
 
@@ -110,7 +112,7 @@ export function makeCompat(cfg) {
     const models = (await env.DB.prepare(`SELECT name, enabled FROM ${T.models} ORDER BY pos, name`).all()).results;
     const cool = (await env.DB.prepare(`SELECT key_id, model FROM ${T.cool} WHERE until > ?`).bind(Date.now()).all()).results;
     return {
-      keys: keys.map((k) => ({ id: k.id, label: k.label, tail: k.key.slice(-4), enabled: !!k.enabled, cooling: cool.filter((c) => c.key_id === k.id).map((c) => c.model) })),
+      keys: keys.map((k) => ({ id: k.id, label: k.label, tail: keyTail(k.key), enabled: !!k.enabled, cooling: cool.filter((c) => c.key_id === k.id).map((c) => c.model) })),
       models: models.map((m) => ({ name: m.name, enabled: !!m.enabled })),
     };
   }
@@ -124,8 +126,9 @@ export function makeCompat(cfg) {
         if (key.length > 400 || /\s/.test(key)) return { error: "that does not look like a key" };
         const bad = checkKey(key);
         if (bad) return { error: bad };
+        if (await hasKey(env, T.keys, key)) break; // already saved
         await env.DB.prepare(`INSERT OR IGNORE INTO ${T.keys} (id, label, key, created) VALUES (?, ?, ?, ?)`)
-          .bind(newId(), String(b.label || id).trim().slice(0, 40) || id, key, now()).run();
+          .bind(newId(), String(b.label || id).trim().slice(0, 40) || id, await sealKey(env, key), now()).run();
         break;
       }
       case "delete_key": await env.DB.prepare(`DELETE FROM ${T.keys} WHERE id = ?`).bind(String(b.id)).run(); break;

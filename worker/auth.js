@@ -109,8 +109,12 @@ const throttleKeys = (email, request) => [
 ];
 const TOO_MANY = { error: "too many wrong passwords. Wait 15 minutes and try again." };
 
-// Optional: set a SETUP_TOKEN secret (npx wrangler secret put SETUP_TOKEN) so nobody but you can create the owner account first.
+// A deployed Worker needs a SETUP_TOKEN secret (npx wrangler secret put SETUP_TOKEN) before the owner account can be created,
+// otherwise whoever opens the URL first would own it. Local development (localhost) stays open.
+const isLoopback = (request) => /^(localhost|127\.0\.0\.1|\[::1\])$/.test(new URL(request.url).hostname);
+const setupLocked = (env, request) => !env.SETUP_TOKEN && !isLoopback(request);
 export async function authSetup(env, request) {
+  if (setupLocked(env, request)) return json({ error: "setup is locked: add a SETUP_TOKEN secret (npx wrangler secret put SETUP_TOKEN), then reload this page and enter it" }, 403);
   const b = await readObject(request);
   const c = readCreds(b, MIN_PASSWORD);
   if (c.error) return json({ error: c.error }, 400);
@@ -159,7 +163,7 @@ export async function auth(request, env, url) {
   const p = url.pathname, m = request.method;
   if (p === "/auth/status" && m === "GET") {
     const user = await currentUser(env, request);
-    return json({ setup: (await userCount(env)) === 0, loggedIn: !!user, email: user ? user.email : "", setup_token: !!env.SETUP_TOKEN });
+    return json({ setup: (await userCount(env)) === 0, loggedIn: !!user, email: user ? user.email : "", setup_token: !!env.SETUP_TOKEN, setup_locked: setupLocked(env, request) });
   }
   if (p === "/auth/setup" && m === "POST") return authSetup(env, request);
   if (p === "/auth/login" && m === "POST") return authLogin(env, request);

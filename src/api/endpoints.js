@@ -60,9 +60,13 @@ export const skillRepos = {
   list: () => get("/api/skill-repos").then(d=>d.repositories),
   info: () => get("/api/skill-repos"),
   add: (repo, root, ref, names, options={}) => post("/api/skill-repos", {repo,root,ref,names,...options}),
+  files: (id) => get("/api/skill-repos/"+encodeURIComponent(id)+"/files"),
+  preview: (id, skill, path) => get("/api/skill-repos/"+encodeURIComponent(id)+"/file?skill="+encodeURIComponent(skill)+"&path="+encodeURIComponent(path)),
+  removeFile: (id, skill, path) => post("/api/skill-repos/"+encodeURIComponent(id)+"/files/remove", {skill,path}),
+  restoreFile: (id, key) => post("/api/skill-repos/"+encodeURIComponent(id)+"/files/restore", {key}),
   filter: (id, settings) => put("/api/skill-repos/"+encodeURIComponent(id)+"/filter", settings),
   toggle: (id, enabled) => put("/api/skill-repos/"+encodeURIComponent(id)+"/enabled",{enabled}),
-  sync: (id) => post("/api/skill-repos/"+encodeURIComponent(id)+"/sync"),
+  sync: (id, force=false) => post("/api/skill-repos/"+encodeURIComponent(id)+"/sync", force?{force:true}:undefined),
   remove: (id) => del("/api/skill-repos/"+encodeURIComponent(id)),
 };
 
