@@ -19,18 +19,23 @@ export function repoArgs(value, root='', ref='main', names='') {
   return {id: `${owner.toLowerCase()}/${repo.toLowerCase()}:${directory}`,owner,repo,root:directory,ref,names:JSON.stringify(selected)};
 }
 
+const isOfficial = (r) => String(r.owner).toLowerCase() === 'anthropics' && String(r.repo).toLowerCase() === 'skills';
 // Repos with live counters: how many skills each one provides now, and how many files of each kind came with them.
 export async function listSkillRepos(env) {
   const rows = (await env.DB.prepare('SELECT * FROM skill_repos ORDER BY id').all()).results;
-  const skillCounts = new Map((await env.DB.prepare("SELECT source, COUNT(*) n FROM skills WHERE source LIKE 'github:%' GROUP BY source").all()).results.map((x) => [x.source, x.n]));
+  const skillCounts = new Map((await env.DB.prepare("SELECT source, COUNT(*) n FROM skills WHERE source LIKE 'github:%' OR source LIKE 'builtin:anthropic%' GROUP BY source").all()).results.map((x) => [x.source, x.n]));
   const fileCounts = new Map();
-  for (const x of (await env.DB.prepare("SELECT s.source source, r.kind kind, COUNT(*) n FROM skill_resources r JOIN skills s ON s.name = r.skill WHERE s.source LIKE 'github:%' GROUP BY s.source, r.kind").all()).results) {
+  for (const x of (await env.DB.prepare("SELECT s.source source, r.kind kind, COUNT(*) n FROM skill_resources r JOIN skills s ON s.name = r.skill WHERE s.source LIKE 'github:%' OR s.source LIKE 'builtin:anthropic%' GROUP BY s.source, r.kind").all()).results) {
     if (!fileCounts.has(x.source)) fileCounts.set(x.source, {});
     fileCounts.get(x.source)[x.kind] = x.n;
   }
+  // The official anthropics/skills repo also owns the built-in skills it keeps up to date: count those too.
+  const sources = (r) => [...(skillCounts.keys())].filter((k) => k === 'github:' + r.id || (isOfficial(r) && k.startsWith('builtin:anthropic')));
+  const sum = (r) => sources(r).reduce((n, k) => n + (skillCounts.get(k) || 0), 0);
+  const files = (r) => { const out = {}; for (const k of [...fileCounts.keys()].filter((k) => k === 'github:' + r.id || (isOfficial(r) && k.startsWith('builtin:anthropic')))) for (const [kind, n] of Object.entries(fileCounts.get(k))) out[kind] = (out[kind] || 0) + n; return out; };
   return rows.map((r) => ({ ...r, enabled: !!r.enabled, adopt: !!Number(r.adopt), names: JSON.parse(r.names),
     file_types: safeJson(r.file_types, ['script', 'test']), summary: safeJson(r.last_summary, null),
-    skill_count: skillCounts.get('github:' + r.id) || 0, file_counts: fileCounts.get('github:' + r.id) || {} }));
+    skill_count: sum(r), file_counts: files(r) }));
 }
 // When GitHub told us to wait, every repo pauses until then (the limit is per token or per shared Worker IP, not per repo).
 const BLOCK_KEY='github_blocked_until';
@@ -129,26 +134,30 @@ export async function addSkillRepo(env, data) {
   } catch(e) {return {error:/constraint|UNIQUE/i.test(String(e))?'That GitHub skill set is already tracked.':String(e.message||e)};}
 }
 // ---- browsing and pruning the files a repo imported ----
-const FILE_JOIN="FROM skill_resources r JOIN skills s ON s.name=r.skill WHERE s.source=?";
+// A repo's files: skills installed from it, and for the official anthropics/skills repo also the built-in skills it maintains.
+const FILE_JOIN="FROM skill_resources r JOIN skills s ON s.name=r.skill WHERE (s.source=? OR (?<>'' AND s.source LIKE 'builtin:anthropic%'))";
+const fileSrc=(repo)=>['github:'+repo.id,isOfficial(repo)?'1':''];
 // Fonts are stored as base64: 4 characters per 3 bytes, minus the '=' padding at the end.
 const rawBytes=(kind,chars,tail='')=>kind==='font'?Math.max(0,Math.floor((chars||0)*3/4)-(String(tail).split('=').length-1)):(chars||0);
 export async function listRepoFiles(env,id){
-  const repo=await env.DB.prepare('SELECT id,excluded_files FROM skill_repos WHERE id=?').bind(String(id)).first();
+  const repo=await env.DB.prepare('SELECT id,owner,repo,excluded_files FROM skill_repos WHERE id=?').bind(String(id)).first();
   if(!repo)return {error:'Repository not found.'};
-  const rows=(await env.DB.prepare(`SELECT r.skill skill,r.path path,r.kind kind,LENGTH(r.content) chars,SUBSTR(r.content,-2) tail ${FILE_JOIN} ORDER BY r.skill,r.path`).bind('github:'+repo.id).all()).results;
+  const rows=(await env.DB.prepare(`SELECT r.skill skill,r.path path,r.kind kind,LENGTH(r.content) chars,SUBSTR(r.content,-2) tail ${FILE_JOIN} ORDER BY r.skill,r.path`).bind(...fileSrc(repo)).all()).results;
   return {files:rows.map(x=>({skill:x.skill,path:x.path,kind:x.kind,bytes:rawBytes(x.kind,x.chars,x.tail)})),excluded:safeJson(repo.excluded_files,[])};
 }
 export async function previewRepoFile(env,id,skill,path){
-  const row=await env.DB.prepare(`SELECT r.kind kind,SUBSTR(r.content,1,4000) c,LENGTH(r.content) chars,SUBSTR(r.content,-2) tail,r.url url ${FILE_JOIN} AND r.skill=? AND r.path=?`).bind('github:'+String(id),String(skill),String(path)).first();
+  const repo=await env.DB.prepare('SELECT id,owner,repo FROM skill_repos WHERE id=?').bind(String(id)).first();
+  if(!repo)return {error:'Repository not found.'};
+  const row=await env.DB.prepare(`SELECT r.kind kind,SUBSTR(r.content,1,4000) c,LENGTH(r.content) chars,SUBSTR(r.content,-2) tail,r.url url ${FILE_JOIN} AND r.skill=? AND r.path=?`).bind(...fileSrc(repo),String(skill),String(path)).first();
   if(!row)return {error:'File not found.'};
   if(row.kind==='font')return {kind:row.kind,bytes:rawBytes(row.kind,row.chars,row.tail),url:row.url,preview:null,note:'Binary font, not shown. Agents receive it as base64.'};
   return {kind:row.kind,bytes:row.chars,url:row.url,preview:row.c||'',truncated:row.chars>4000};
 }
 // Removing a file also remembers it, otherwise the next sync would bring it straight back.
 export async function removeRepoFile(env,id,{skill,path}={}){
-  const repo=await env.DB.prepare('SELECT id,excluded_files FROM skill_repos WHERE id=?').bind(String(id)).first();
+  const repo=await env.DB.prepare('SELECT id,owner,repo,excluded_files FROM skill_repos WHERE id=?').bind(String(id)).first();
   if(!repo)return {error:'Repository not found.'};
-  const row=await env.DB.prepare(`SELECT 1 x ${FILE_JOIN} AND r.skill=? AND r.path=?`).bind('github:'+repo.id,String(skill),String(path)).first();
+  const row=await env.DB.prepare(`SELECT 1 x ${FILE_JOIN} AND r.skill=? AND r.path=?`).bind(...fileSrc(repo),String(skill),String(path)).first();
   if(!row)return {error:'File not found.'};
   const key=String(skill)+'/'+String(path);
   const excluded=[...new Set([...safeJson(repo.excluded_files,[]),key])].slice(-500);
@@ -160,7 +169,7 @@ export async function removeRepoFile(env,id,{skill,path}={}){
 }
 // Restoring clears the last checked revision so the next sync looks at the repository again and fetches the file.
 export async function restoreRepoFile(env,id,{key}={}){
-  const repo=await env.DB.prepare('SELECT id,excluded_files FROM skill_repos WHERE id=?').bind(String(id)).first();
+  const repo=await env.DB.prepare('SELECT id,owner,repo,excluded_files FROM skill_repos WHERE id=?').bind(String(id)).first();
   if(!repo)return {error:'Repository not found.'};
   const list=safeJson(repo.excluded_files,[]);
   if(!list.includes(String(key)))return {error:'That file is not on the removed list.'};
@@ -211,17 +220,30 @@ async function rememberQuota(env,url,res){
     await setConfig(env,'github_rl',JSON.stringify({remaining:Number(remaining),limit:Number(limit),reset:Number(reset||0)*1000,token:env.GITHUB_TOKEN?1:0}));
   }catch{}
 }
+// Every API request this Worker sends is noted (time only, last hour). GitHub's "remaining" is counted per address, and Workers share addresses,
+// so without this the app cannot tell its own use from other people's.
+async function noteCall(env){
+  try{
+    const hourAgo=Date.now()-3600000;
+    const calls=safeJson(await getConfig(env,'github_calls'),[]).filter(t=>t>hourAgo);
+    calls.push(Date.now());
+    await setConfig(env,'github_calls',JSON.stringify(calls.slice(-300)));
+  }catch{}
+}
 // Last known quota for the current credentials (a token has its own), or null before the first GitHub call.
 export async function githubQuota(env){
   const q=safeJson(await getConfig(env,'github_rl'),null);
   if(!q||q.token!==(env.GITHUB_TOKEN?1:0))return null;
   const renewed=q.reset&&q.reset<=Date.now(); // the hour is over: the full allowance is back
-  return {remaining:renewed?q.limit:q.remaining,limit:q.limit,reset:q.reset?new Date(q.reset).toISOString():'',token:!!env.GITHUB_TOKEN,estimated:!!renewed};
+  const hourAgo=Date.now()-3600000;
+  const mine=safeJson(await getConfig(env,'github_calls'),[]).filter(t=>t>hourAgo).length;
+  return {remaining:renewed?q.limit:q.remaining,limit:q.limit,reset:q.reset?new Date(q.reset).toISOString():'',token:!!env.GITHUB_TOKEN,estimated:!!renewed,used_by_this_worker:mine};
 }
 async function checkedFetch(env,url,extra={}){
   const waiting=await githubBlockedUntil(env);
   if(waiting)throw new SyncBlocked('GitHub rate limit: paused until '+iso(waiting)+'. No requests are sent before then.'+(env.GITHUB_TOKEN?'':' Configure GITHUB_TOKEN on this Worker to raise the limit.'),waiting);
   const res=await fetch(url,{headers:{...headers(env),...extra},signal:AbortSignal.timeout(15000)});
+  if(String(url).startsWith('https://api.github.com/'))await noteCall(env);
   await rememberQuota(env,url,res);
   if(res.status===304)return res;
   if(!res.ok){
@@ -267,6 +289,36 @@ async function failSync(env,id,e){
   await env.DB.prepare('UPDATE skill_repos SET last_error=?,last_checked=? WHERE id=?').bind(message,now(),id).run();
   return e instanceof SyncBlocked?{error:message,blocked_until:iso(e.until)}:{error:message};
 }
+// The current commit of a branch or tag WITHOUT the GitHub API: git's own discovery endpoint answers with every ref and is not counted
+// against the 60-per-hour API limit. Any problem returns null and the caller uses the API as before.
+function parseRefs(text){
+  const refs=new Map();
+  let i=0;
+  while(i+4<=text.length){
+    const n=parseInt(text.slice(i,i+4),16);
+    if(!Number.isFinite(n))break;
+    if(n<4){i+=4;continue;}            // flush / delimiter packets
+    const line=text.slice(i+4,i+n).replace(/\n$/,'').split('\0')[0];
+    i+=n;
+    const m=line.match(/^([0-9a-f]{40}) (\S+)$/);
+    if(m)refs.set(m[2],m[1]);
+  }
+  return refs;
+}
+export function pickRef(refs,ref){
+  if(ref==='HEAD')return refs.get('HEAD')||null;
+  return refs.get('refs/heads/'+ref)||refs.get('refs/tags/'+ref+'^{}')||refs.get('refs/tags/'+ref)||null;
+}
+async function gitHead(env,r){
+  const headers={'User-Agent':'git/2.43.0',Accept:'*/*'};
+  if(env.GITHUB_TOKEN)headers.Authorization='Basic '+btoa('x-access-token:'+env.GITHUB_TOKEN);
+  const res=await fetch(`https://github.com/${encodeURIComponent(r.owner)}/${encodeURIComponent(r.repo)}.git/info/refs?service=git-upload-pack`,{headers,signal:AbortSignal.timeout(15000)});
+  if(!res.ok)return null;
+  const buf=await res.arrayBuffer();
+  if(buf.byteLength>8000000)return null;
+  const sha=pickRef(parseRefs(new TextDecoder('latin1').decode(buf)),r.ref);
+  return /^[a-f0-9]{40}$/.test(sha||'')?sha:null;
+}
 // Where skills live differs per repository: skills/<name>/, .claude/skills/<name>/, a single SKILL.md at the root, nested plugin folders...
 // So every SKILL.md in the tree counts, and the folder setting only narrows the search.
 const SKILL_MD = (p) => p === 'SKILL.md' || p.endsWith('/SKILL.md');
@@ -280,28 +332,38 @@ const byRank = (a, b) => { const x = rankOf(a), y = rankOf(b); for (let i = 0; i
 async function startSync(env,r,importMissing,force=false){
   const prefix=`https://api.github.com/repos/${encodeURIComponent(r.owner)}/${encodeURIComponent(r.repo)}`;
   const opts=repoOpts(r);
-  // An unchanged branch answers 304, which GitHub does not count against the quota.
-  // A manual sync may use it too when nothing is waiting to be imported or reviewed. "Re-check everything" (force) never does.
+  // A manual sync may skip the check too when nothing is waiting to be imported or reviewed. "Re-check everything" (force) never does.
   const last=safeJson(r.last_summary,null);
   const nothingPending=!!last&&!last.available&&!(last.held&&last.held.length)&&!(last.problems&&last.problems.length); // problems get retried by a manual sync
   const shortcut=!force&&(!importMissing||nothingPending);
-  const conditional=shortcut&&r.etag&&r.last_sha?{'If-None-Match':r.etag}:{};
-  const first=await checkedFetch(env,prefix+'/commits/'+encodeURIComponent(r.ref),conditional).catch(e=>{
-    if(e&&e.status===404)throw Error(`Repository or branch not found: ${r.owner}/${r.repo} @ ${r.ref}.`+(env.GITHUB_TOKEN?'':' If the repository is private, add a GITHUB_TOKEN secret.'));
-    throw e;
-  });
-  if(first.status===304){
-    await env.DB.prepare("UPDATE skill_repos SET last_checked=?,last_error='',sync_status='up-to-date' WHERE id=?").bind(now(),r.id).run();
-    return {ok:true,unchanged:true,free:true,sha:r.last_sha,updated:0,added:0,skipped:0};
-  }
-  const commit=await first.json(), etag=first.headers.get('etag')||'';
-  const sha=commit.sha, treeSha=commit.commit?.tree?.sha;
-  if(!/^[a-f0-9]{40}$/.test(sha||'')||!/^[a-f0-9]{40}$/.test(treeSha||'')) throw Error('Invalid GitHub revision.');
-  if(shortcut && r.last_sha===sha){
+  const upToDate=async(sha,etag)=>{
     await env.DB.prepare("UPDATE skill_repos SET last_checked=?,last_error='',sync_status='up-to-date',etag=? WHERE id=?").bind(now(),etag,r.id).run();
-    return {ok:true,unchanged:true,sha,updated:0,added:0,skipped:0};
+    return {ok:true,unchanged:true,free:true,sha,updated:0,added:0,skipped:0};
+  };
+  // 1. Latest commit through git itself: no GitHub API request, so it also works while the API is rate limited.
+  let sha=await gitHead(env,r).catch(()=>null), etag='', tree=null;
+  if(sha&&shortcut&&r.last_sha===sha)return upToDate(sha,r.etag);
+  if(sha){
+    // 2. One API request: the file list of exactly that commit (a commit id is accepted where a tree id is expected).
+    try{tree=await (await checkedFetch(env,prefix+'/git/trees/'+sha+'?recursive=1')).json();}
+    catch(e){if(!(e&&(e.status===404||e.status===422)))throw e;tree=null;sha=null;} // unusual: use the commit lookup below
   }
-  const tree=await (await checkedFetch(env,prefix+'/git/trees/'+treeSha+'?recursive=1')).json();
+  if(!tree){
+    // Fallback: the API. An unchanged branch answers 304, which GitHub does not count against the quota.
+    const conditional=shortcut&&r.etag&&r.last_sha?{'If-None-Match':r.etag}:{};
+    const first=await checkedFetch(env,prefix+'/commits/'+encodeURIComponent(r.ref),conditional).catch(e=>{
+      if(e&&e.status===404)throw Error(`Repository or branch not found: ${r.owner}/${r.repo} @ ${r.ref}.`+(env.GITHUB_TOKEN?'':' If the repository is private, add a GITHUB_TOKEN secret.'));
+      throw e;
+    });
+    if(first.status===304)return upToDate(r.last_sha,r.etag);
+    const commit=await first.json();
+    etag=first.headers.get('etag')||'';
+    sha=commit.sha;
+    const treeSha=commit.commit?.tree?.sha;
+    if(!/^[a-f0-9]{40}$/.test(sha||'')||!/^[a-f0-9]{40}$/.test(treeSha||'')) throw Error('Invalid GitHub revision.');
+    if(shortcut && r.last_sha===sha)return upToDate(sha,etag);
+    tree=await (await checkedFetch(env,prefix+'/git/trees/'+treeSha+'?recursive=1')).json();
+  }
   if(tree.truncated || !Array.isArray(tree.tree)) throw Error('GitHub returned an incomplete repository tree.');
 
   const notes=[], summary=emptySummary();

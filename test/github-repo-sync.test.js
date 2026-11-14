@@ -126,12 +126,18 @@ test('Large skill repositories ignore unrelated assets and keep only Python scri
 });
 
 // ---- regression tests for the stuck-sync / rate-limit audit (2026-11-11) ----
-function flexMock(tree,files,{ref=sha1,etag='',log=[],rl=null}={}){
+const pkt=(t)=>(t.length+4).toString(16).padStart(4,'0')+t;
+// What `git ls-remote` receives: the real discovery answer, with HEAD first (plus capabilities), then every ref.
+const refsBody=(commit,extra)=>pkt('# service=git-upload-pack\n')+'0000'+pkt(`${commit} HEAD\0multi_ack symref=HEAD:refs/heads/main agent=git/github\n`)
+  +(extra||[['refs/heads/other','1'.repeat(40)],['refs/heads/main',commit],['refs/tags/v1','2'.repeat(40)]]).map(([n,v])=>pkt(`${v} ${n}\n`)).join('')+'0000';
+const apiOnly=(l)=>l.filter(x=>x.url.startsWith('https://api.github.com/'));
+function flexMock(tree,files,{ref=sha1,etag='',log=[],rl=null,git=false,gitRefs=null}={}){
  const original=globalThis.fetch;
  globalThis.fetch=async(url,init)=>{
   const s=String(url);log.push({url:s,headers:init?.headers||{}});
   const h=new Headers({...(etag?{etag}:{}),...(rl||{})});
   const ok=(body)=>({ok:true,status:200,headers:h,json:async()=>body,text:async()=>typeof body==='string'?body:JSON.stringify(body),arrayBuffer:async()=>body instanceof Uint8Array?body.buffer.slice(body.byteOffset,body.byteOffset+body.byteLength):new TextEncoder().encode(String(body)).buffer});
+  if(git&&s.startsWith('https://github.com/')&&s.includes('/info/refs'))return ok(refsBody(ref,gitRefs));
   if(s.includes('/commits/'))return ok({sha:ref,commit:{tree:{sha:treeSha}}});
   if(s.includes('/git/trees/'))return ok({truncated:false,tree});
   const path=decodeURIComponent(new URL(s).pathname.split('/').slice(4).join('/'));
@@ -177,7 +183,7 @@ test('a skill whose SKILL.md name differs from its folder is installed under the
 test('after GitHub rate limits us nothing more is sent until the reset, and a new token lifts the pause',async()=>{
  const {env,db}=await fixture();
  const original=globalThis.fetch;let calls=0;
- globalThis.fetch=async()=>{calls++;return new Response('limit',{status:403,headers:{'x-ratelimit-remaining':'0','x-ratelimit-reset':String(Math.floor(Date.now()/1000)+3600)}});};
+ globalThis.fetch=async(url)=>{if(String(url).startsWith('https://api.github.com/'))calls++;return new Response('limit',{status:403,headers:{'x-ratelimit-remaining':'0','x-ratelimit-reset':String(Math.floor(Date.now()/1000)+3600)}});};
  try{
   const repo=(await addSkillRepo(env,{repo:'demo/limited2'})).id;
   await setSkillRepoSync(env,repo,true);
@@ -210,8 +216,8 @@ test('a failed first sync is retried soon, not after 24 hours, and an unchanged 
   restore();log.length=0;
   globalThis.fetch=async(url,init)=>{log.push({url:String(url),headers:init?.headers||{}});return {ok:false,status:304,headers:new Headers(),text:async()=>''};};
   const unchanged=await syncSkillRepo(env,repo,{importMissing:false});
-  assert.equal(unchanged.unchanged,true);assert.equal(log.length,1);
-  assert.equal(log[0].headers['If-None-Match'],'"v1"');
+  assert.equal(unchanged.unchanged,true);assert.equal(apiOnly(log).length,1);
+  assert.equal(apiOnly(log)[0].headers['If-None-Match'],'"v1"');
   restore=()=>{};
  }finally{restore();}
 });
@@ -408,12 +414,12 @@ test('a manual sync costs no GitHub quota when nothing is pending; Re-check ever
   restore();log.length=0;
   globalThis.fetch=async(url,init)=>{log.push({url:String(url),headers:init?.headers||{}});return {ok:false,status:304,headers:new Headers(),text:async()=>''};};
   const free=await syncSkillRepo(env,repo,{importMissing:true});
-  assert.equal(free.unchanged,true);assert.equal(free.free,true);assert.equal(log.length,1);
-  assert.equal(log[0].headers['If-None-Match'],'"v9"');
+  assert.equal(free.unchanged,true);assert.equal(free.free,true);assert.equal(apiOnly(log).length,1);
+  assert.equal(apiOnly(log)[0].headers['If-None-Match'],'"v9"');
   log.length=0;
   globalThis.fetch=async(url,init)=>{log.push({url:String(url),headers:init?.headers||{}});return {ok:false,status:404,headers:new Headers(),text:async()=>''};};
   await syncSkillRepo(env,repo,{importMissing:true,force:true});
-  assert.equal(log[0].headers['If-None-Match'],undefined,'force must not use the shortcut');
+  assert.equal(apiOnly(log)[0].headers['If-None-Match'],undefined,'force must not use the shortcut');
   restore=()=>{};
  }finally{restore();}
 });
@@ -429,7 +435,7 @@ test('a manual sync still looks at the repository when new skills were left unin
   assert.equal(auto.summary.available,1);
   log.length=0;
   const manual=await syncSkillRepo(env,repo,{importMissing:true});
-  assert.equal(log[0].headers['If-None-Match'],undefined);
+  assert.equal(apiOnly(log)[0].headers['If-None-Match'],undefined);
   assert.deepEqual(manual.summary.added,['newbie']);
  }finally{restore();}
 });
@@ -605,4 +611,110 @@ test('repos created before automatic detection are looked at again once', async(
  db.prepare("UPDATE skill_repos SET last_sha=? WHERE id='o/r:skills'").run(sha1);
  await ensureSchema(env);
  assert.equal(db.prepare("SELECT last_sha FROM skill_repos WHERE id='o/r:skills'").get().last_sha,sha1,'only once');
+});
+
+// ---- round 6: change detection through git, so checks cost no API quota ----
+test('a check costs no GitHub API request; a real change costs exactly one (the file list)', async()=>{
+ const {env}=await fixture();
+ const log=[];
+ const tree=[{type:'blob',path:'skills/solo/SKILL.md',size:900}];
+ const rl={'x-ratelimit-remaining':'59','x-ratelimit-limit':'60','x-ratelimit-reset':String(Math.floor(Date.now()/1000)+3000)};
+ let restore=flexMock(tree,{'skills/solo/SKILL.md':fn('solo')},{log,git:true,rl});
+ try{
+  const repo=(await addSkillRepo(env,{repo:'demo/gitfirst'})).id;
+  assert.equal((await syncSkillRepo(env,repo,{importMissing:true})).complete,true);
+  assert.equal(apiOnly(log).length,1,'first sync: just the tree');
+  assert.match(apiOnly(log)[0].url,/\/git\/trees\/a{40}\?recursive=1$/,'asked for by commit id');
+  assert.equal((await githubQuota(env)).used_by_this_worker,1);
+  log.length=0;
+  for(let i=0;i<3;i++){const again=await syncSkillRepo(env,repo,{importMissing:false});assert.equal(again.unchanged,true);assert.equal(again.free,true);}
+  assert.equal(apiOnly(log).length,0,'three checks, zero API requests');
+  assert.equal(log.filter(x=>x.url.includes('/info/refs')).length,3);
+  assert.equal((await githubQuota(env)).used_by_this_worker,1);
+  // upstream moves: one tree request, the new commit is installed
+  restore();log.length=0;
+  restore=flexMock(tree,{'skills/solo/SKILL.md':fn('solo')+'\nNew line.\n'},{log,git:true,ref:sha2,rl});
+  const changed=await syncSkillRepo(env,repo,{importMissing:false});
+  assert.deepEqual(changed.summary.updated,['solo']);
+  assert.equal(apiOnly(log).length,1);
+ }finally{restore();}
+});
+
+test('while the API is paused, unchanged repos still report up to date and only a real change waits', async()=>{
+ const {env}=await fixture();
+ const tree=[{type:'blob',path:'skills/solo/SKILL.md',size:900}];
+ let restore=flexMock(tree,{'skills/solo/SKILL.md':fn('solo')},{git:true});
+ let repo;
+ try{
+  repo=(await addSkillRepo(env,{repo:'demo/paused'})).id;
+  await syncSkillRepo(env,repo,{importMissing:true});
+  await env.DB.prepare("INSERT INTO config (key,value) VALUES ('github_blocked_until',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind((Date.now()+3600000)+':0').run();
+  const log=[];restore();restore=flexMock(tree,{'skills/solo/SKILL.md':fn('solo')},{git:true,log});
+  const same=await syncSkillRepo(env,repo,{importMissing:false});
+  assert.equal(same.unchanged,true);assert.equal(apiOnly(log).length,0);
+  restore();restore=flexMock(tree,{'skills/solo/SKILL.md':fn('solo')+'\nChanged.\n'},{git:true,ref:sha2});
+  const moved=await syncSkillRepo(env,repo,{importMissing:false});
+  assert.match(moved.error,/paused until/i);
+ }finally{restore();}
+});
+
+test('branches, tags and unreadable answers: the right commit is picked, anything odd falls back to the API', async()=>{
+ const {pickRef}=await import('../worker/githubSkills.js');
+ const refs=new Map([['HEAD','h'.repeat(40)],['refs/heads/main','a'.repeat(40)],['refs/tags/v1','b'.repeat(40)],['refs/tags/v1^{}','c'.repeat(40)],['refs/tags/v2','d'.repeat(40)]]);
+ assert.equal(pickRef(refs,'main'),'a'.repeat(40));
+ assert.equal(pickRef(refs,'v1'),'c'.repeat(40),'an annotated tag means the commit it points to');
+ assert.equal(pickRef(refs,'v2'),'d'.repeat(40));
+ assert.equal(pickRef(refs,'HEAD'),'h'.repeat(40));
+ assert.equal(pickRef(refs,'nope'),null);
+ // git endpoint unreachable: the old API path still works (commit lookup + tree)
+ const {env}=await fixture();
+ const log=[];
+ const restore=flexMock([{type:'blob',path:'skills/solo/SKILL.md',size:900}],{'skills/solo/SKILL.md':fn('solo')},{log}); // git:false => info/refs answers 404
+ try{
+  const repo=(await addSkillRepo(env,{repo:'demo/nogit'})).id;
+  assert.equal((await syncSkillRepo(env,repo,{importMissing:true})).complete,true);
+  assert.equal(apiOnly(log).length,2,'commit lookup + tree, as before');
+ }finally{restore();}
+});
+
+test('if GitHub does not accept the commit id for the file list, the commit lookup is used instead', async()=>{
+ const {env}=await fixture();
+ const log=[];
+ const tree=[{type:'blob',path:'skills/solo/SKILL.md',size:900}];
+ const restore=flexMock(tree,{'skills/solo/SKILL.md':fn('solo')},{log,git:true});
+ const inner=globalThis.fetch;
+ let refused=0;
+ globalThis.fetch=async(url,init)=>{
+  if(String(url).includes('/git/trees/'+sha1)){refused++;log.push({url:String(url),headers:{}});return {ok:false,status:422,headers:new Headers(),text:async()=>'no'};}
+  return inner(url,init);
+ };
+ try{
+  const repo=(await addSkillRepo(env,{repo:'demo/treeish'})).id;
+  const out=await syncSkillRepo(env,repo,{importMissing:true});
+  assert.equal(out.complete,true);assert.equal(refused,1);
+ }finally{restore();}
+});
+
+test('the official anthropics/skills repo counts and lists the built-in skills it maintains', async()=>{
+ const {env,db}=await fixture();
+ const id='anthropics/skills:skills'; // seeded with the app
+ const base=(await listSkillRepos(env)).find(r=>r.id===id);
+ assert.equal(base.skill_count,11,'the 11 adapted built-in skills belong to this repo');
+ db.prepare("INSERT INTO skills (name,description,body,enabled,core,source,created,updated) VALUES ('pdf','Use when handling pdf files.','x',1,0,'builtin:anthropic-official','t','t')").run();
+ db.prepare("INSERT INTO skills (name,description,body,enabled,core,source,created,updated) VALUES ('docx','Use when handling word files.','x',1,0,?,'t','t')").run('github:'+id);
+ db.prepare("INSERT INTO skills (name,description,body,enabled,core,source,created,updated) VALUES ('mine','Use when mine.','x',1,0,'paste','t','t')").run();
+ for(const [skill,path] of [['pdf','scripts/a.py'],['pdf','scripts/b.py'],['docx','scripts/c.py'],['mine','scripts/m.py']])
+  db.prepare("INSERT INTO skill_resources (skill,path,kind,content,url) VALUES (?,?,'script','print(1)','')").run(skill,path);
+ const row=(await listSkillRepos(env)).find(r=>r.id===id);
+ assert.equal(row.skill_count,13,'11 adapted built-ins + pdf (built-in) + docx (installed by this repo)');
+ assert.deepEqual(row.file_counts,{script:3});
+ const files=await listRepoFiles(env,id);
+ assert.deepEqual(files.files.map(f=>f.skill+'/'+f.path),['docx/scripts/c.py','pdf/scripts/a.py','pdf/scripts/b.py']);
+ assert.equal((await previewRepoFile(env,id,'pdf','scripts/a.py')).preview,'print(1)');
+ assert.equal((await removeRepoFile(env,id,{skill:'pdf',path:'scripts/b.py'})).ok,true);
+ assert.match((await removeRepoFile(env,id,{skill:'mine',path:'scripts/m.py'})).error,/not found/);
+ // an ordinary repo never claims built-in skills
+ const other=(await addSkillRepo(env,{repo:'demo/ordinary'})).id;
+ assert.equal((await listSkillRepos(env)).find(r=>r.id===other).skill_count,0);
+ assert.equal((await listRepoFiles(env,other)).files.length,0);
 });

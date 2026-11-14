@@ -33,3 +33,9 @@ Reported: repos (impeccable, ui-audit, ui-ux-pro-max-skill, taste-skill) have sk
 - [x] startSync: find every SKILL.md at any depth (incl. repo root), dedupe same-named copies (prefer visible skills/ folders), fall back to auto when the chosen folder is empty, files belong to nearest skill folder
 - [x] finishOneSkill: install under declared name (no folder/name mismatch error), conflict/duplicate handling at install time, skill_map
 - [x] UI: folder field blank = automatic; show root or "automatic"; folder editable in File settings; zip r6
+
+## Round 6 (2026-11-13) "how do 5 repos deplete 60 calls/hour?"
+Facts: designed cost = 1 API call to check (0 quota when 304) + 1 for the file tree when changed; cron 1 repo/2 min, 24 h between successful checks. 9 repos (not 5) are tracked. "0 of 60" is GitHub's count for the Worker's SHARED egress address, and the app never counted its own calls, so it could not prove who used them.
+- [x] P14 detect changes with git smart-HTTP info/refs (0 API calls, works while API is paused), tree by commit sha (1 API call per real change), own-call counter shown next to the quota, tests count api.github.com calls only
+- [x] P15 anthropics/skills repo shows "0 skills imported / files (0)" because its skills are source builtin:anthropic-official: count and list them for that repo
+- [ ] zip r7
