@@ -1,7 +1,46 @@
 // Owner-managed GitHub skill sets. Sync never executes downloaded code.
 import { now } from './util.js';
 import { getConfig, setConfig } from './db.js';
+import { sealKey, openKey, LOCKED_MESSAGE } from './secrets.js';
 import { parseSkill, scanSkill, toSkillMd } from './skills.js';
+
+const TOKEN_KEY = 'github_token';
+
+async function githubEnv(env) {
+  const stored = await getConfig(env, TOKEN_KEY);
+  if (!stored) return env;
+  const token = await openKey(env, stored);
+  return {...env, GITHUB_TOKEN: token || '', github_token_error: token ? '' : LOCKED_MESSAGE};
+}
+
+export async function githubTokenStatus(env) {
+  const saved = !!await getConfig(env, TOKEN_KEY);
+  const effective = await githubEnv(env);
+  return {token_configured: !!effective.GITHUB_TOKEN, token_saved: saved,
+    token_locked: !!effective.github_token_error, token_storage_ready: !!env.KEY_SECRET,
+    token_source: saved ? 'database' : env.GITHUB_TOKEN ? 'worker' : ''};
+}
+
+export async function saveGitHubToken(env, value) {
+  if (!env.KEY_SECRET) return {error: 'Configure KEY_SECRET on this Worker before saving a GitHub token. It encrypts the token in the database.'};
+  const token = typeof value === 'string' ? value.trim() : '';
+  if (!/^(ghp_[A-Za-z0-9]{20,255}|github_pat_[A-Za-z0-9_]{20,255})$/.test(token)) return {error: 'Enter a raw GitHub classic or fine-grained personal access token, without quotes or a Bearer prefix.'};
+  const check = await checkGitHubAccess({...env, GITHUB_TOKEN: token});
+  if (!check.ok) return {error: check.error};
+  await setConfig(env, TOKEN_KEY, await sealKey(env, token));
+  await clearGitHubQuota(env);
+  return {ok: true, ...await githubTokenStatus(env)};
+}
+
+async function clearGitHubQuota(env) {
+  await env.DB.prepare("DELETE FROM config WHERE key IN ('github_blocked_until', 'github_rl', 'github_calls')").run();
+}
+
+export async function removeGitHubToken(env) {
+  await env.DB.prepare('DELETE FROM config WHERE key=?').bind(TOKEN_KEY).run();
+  await clearGitHubQuota(env);
+  return {ok: true, ...await githubTokenStatus(env)};
+}
 
 const PATTERN = /^[A-Za-z0-9_.-]{1,100}$/;
 const official = ['mcp-builder','skill-creator','doc-coauthoring','frontend-design','webapp-testing','internal-comms','discernment-nudge','web-artifacts-builder','theme-factory','canvas-design','brand-guidelines'];
@@ -42,6 +81,7 @@ const BLOCK_KEY='github_blocked_until';
 // The pause is remembered together with whether a token was set, so adding a token lifts it at once (a token has its own quota).
 const tokenFlag=(env)=>env.GITHUB_TOKEN?'1':'0';
 export async function githubBlockedUntil(env){
+  env=await githubEnv(env);
   const [until,flag]=String(await getConfig(env,BLOCK_KEY)||'').split(':');
   return flag===tokenFlag(env)&&Number(until)>Date.now()?Number(until):0;
 }
@@ -232,6 +272,7 @@ async function noteCall(env){
 }
 // Last known quota for the current credentials (a token has its own), or null before the first GitHub call.
 export async function githubQuota(env){
+  env=await githubEnv(env);
   const q=safeJson(await getConfig(env,'github_rl'),null);
   if(!q||q.token!==(env.GITHUB_TOKEN?1:0))return null;
   const renewed=q.reset&&q.reset<=Date.now(); // the hour is over: the full allowance is back
@@ -241,13 +282,13 @@ export async function githubQuota(env){
 }
 async function checkedFetch(env,url,extra={}){
   const waiting=await githubBlockedUntil(env);
-  if(waiting)throw new SyncBlocked('GitHub rate limit: paused until '+iso(waiting)+'. No requests are sent before then.'+(env.GITHUB_TOKEN?'':' Configure GITHUB_TOKEN on this Worker to raise the limit.'),waiting);
+  if(waiting)throw new SyncBlocked('GitHub rate limit: paused until '+iso(waiting)+'. No requests are sent before then.'+(env.GITHUB_TOKEN?'':' Save a GitHub token in the app to raise the limit.'),waiting);
   const res=await fetch(url,{headers:{...headers(env),...extra},signal:AbortSignal.timeout(15000)});
   if(String(url).startsWith('https://api.github.com/'))await noteCall(env);
   await rememberQuota(env,url,res);
   if(res.status===304)return res;
   if(!res.ok){
-    if(res.status===401 && env.GITHUB_TOKEN) throw Error('GitHub rejected GITHUB_TOKEN (HTTP 401). Replace the Worker secret with a valid raw token (no Bearer prefix or quotes).');
+    if(res.status===401 && env.GITHUB_TOKEN) throw Error('GitHub rejected the token (HTTP 401). Replace the saved GitHub token or GITHUB_TOKEN Worker secret.');
     if(res.status===403 || res.status===429){
       const remaining=res.headers.get('x-ratelimit-remaining');
       const reset=Number(res.headers.get('x-ratelimit-reset')||0)*1000;
@@ -257,7 +298,7 @@ async function checkedFetch(env,url,extra={}){
         const guess=reset>Date.now()?reset:retry?Date.now()+retry:Date.now()+10*60000;
         const until=Math.min(Date.now()+2*3600000,Math.max(Date.now()+60000,guess));
         await setConfig(env,BLOCK_KEY,until+':'+tokenFlag(env));
-        throw new SyncBlocked('GitHub rate limited (HTTP '+res.status+'). Paused until '+iso(until)+'. '+(env.GITHUB_TOKEN?'Token is configured; check its rate limit.':'Configure GITHUB_TOKEN on this Worker: without a token GitHub allows only 60 requests/hour for a shared address.'),until);
+        throw new SyncBlocked('GitHub rate limited (HTTP '+res.status+'). Paused until '+iso(until)+'. '+(env.GITHUB_TOKEN?'Token is configured; check its rate limit.':'Save a GitHub token in the app (or configure GITHUB_TOKEN): without a token GitHub allows only 60 requests/hour for a shared address.'),until);
       }
       throw Error('GitHub access refused (HTTP '+res.status+'). '+(env.GITHUB_TOKEN?'Check token permissions.':'The repository may be private: add a GITHUB_TOKEN secret.'));
     }
@@ -272,7 +313,7 @@ export async function checkGitHubAccess(env){
   const configured=!!env.GITHUB_TOKEN;
   try {
     const res=await fetch('https://api.github.com/rate_limit',{headers:headers(env),signal:AbortSignal.timeout(15000)});
-    if(!res.ok) return {ok:false,configured,error:res.status===401?'GitHub rejected GITHUB_TOKEN (401). Replace the Worker secret with a valid raw token.':`GitHub access check failed (HTTP ${res.status}).`};
+    if(!res.ok) return {ok:false,configured,error:res.status===401?'GitHub rejected the token (401). Enter a valid raw personal access token.':`GitHub access check failed (HTTP ${res.status}).`};
     const data=await res.json();
     const core=data.resources?.core||data.rate||{};
     return {ok:true,configured,limit:Number(core.limit??0),remaining:Number(core.remaining??0),reset:core.reset?new Date(Number(core.reset)*1000).toISOString():''};
@@ -352,7 +393,7 @@ async function startSync(env,r,importMissing,force=false){
     // Fallback: the API. An unchanged branch answers 304, which GitHub does not count against the quota.
     const conditional=shortcut&&r.etag&&r.last_sha?{'If-None-Match':r.etag}:{};
     const first=await checkedFetch(env,prefix+'/commits/'+encodeURIComponent(r.ref),conditional).catch(e=>{
-      if(e&&e.status===404)throw Error(`Repository or branch not found: ${r.owner}/${r.repo} @ ${r.ref}.`+(env.GITHUB_TOKEN?'':' If the repository is private, add a GITHUB_TOKEN secret.'));
+      if(e&&e.status===404)throw Error(`Repository or branch not found: ${r.owner}/${r.repo} @ ${r.ref}.`+(env.GITHUB_TOKEN?'':' If the repository is private, save a GitHub token with access to it.'));
       throw e;
     });
     if(first.status===304)return upToDate(r.last_sha,r.etag);
@@ -522,6 +563,8 @@ export async function syncSkillRepo(env,id,{importMissing=false,force=false}={})
   const lease=await env.DB.prepare('UPDATE skill_repos SET sync_lock=? WHERE id=? AND sync_lock<?').bind(t,r.id,t-LOCK_MS).run();
   if(!lease.meta.changes)return {ok:true,running:true,busy:true,sha:r.sync_sha,done:Number(r.sync_done||0),total:Number(r.sync_total||0)};
   try{
+    env=await githubEnv(env);
+    if(env.github_token_error)throw Error(env.github_token_error);
     if(!r.sync_todo || r.sync_status!=='running'){
       const state=await startSync(env,r,importMissing,force);
       if(state.unchanged)return state;

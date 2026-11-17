@@ -15,7 +15,7 @@ import { COMPAT } from "./providers.js";
 import { delegate, getDelegation, saveDelegation } from "./delegate.js";
 import { BRIEF_FORM, GUIDE } from "./delegateguide.js";
 import { monitor } from "./monitor.js";
-import { addSkillRepo, githubBlockedUntil, githubQuota, listRepoFiles, listSkillRepos, previewRepoFile, removeRepoFile, removeSkillRepo, restoreRepoFile, setSkillRepoFilter, setSkillRepoSync, syncSkillRepo } from "./githubSkills.js";
+import { addSkillRepo, githubTokenStatus, saveGitHubToken, removeGitHubToken, githubBlockedUntil, githubQuota, listRepoFiles, listSkillRepos, previewRepoFile, removeRepoFile, removeSkillRepo, restoreRepoFile, setSkillRepoFilter, setSkillRepoSync, syncSkillRepo } from "./githubSkills.js";
 
 export async function settings(env) {
   const last = await env.DB.prepare("SELECT MAX(last_seen) AS last FROM services").first();
@@ -101,8 +101,10 @@ export async function api(request, env, url) {
   // GitHub repositories/skill sets: owner controls automatic daily update checks.
   if (p === "/api/skill-repos" && m === "GET") {
     const until = await githubBlockedUntil(env); // when GitHub asked every repo to wait
-    return json({repositories:await listSkillRepos(env),token_configured:!!env.GITHUB_TOKEN,blocked_until:until?new Date(until).toISOString():"",quota:await githubQuota(env)});
+    return json({repositories:await listSkillRepos(env),...await githubTokenStatus(env),blocked_until:until?new Date(until).toISOString():"",quota:await githubQuota(env)});
   }
+  if (p === '/api/github-token' && m === 'PUT') return withStatus(await saveGitHubToken(env, (await body(request)).token));
+  if (p === '/api/github-token' && m === 'DELETE') return withStatus(await removeGitHubToken(env));
   if (p === "/api/skill-repos" && m === "POST") return withStatus(await addSkillRepo(env,await body(request)));
   const fileRoute=p.match(/^\/api\/skill-repos\/([^/]+)\/(files|file|files\/remove|files\/restore)$/);
   if(fileRoute){

@@ -94,7 +94,7 @@ test('GitHub HTTP 403 distinguishes a missing token from an already configured t
  globalThis.fetch=async()=>new Response('rate limit',{status:403,headers:{'x-ratelimit-remaining':'0','x-ratelimit-reset':'1793749200'}});
  try{
   const unauthenticated=await syncSkillRepo(env,repo,{importMissing:true});
-  assert.match(unauthenticated.error,/Configure GITHUB_TOKEN/);
+  assert.match(unauthenticated.error,/Save a GitHub token in the app/);
   env.GITHUB_TOKEN='github_pat_fake_test';
   const authenticated=await syncSkillRepo(env,repo,{importMissing:true});
   assert.match(authenticated.error,/Token is configured/);

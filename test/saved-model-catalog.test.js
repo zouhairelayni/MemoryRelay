@@ -65,3 +65,56 @@ test('OpenAI catalog uses saved keys and retries another key without adding a ne
     assert.deepEqual(seen,['Bearer sk-expired-key','Bearer sk-valid-key']);
   } finally {globalThis.fetch=oldFetch;}
 });
+
+test('GitHub tokens are owner-only, encrypted, replaceable, and used by sync before the Worker secret', async () => {
+  const {api,call,env} = await setup();
+  const token = 'ghp_' + 'a'.repeat(36), replacement = 'github_pat_' + 'b'.repeat(40);
+  env.GITHUB_TOKEN = 'worker-fallback';
+  const oldFetch = globalThis.fetch, seen = [];
+  globalThis.fetch = async (url, opts = {}) => {
+    seen.push([String(url), opts.headers.Authorization]);
+    if (String(url).endsWith('/rate_limit')) return new Response(JSON.stringify({resources:{core:{limit:5000,remaining:4999}}}));
+    if (String(url).includes('/info/refs')) return new Response('', {status:404});
+    if (String(url).includes('/commits/main')) return new Response(JSON.stringify({sha:'a'.repeat(40),commit:{tree:{sha:'b'.repeat(40)}}}));
+    if (String(url).includes('/git/trees/')) return new Response(JSON.stringify({tree:[],truncated:false}));
+    throw Error('Unexpected request');
+  };
+  try {
+    assert.equal((await call('/api/github-token',{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify({token})})).status,401);
+    assert.equal((await call('/api/github-token',{method:'DELETE'})).status,401);
+    assert.equal((await api('/api/github-token','PUT',{token})).status,400);
+    env.KEY_SECRET = 'test-encryption-secret';
+    assert.equal((await api('/api/github-token','PUT',{token:'Bearer '+token})).status,400);
+    await env.DB.prepare("INSERT INTO config (key,value) VALUES ('github_blocked_until',?)").bind((Date.now()+3600000)+':1').run();
+    const saved = await api('/api/github-token','PUT',{token});
+    assert.equal(saved.status,200);
+    assert.ok(!(await saved.text()).includes(token));
+    const stored = await env.DB.prepare("SELECT value FROM config WHERE key='github_token'").first();
+    assert.match(stored.value,/^enc:v1:/);
+    assert.ok(!stored.value.includes(token));
+    const info = await (await api('/api/skill-repos')).json();
+    assert.equal(info.token_source,'database');
+    assert.equal(info.blocked_until,'');
+    assert.equal(info.token_configured,true);
+    const repo = await (await api('/api/skill-repos','POST',{repo:'owner/private'})).json();
+    assert.equal((await api('/api/skill-repos/'+encodeURIComponent(repo.id)+'/sync','POST',{})).status,200);
+    assert.ok(seen.some(([url,auth])=>url.includes('/commits/')&&auth==='Bearer '+token));
+    assert.ok(seen.some(([url,auth])=>url.includes('/info/refs')&&auth==='Basic '+btoa('x-access-token:'+token)));
+    assert.equal((await api('/api/github-token','PUT',{token:replacement})).status,200);
+    const {openKey} = await import('../worker/secrets.js');
+    assert.equal(await openKey(env,(await env.DB.prepare("SELECT value FROM config WHERE key='github_token'").first()).value),replacement);
+    // A rejected replacement must preserve the working saved token.
+    globalThis.fetch = async()=>new Response('',{status:401});
+    assert.equal((await api('/api/github-token','PUT',{token})).status,400);
+    assert.equal(await openKey(env,(await env.DB.prepare("SELECT value FROM config WHERE key='github_token'").first()).value),replacement);
+    delete env.KEY_SECRET;
+    const locked = await (await api('/api/skill-repos')).json();
+    assert.equal(locked.token_locked,true);
+    assert.equal(locked.token_configured,false);
+    assert.equal((await api('/api/skill-repos/'+encodeURIComponent(repo.id)+'/sync','POST',{})).status,400);
+    const removed = await (await api('/api/github-token','DELETE')).json();
+    assert.equal(removed.token_source,'worker');
+    assert.equal(removed.token_saved,false);
+    assert.equal(await env.DB.prepare("SELECT value FROM config WHERE key='github_token'").first(),null);
+  } finally { globalThis.fetch = oldFetch; }
+});

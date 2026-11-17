@@ -104,6 +104,8 @@ function RepoFiles({repoId,onChanged}){
 export default function GithubSources({active,onUpdated}) {
   const [rows,setRows]=useState([]);
   const [tokenConfigured,setTokenConfigured]=useState(null);
+  const [token,setToken]=useState("");
+  const [tokenState,setTokenState]=useState({});
   const [blockedUntil,setBlockedUntil]=useState("");
   const [quota,setQuota]=useState(null);
   const [repo,setRepo]=useState("");
@@ -117,7 +119,7 @@ export default function GithubSources({active,onUpdated}) {
   const draftOf=(r)=>drafts[r.id]||{file_types:r.file_types||["script","test"],root:r.root||"",path_filter:r.path_filter||"",max_kb:r.max_kb!==undefined && r.max_kb!==null && r.max_kb!==""?r.max_kb:750,adopt:!!r.adopt,update_mode:r.update_mode||"safe"};
   const setDraft=(r,patch)=>setDrafts(d=>({...d,[r.id]:{...draftOf(r),...patch}}));
   const [message,setMessage]=useState("");
-  const load=()=>skillRepos.info().then(({repositories,token_configured,blocked_until,quota:q})=>{setRows(repositories);setTokenConfigured(token_configured);setBlockedUntil(blocked_until||"");setQuota(q||null);return repositories;}).catch(e=>setMessage(e.message));
+  const load=()=>skillRepos.info().then(({repositories,token_configured,blocked_until,quota:q,...tokenInfo})=>{setTokenState(tokenInfo);setRows(repositories);setTokenConfigured(token_configured);setBlockedUntil(blocked_until||"");setQuota(q||null);return repositories;}).catch(e=>setMessage(e.message));
   // Refresh only while this screen is open AND the page is visible; a hidden tab must not keep calling the Worker.
   useEffect(()=>{
     if(!active)return undefined;
@@ -151,10 +153,20 @@ export default function GithubSources({active,onUpdated}) {
     </div></div>
     {quota?<p className="muted small" role="status">GitHub requests left this hour: <b>{quota.remaining}</b> of {quota.limit}{quota.reset?` · resets ${new Date(quota.reset).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}`:""}{quota.token?"":" · no token"}{quota.estimated?" (estimated)":""}
       {typeof quota.used_by_this_worker==="number"?<span> · this app sent {quota.used_by_this_worker} in the last hour{!quota.token&&quota.limit-quota.remaining-quota.used_by_this_worker>0?`, other apps sharing this address used ${quota.limit-quota.remaining-quota.used_by_this_worker}`:""}</span>:null}</p>:null}
-    {blockedUntil?<p className="small" role="alert" style={{color:"var(--danger, #b92a44)"}}>GitHub is limiting requests. Syncing is paused until {new Date(blockedUntil).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}.{tokenConfigured?"":" Adding a GITHUB_TOKEN secret removes this limit."}</p>:null}
-    <details className="repo-guide"><summary>GitHub token setup</summary>
-      <p className="muted small">Create a <a href="https://github.com/settings/personal-access-tokens/new?name=MemoryRelay%20Skill%20Sync&amp;contents=read&amp;expires_in=90" target="_blank" rel="noopener noreferrer">fine-grained personal access token</a> in GitHub with <strong>Contents: Read-only</strong> and <strong>Metadata: Read-only</strong> (automatic). Use 90-day expiry or your preferred rotation. Public repositories are readable; select private repositories only if necessary.</p>
-      <p className="muted small">Cloudflare → Workers &amp; Pages → MemoryRelay Worker → Settings → Variables and Secrets → Add. Name <code>GITHUB_TOKEN</code>, type <strong>Secret</strong>, paste your token, then deploy the setting. Never paste a token here or commit it to GitHub. Authenticated GitHub API calls have a higher rate limit.</p>
+    {blockedUntil?<p className="small" role="alert" style={{color:"var(--danger, #b92a44)"}}>GitHub is limiting requests. Syncing is paused until {new Date(blockedUntil).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}.{tokenConfigured?"":" Save a GitHub token below to use an authenticated quota."}</p>:null}
+    <details className="repo-guide"><summary>GitHub token</summary>
+      <p className="muted small">{tokenState.token_saved ? "A token is saved in the database." : tokenState.token_source === "worker" ? "Using the GITHUB_TOKEN Worker secret. A token saved here takes priority." : "Save a personal access token to increase your GitHub quota and sync private repositories."}</p>
+      {tokenState.token_locked?<p className="small" role="alert">The saved token cannot be decrypted. Restore KEY_SECRET on the Worker, or replace the token.</p>:null}
+      {!tokenState.token_storage_ready?<p className="small" role="alert">Set KEY_SECRET in your Worker secrets to enable encrypted token storage.</p>:null}
+      <form className="row" style={{gap:8,flexWrap:"wrap"}} onSubmit={e=>{e.preventDefault();perform("token",async()=>{const result=await skillRepos.saveToken(token);setToken("");return result;});}}>
+        <label className="small">GitHub personal access token
+          <input className="fld" type="password" autoComplete="new-password" spellCheck={false} value={token} onChange={e=>setToken(e.target.value)} placeholder={tokenState.token_saved?"Enter a replacement token":"ghp_… or github_pat_…"} disabled={!!busy}/>
+        </label>
+        <button className="btn" type="submit" disabled={!!busy||!token.trim()||!tokenState.token_storage_ready}>{busy==="token"?"Saving…":tokenState.token_saved?"Replace token":"Save token"}</button>
+        {tokenState.token_saved?<button className="btn" type="button" disabled={!!busy} onClick={()=>perform("remove-token",()=>skillRepos.removeToken())}>Remove saved token</button>:null}
+      </form>
+      <p className="muted small">Classic and fine-grained tokens are supported. For a fine-grained token, grant Contents: Read-only for the repositories you want to sync. The token is checked before saving and stored encrypted. Removing it falls back to the Worker secret, if configured.</p>
+      <p className="muted small"><a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer">Manage GitHub tokens</a></p>
     </details>
     {rows.map(r=><div key={r.id} className="stack" style={{borderTop:"1px solid var(--line)",paddingTop:12,gap:6}}>
       <div className="row" style={{justifyContent:"space-between",alignItems:"center"}}>

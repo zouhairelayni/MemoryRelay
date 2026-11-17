@@ -57,6 +57,8 @@ export const backup = {
 };
 
 export const skillRepos = {
+  saveToken: (token) => put("/api/github-token", {token}),
+  removeToken: () => del("/api/github-token"),
   list: () => get("/api/skill-repos").then(d=>d.repositories),
   info: () => get("/api/skill-repos"),
   add: (repo, root, ref, names, options={}) => post("/api/skill-repos", {repo,root,ref,names,...options}),
