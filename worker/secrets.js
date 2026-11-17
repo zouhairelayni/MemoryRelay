@@ -63,5 +63,11 @@ export async function sealAllKeys(env) {
     const rows = (await env.DB.prepare(`SELECT id, key FROM ${table} WHERE key NOT LIKE 'enc:v1:%'`).all()).results;
     for (const r of rows) { await env.DB.prepare(`UPDATE ${table} SET key = ? WHERE id = ?`).bind(await sealKey(env, r.key), r.id).run(); n++; }
   }
+  const github = await env.DB.prepare("SELECT value FROM config WHERE key = 'github_token'").first();
+  if (github && !isSealed(github.value)) {
+    const result = await env.DB.prepare("UPDATE config SET value = ? WHERE key = 'github_token' AND value = ?")
+      .bind(await sealKey(env, github.value), github.value).run();
+    n += result.meta.changes;
+  }
   return n;
 }

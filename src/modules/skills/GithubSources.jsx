@@ -155,17 +155,17 @@ export default function GithubSources({active,onUpdated}) {
       {typeof quota.used_by_this_worker==="number"?<span> · this app sent {quota.used_by_this_worker} in the last hour{!quota.token&&quota.limit-quota.remaining-quota.used_by_this_worker>0?`, other apps sharing this address used ${quota.limit-quota.remaining-quota.used_by_this_worker}`:""}</span>:null}</p>:null}
     {blockedUntil?<p className="small" role="alert" style={{color:"var(--danger, #b92a44)"}}>GitHub is limiting requests. Syncing is paused until {new Date(blockedUntil).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}.{tokenConfigured?"":" Save a GitHub token below to use an authenticated quota."}</p>:null}
     <details className="repo-guide"><summary>GitHub token</summary>
-      <p className="muted small">{tokenState.token_saved ? "A token is saved in the database." : tokenState.token_source === "worker" ? "Using the GITHUB_TOKEN Worker secret. A token saved here takes priority." : "Save a personal access token to increase your GitHub quota and sync private repositories."}</p>
+      <p className="muted small">{tokenState.token_saved ? (tokenState.token_encrypted ? "A token is saved encrypted in the database." : "A token is saved unencrypted in the database.") : tokenState.token_source === "worker" ? "Using the GITHUB_TOKEN Worker secret. A token saved here takes priority." : "Save a personal access token to increase your GitHub quota and sync private repositories."}</p>
       {tokenState.token_locked?<p className="small" role="alert">The saved token cannot be decrypted. Restore KEY_SECRET on the Worker, or replace the token.</p>:null}
-      {!tokenState.token_storage_ready?<p className="small" role="alert">Set KEY_SECRET in your Worker secrets to enable encrypted token storage.</p>:null}
+      {!tokenState.token_encryption_enabled?<p className="small" role="status">Encryption is off. Tokens saved here will be stored unencrypted in the database. Set KEY_SECRET in your Worker secrets to enable encryption.</p>:null}
       <form className="row" style={{gap:8,flexWrap:"wrap"}} onSubmit={e=>{e.preventDefault();perform("token",async()=>{const result=await skillRepos.saveToken(token);setToken("");return result;});}}>
         <label className="small">GitHub personal access token
           <input className="fld" type="password" autoComplete="new-password" spellCheck={false} value={token} onChange={e=>setToken(e.target.value)} placeholder={tokenState.token_saved?"Enter a replacement token":"ghp_… or github_pat_…"} disabled={!!busy}/>
         </label>
-        <button className="btn" type="submit" disabled={!!busy||!token.trim()||!tokenState.token_storage_ready}>{busy==="token"?"Saving…":tokenState.token_saved?"Replace token":"Save token"}</button>
+        <button className="btn" type="submit" disabled={!!busy||!token.trim()}>{busy==="token"?"Saving…":tokenState.token_saved?"Replace token":"Save token"}</button>
         {tokenState.token_saved?<button className="btn" type="button" disabled={!!busy} onClick={()=>perform("remove-token",()=>skillRepos.removeToken())}>Remove saved token</button>:null}
       </form>
-      <p className="muted small">Classic and fine-grained tokens are supported. For a fine-grained token, grant Contents: Read-only for the repositories you want to sync. The token is checked before saving and stored encrypted. Removing it falls back to the Worker secret, if configured.</p>
+      <p className="muted small">Classic and fine-grained tokens are supported. For a fine-grained token, grant Contents: Read-only for the repositories you want to sync. The token is checked before saving. Encryption at rest is optional, as with the app’s other API keys. Removing it falls back to the Worker secret, if configured.</p>
       <p className="muted small"><a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer">Manage GitHub tokens</a></p>
     </details>
     {rows.map(r=><div key={r.id} className="stack" style={{borderTop:"1px solid var(--line)",paddingTop:12,gap:6}}>

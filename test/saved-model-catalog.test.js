@@ -82,7 +82,6 @@ test('GitHub tokens are owner-only, encrypted, replaceable, and used by sync bef
   try {
     assert.equal((await call('/api/github-token',{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify({token})})).status,401);
     assert.equal((await call('/api/github-token',{method:'DELETE'})).status,401);
-    assert.equal((await api('/api/github-token','PUT',{token})).status,400);
     env.KEY_SECRET = 'test-encryption-secret';
     assert.equal((await api('/api/github-token','PUT',{token:'Bearer '+token})).status,400);
     await env.DB.prepare("INSERT INTO config (key,value) VALUES ('github_blocked_until',?)").bind((Date.now()+3600000)+':1').run();
@@ -117,4 +116,37 @@ test('GitHub tokens are owner-only, encrypted, replaceable, and used by sync bef
     assert.equal(removed.token_saved,false);
     assert.equal(await env.DB.prepare("SELECT value FROM config WHERE key='github_token'").first(),null);
   } finally { globalThis.fetch = oldFetch; }
+});
+
+
+test('GitHub token saving works without KEY_SECRET and enabling encryption migrates the saved token', async () => {
+  const {api,env} = await setup();
+  const token = 'ghp_' + 'c'.repeat(36);
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({resources:{core:{limit:5000,remaining:4999}}}));
+  try {
+    const response = await api('/api/github-token','PUT',{token});
+    assert.equal(response.status,200);
+    const text = await response.text();
+    assert.ok(!text.includes(token));
+    const state = JSON.parse(text);
+    assert.equal(state.token_saved,true);
+    assert.equal(state.token_configured,true);
+    assert.equal(state.token_encrypted,false);
+    assert.equal(state.token_encryption_enabled,false);
+    const readStored = async () => (await env.DB.prepare("SELECT value FROM config WHERE key='github_token'").first()).value;
+    assert.equal(await readStored(),token);
+    const info = await (await api('/api/skill-repos')).json();
+    assert.equal(info.token_saved,true);
+    assert.equal(info.token_encrypted,false);
+    assert.ok(!JSON.stringify(info).includes(token));
+    assert.ok(!(await (await api('/api/export')).text()).includes(token));
+    env.KEY_SECRET = 'enable-encryption-later';
+    const {sealAllKeys,openKey} = await import('../worker/secrets.js');
+    assert.equal(await sealAllKeys(env),1);
+    assert.match(await readStored(),/^enc:v1:/);
+    assert.equal(await openKey(env,await readStored()),token);
+    assert.equal(await sealAllKeys(env),0);
+    assert.equal((await (await api('/api/skill-repos')).json()).token_encrypted,true);
+  } finally { globalThis.fetch = originalFetch; }
 });

@@ -1,7 +1,7 @@
 // Owner-managed GitHub skill sets. Sync never executes downloaded code.
 import { now } from './util.js';
 import { getConfig, setConfig } from './db.js';
-import { sealKey, openKey, LOCKED_MESSAGE } from './secrets.js';
+import { sealKey, openKey, isSealed, LOCKED_MESSAGE } from './secrets.js';
 import { parseSkill, scanSkill, toSkillMd } from './skills.js';
 
 const TOKEN_KEY = 'github_token';
@@ -14,15 +14,16 @@ async function githubEnv(env) {
 }
 
 export async function githubTokenStatus(env) {
-  const saved = !!await getConfig(env, TOKEN_KEY);
+  const stored = await getConfig(env, TOKEN_KEY);
+  const saved = !!stored;
   const effective = await githubEnv(env);
   return {token_configured: !!effective.GITHUB_TOKEN, token_saved: saved,
-    token_locked: !!effective.github_token_error, token_storage_ready: !!env.KEY_SECRET,
+    token_locked: !!effective.github_token_error, token_encryption_enabled: !!env.KEY_SECRET,
+    token_encrypted: saved && isSealed(stored),
     token_source: saved ? 'database' : env.GITHUB_TOKEN ? 'worker' : ''};
 }
 
 export async function saveGitHubToken(env, value) {
-  if (!env.KEY_SECRET) return {error: 'Configure KEY_SECRET on this Worker before saving a GitHub token. It encrypts the token in the database.'};
   const token = typeof value === 'string' ? value.trim() : '';
   if (!/^(ghp_[A-Za-z0-9]{20,255}|github_pat_[A-Za-z0-9_]{20,255})$/.test(token)) return {error: 'Enter a raw GitHub classic or fine-grained personal access token, without quotes or a Bearer prefix.'};
   const check = await checkGitHubAccess({...env, GITHUB_TOKEN: token});
