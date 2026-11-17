@@ -28,7 +28,7 @@ function FileOptions({value,onChange,disabled,showRoot=false}){
       {Object.entries(TYPE_LABELS).map(([k,label])=><label key={k} className="row small" style={{gap:6,alignItems:"center"}}><input type="checkbox" disabled={disabled} checked={value.file_types.includes(k)} onChange={()=>toggle(k)}/>{label}</label>)}
     </div>
     <textarea className="fld" rows={3} disabled={disabled} aria-label="Path filter" placeholder={"Path filter, one pattern per line (blank = all)\nscripts/**\n*.mjs\n!**/fixtures/**"} value={value.path_filter} onChange={e=>onChange({path_filter:e.target.value})}/>
-    <label className="row small" style={{gap:8,alignItems:"center"}}>Largest file <input className="fld" type="number" min="50" max="1000" style={{width:90}} disabled={disabled} value={value.max_kb===""?"":value.max_kb} onChange={e=>{const v=e.target.value.trim();if(v===""){onChange({max_kb:""});return;}const n=Number(v);if(Number.isNaN(n))return;onChange({max_kb:n<50?50:n>1000?1000:n});}} onBlur={e=>{if(e.target.value.trim()==="")onChange({max_kb:750});}}/>> KB (up to 1000)</label>
+    <label className="row small" style={{gap:8,alignItems:"center"}}>Largest file <input className="fld" type="number" min="50" max="1000" style={{width:90}} disabled={disabled} placeholder="750" value={value.max_kb} onChange={e=>onChange({max_kb:e.target.value})}/> KB (50–1000; blank = 750)</label>
     <label className="row small" style={{gap:8,alignItems:"center",flexWrap:"wrap"}}>Automatic updates
       <select className="fld" disabled={disabled} value={value.update_mode||"safe"} onChange={e=>onChange({update_mode:e.target.value})}>
         <option value="safe">Hold risky changes for my review</option>
