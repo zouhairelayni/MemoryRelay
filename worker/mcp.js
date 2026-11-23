@@ -11,6 +11,7 @@ import { delegate } from "./delegate.js";
 import { BRIEF_FORM, GUIDE } from "./delegateguide.js";
 import { rateLimit } from "./limits.js";
 import { getMemoryLimit } from "./memorySettings.js";
+import { AGENT_MEMORY_GUIDANCE } from "./memoryFormat.js";
 import { tally } from "./metering.js";
 
 // Errors whose message is safe to show to an agent. Anything else becomes a generic "internal error".
@@ -24,7 +25,7 @@ const TOOL_BY_NAME = new Map(TOOLS.map((t) => [t.name, t]));
 export function describedTools(limit, svc) {
   return TOOLS.filter((t) => mayCall(svc, t.name)).map((t) => {
     if (t.name !== "remember" && t.name !== "update_memory") return t;
-    return { ...t, description: t.description + ` Current memory context limit: ${limit} estimated tokens, including rules memories; changes in owner settings take effect immediately.`,
+    return { ...t, description: t.description + ` Current owner-configured memory limit: ${limit} estimated tokens per memory (NOT characters), including rule memories. Owner Settings apply immediately; call get_memory_settings to read current allowance. ${AGENT_MEMORY_GUIDANCE}`,
       inputSchema: { ...t.inputSchema, properties: { ...t.inputSchema.properties, text: { ...t.inputSchema.properties.text, description: `Up to ${limit} estimated tokens (UTF-8 estimate; model tokenizers vary).` } } } };
   });
 }
@@ -60,7 +61,7 @@ export function validateArgs(schema, input) {
 
 export async function callTool(env, name, a, agentName = "", svc = null) {
   switch (name) {
-    case "get_memory_settings": return { max_tokens: await getMemoryLimit(env), units: "estimated_tokens", note: "Conservative UTF-8 estimate; model-specific tokenizers vary. Owner changes take effect immediately." };
+    case "get_memory_settings": return { max_tokens: await getMemoryLimit(env), units: "estimated_tokens", note: "Conservative UTF-8 estimate; model-specific tokenizers vary. Owner changes take effect immediately. " + AGENT_MEMORY_GUIDANCE };
     case "get_skill_template": return { template: SKILL_TEMPLATE, max_tokens: 5000, note: "Keep the description to the trigger. Put detail in Steps and Rules. Or call draft_skill to have the built-in AI write one." };
     case "upload_skill": return uploadSkillFromAgent(env, a.skill_md, (svc && svc.name) || agentName);
     case "draft_skill": {
@@ -154,7 +155,7 @@ async function dispatch(msg, env, stats, svc) {
     if (stats) stats.app = [ci.name, ci.version].filter(Boolean).map(String).join(" ").slice(0, 60);
     const protocolVersion = PROTOCOLS.includes(params.protocolVersion) ? params.protocolVersion : PROTOCOLS[0];
     return ok({ protocolVersion, capabilities: { tools: { listChanged: false } },
-      instructions: `MemoryRelay memory length: ${memoryLimit} estimated tokens per memory (owner-configurable). Before starting any task, call select_skills with the user's request word for word. Follow only the skills it returns. If the user names a skill, call get_skill with that exact name; list_skills shows what exists. Never tell the user a skill does not exist before checking list_skills. To save your own usage limits, hand self-contained coding jobs (snippets, functions, small features, tests, reviews) to delegate (call get_delegation_brief once for the brief form and the review checklist); it runs them on other models and returns a checked result that you must still verify. To add a skill, call draft_skill (AI writes it) or get_skill_template (write it yourself, max 5000 tokens), then call upload_skill. Uploads wait for owner approval.`,
+      instructions: `MemoryRelay memory length: ${memoryLimit} estimated tokens per memory (owner-configurable; not characters). ${AGENT_MEMORY_GUIDANCE} Before starting any task, call select_skills with the user's request word for word. Follow only the skills it returns. If the user names a skill, call get_skill with that exact name; list_skills shows what exists. Never tell the user a skill does not exist before checking list_skills. To save your own usage limits, hand self-contained coding jobs (snippets, functions, small features, tests, reviews) to delegate (call get_delegation_brief once for the brief form and the review checklist); it runs them on other models and returns a checked result that you must still verify. To add a skill, call draft_skill (AI writes it) or get_skill_template (write it yourself, max 5000 tokens), then call upload_skill. Uploads wait for owner approval.`,
       serverInfo: { name: "my-memory", version: SERVER_VERSION } });
   }
   if (method === "ping") return ok({});

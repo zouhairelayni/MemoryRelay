@@ -1,5 +1,6 @@
 import Icon from "../components/Icon.jsx";
 import Logo from "../components/Logo.jsx";
+import PwaRefresh from "./PwaRefresh.jsx";
 
 export default function TopBar({ onSettings }) {
   return (
@@ -9,6 +10,7 @@ export default function TopBar({ onSettings }) {
         <span className="brand">Memory Relay</span>
         <span className="brand-context">Control workspace</span>
       </div>
+      <PwaRefresh />
       <button type="button" className="ib lg" id="open-settings" onClick={onSettings} aria-label="Open settings" title="Settings"><Icon name="gear" size={22} /></button>
     </header>
   );

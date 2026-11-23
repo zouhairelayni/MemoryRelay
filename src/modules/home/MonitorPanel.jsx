@@ -1,6 +1,7 @@
-import {useEffect,useMemo,useRef,useState} from 'react';
+import {useEffect,useMemo,useState} from 'react';
 import {monitoring} from '../../api/endpoints.js';
 import ActivityChart from './ActivityChart.jsx';
+import MetricDropdown from './MetricDropdown.jsx';
 
 const fmt=n=>Intl.NumberFormat().format(Number(n)||0);
 const time=ts=>new Date(ts).toLocaleString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
@@ -35,9 +36,6 @@ function Heat({hourly}){
 }
 export default function MonitorPanel({active}) {
   const [period,setPeriod]=useState('30'),[metric,setMetric]=useState('mcp'),[data,setData]=useState(null),[error,setError]=useState('');
-  const metricSelect = useRef(null);
-  const [nativePicker,setNativePicker]=useState(()=>typeof HTMLSelectElement !== 'undefined' && typeof HTMLSelectElement.prototype.showPicker==='function');
-  const openMetricPicker=()=>{try{metricSelect.current.showPicker();}catch{setNativePicker(false);metricSelect.current?.focus();}};
   useEffect(()=>{if(!active)return;let alive=true;setData(null);
     const load=()=>monitoring.get(period).then(d=>{if(alive){setData(d);setError('');}}).catch(e=>{if(alive)setError(e.message)});
     load();const id=setInterval(load,8000);return()=>{alive=false;clearInterval(id)};
@@ -58,6 +56,9 @@ export default function MonitorPanel({active}) {
     return {buckets,totals,byMetric,byAction};
   },[data]);
   const totals=useMemo(()=>METRICS.map(([id,label])=>({id,label,count:(data?.totals||[]).reduce((n,row)=>n+measure(row,id),0)})),[data]);
+  const primaryMetrics=useMemo(()=>["mcp","tokens","skill","errors"].map(id=>totals.find(x=>x.id===id)).filter(Boolean),[totals]);
+  const supportingMetrics=useMemo(()=>totals.filter(x=>!["mcp","tokens","skill","errors"].includes(x.id)),[totals]);
+  const metricCard=({id,label,count})=><div key={id} className={`monitor-metric metric-${id}`}><span className="monitor-metric-label">{label}</span><b>{fmt(count)}</b><span className="monitor-metric-meta">{data.label} <span aria-hidden="true">↗</span></span></div>;
   const timeLabels=useMemo(()=>timeline.buckets.map(t=>new Date(t).toLocaleString(undefined,
     period==='1h'||period==='1d'?{hour:'2-digit',minute:'2-digit'}:{month:'short',day:'numeric'})),[timeline.buckets,period]);
   const functionRows=useMemo(()=>(data?.totals||[]).filter(x=>Number(x.n)>0),[data]);
@@ -70,43 +71,35 @@ export default function MonitorPanel({active}) {
     metric.slice(3).replace(':',' / '):METRICS.find(([id])=>id===metric)?.[1]||'MCP calls';
   const jobs=data?.jobs||[],activeJobs=jobs.filter(j=>j.state==='running');
   return <section className="monitor-root" aria-label="Activity monitoring">
-    <div className="monitor-header"><div><h3>Activity</h3><p className="muted small">Recorded usage. AI token counts are estimates, not billing totals.</p></div>
-      <select className="fld" aria-label="Activity period" value={period} onChange={e=>{setPeriod(e.target.value);setMetric('mcp')}}>
-        <option value="1h">1 hour</option><option value="1d">1 day</option><option value="7">7 days</option><option value="30">30 days</option><option value="90">90 days</option>
-      </select></div>
+    <div className="monitor-header"><div><span className="dash-eyebrow">PERFORMANCE</span><h3>Usage at a glance</h3><p className="muted small">All figures reflect recorded activity, not billing totals.</p></div>
+      <div className="monitor-period" role="group" aria-label="Activity period">{[["1h","1h"],["1d","24h"],["7","7d"],["30","30d"],["90","90d"]].map(([value,label])=><button key={value} type="button" className={period===value?"on":""} aria-pressed={period===value} onClick={()=>{setPeriod(value);setMetric("mcp");}}>{label}</button>)}</div></div>
     {error?<p className="small" role="alert">Unable to load activity: {error}</p>:null}
     {!data?<p className="muted small">Loading activity…</p>:<>
       <div className="monitor-metrics">
-        {totals.map(({id,label,count})=><div key={id} className="monitor-metric"><span>{label}</span><b>{fmt(count)}</b></div>)}
+        {primaryMetrics.map(metricCard)}
       </div>
-      <div className="card monitor-figure">
-        <div className="monitor-chart-title"><div><h4>Activity trend</h4><p className="muted small">{data.label} · Recorded data, not cumulative totals</p></div>
-          <div className="meter-native-picker">
-          {nativePicker?<button type="button" className="fld meter-native-trigger" aria-label={`Choose chart metric. Current: ${selectedLabel}`} onClick={openMetricPicker}>{selectedLabel} <span aria-hidden="true">▾</span></button>:null}
-          <select ref={metricSelect} className={`fld${nativePicker?" meter-native-select-hidden":""}`} tabIndex={nativePicker?-1:0} aria-label="Chart metric" value={metric} onChange={e=>setMetric(e.target.value)}>
-            <option value="all">All recorded events</option>
-            <optgroup label="Metrics">{METRICS.map(([id,name])=><option key={id} value={id}>{name}</option>)}</optgroup>
-            <optgroup label="Functions">{functionRows.map(x=><option key={`${x.category}:${x.action}`} value={`fn:${x.category}:${x.action}`}>{x.category} / {x.action}</option>)}</optgroup>
-          </select>
-          </div>
+      <div className="card monitor-figure monitor-figure-primary">
+        <div className="monitor-chart-title"><div><span className="dash-eyebrow">ACTIVITY INSIGHTS</span><h4>Activity trend</h4><p className="muted small">{data.label} · Recorded data, not cumulative totals</p></div>
+          <MetricDropdown value={metric} onChange={setMetric} metrics={METRICS} functions={functionRows}/>
         </div>
         <ActivityChart type="line" labels={timeLabels} values={plotValues} label={`${selectedLabel} over ${data.label}`} unit={metric==='tokens'?'tokens':metric==='skill'?'selections':metric==='delegate'?'tasks':metric==='errors'?'errors':'calls'}/>
         {period==='1h'||period==='1d'?null:<><h4>Hourly activity (UTC)</h4><Heat hourly={data.hourly}/></>}
       </div>
-      <div className="card monitor-figure"><div className="monitor-chart-title"><h4>Most used functions</h4><span className="muted small">Top {topFunctions.length} in {data.label}</span></div>
+      <div className="monitor-supporting"><div className="monitor-secondary-label"><span className="dash-eyebrow">MORE USAGE SIGNALS</span></div><div className="monitor-metrics monitor-metrics-secondary">{supportingMetrics.map(metricCard)}</div></div>
+      <div className="card monitor-figure monitor-functions"><div className="monitor-chart-title"><h4>Most used functions</h4><span className="muted small">Top {topFunctions.length} in {data.label}</span></div>
         {topFunctions.length?<ActivityChart type="bar" labels={functionNames} values={functionCounts} label="Most used functions"/>:<p className="muted small">No functions recorded for this period.</p>}
         <details className="monitor-details"><summary>All recorded functions ({functionRows.length})</summary>
           <div className="monitor-function-list">{functionRows.map(x=><div key={`${x.category}:${x.action}`} className="monitor-breakdown"><span>{x.category} / {x.action}</span><b>{fmt(x.n)}</b></div>)}</div>
         </details>
       </div>
-      <div className="card monitor-figure" aria-live="polite"><div className="monitor-chart-title"><h4>Subagent tasks</h4><span className="muted small">{activeJobs.length} running</span></div>
+      <div className="card monitor-figure monitor-agent-jobs" aria-live="polite"><div className="monitor-chart-title"><h4>Subagent tasks</h4><span className="muted small">{activeJobs.length} running</span></div>
         {activeJobs.map(j=><div key={j.id} className="job-row"><div className="row" style={{alignItems:'center',gap:8}}><span className="job-dot"/><b>{j.agent}</b><span className="muted small">{j.provider||'Finding a model'} {j.model}</span></div><p>{j.task_summary||'Task summary unavailable'}</p><small className="muted">{j.kind} · Started {time(j.ts)} · <RunningElapsed start={j.ts}/></small></div>)}
         {!activeJobs.length?<p className="muted small">No subagents currently running.</p>:null}
         <details className="monitor-details"><summary>Completed and failed tasks ({jobs.length-activeJobs.length})</summary>
           {jobs.filter(j=>j.state!=='running').slice(0,25).map(j=><div className="job-row" key={j.id}><b>{j.agent} · {j.state||'Completed'}</b><p>{j.task_summary||'Task summary was not recorded'}</p><small className="muted">{j.provider} {j.model} · {j.kind} · {time(j.ts)} · {elapsed(j.ms)} · {fmt(Number(j.tokens_in)+Number(j.tokens_out))} estimated tokens</small>{j.error?<p className="small" role="alert">{j.error}</p>:null}</div>)}
         </details>
       </div>
-      <div className="card monitor-figure"><h4>Errors and recent calls</h4>
+      <div className="card monitor-figure monitor-recent"><h4>Errors and recent calls</h4>
         <details className="monitor-details"><summary>Errors ({data.errors.length} recent)</summary>
           {data.errors.length?data.errors.map((e,i)=><div key={i} className="job-row"><b>{e.error_code||'ERROR'} · {e.action}</b><p>{e.error_message||'Request failed'}</p><small className="muted">{time(e.ts)}</small></div>):<p className="muted small">No recent recorded errors.</p>}
         </details>

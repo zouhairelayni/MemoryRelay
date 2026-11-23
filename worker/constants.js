@@ -5,13 +5,13 @@ export const SESSION_DAYS = 14;
 export const PBKDF2_ITER = 100000;
 export const MAX_CALLS = 8; // Workers subrequest budget per request
 export const RETRYABLE = new Set([0, 500, 502, 503, 504]); // 0 = could not reach Gemini at all
-export const BUILD = "2026-11-23.1-memory-config-pwa";
+export const BUILD = "2026-11-23.2-aurora-dashboard-markdown";
 export const MAX_MEMORIES = 5000;        // library cap, stops a looping agent from filling the database
 export const MAX_TAGS = 5;
 export const MAX_ARG_CHARS = 100000;     // largest single string an agent may send
 export const MCP_PER_MINUTE = 300;       // requests per connection
 export const PROTOCOLS = ["2025-06-18", "2025-03-26", "2024-11-05"];
-export const SERVER_VERSION = "3.3.0";
+export const SERVER_VERSION = "3.3.8";
 export const ACCESS = ["read", "write", "full"];   // what a connection may do
 export const ACCESS_RANK = { read: 1, write: 2, full: 3 };
 export const ACCESS_LABEL = { read: "Read only", write: "Read and write", full: "Full access" };
@@ -25,7 +25,7 @@ export const TOOLS = [
     description: "Read the current owner-configured per-memory estimated-token limit. Changes in dashboard Settings apply instantly to MCP storage and search.",
     inputSchema: { type: "object", properties: {} } },
   { name: "remember", annotations: T("Save a memory", { idempotentHint: true }),
-    description: "Save ONE self-contained fact, preference, or decision. The owner-configured estimated-token limit is returned by tools/list. Never paste whole conversations. Skips duplicates.",
+    description: "Save ONE self-contained fact, preference, or decision, formatted with **Title** and - *Label:* bullets. Use ```bash fenced blocks for copyable commands. The owner-configured estimated-token limit is returned by tools/list and get_memory_settings. Never paste secrets or whole conversations. Skips duplicates.",
     inputSchema: { type: "object", properties: { text: { type: "string" }, tags: { type: "string" } }, required: ["text"] } },
   { name: "search", annotations: T("Search memories", { readOnlyHint: true, idempotentHint: true }),
     description: "Find memories containing all the query words (max 20 short results). Use before answering questions about the user.",
@@ -34,7 +34,7 @@ export const TOOLS = [
     description: "Show the most recent memories (max 20). Use only when the user asks what was saved recently.",
     inputSchema: { type: "object", properties: { n: { type: "integer" } } } },
   { name: "update_memory", annotations: T("Update a memory", { destructiveHint: true, idempotentHint: true }),
-    description: "Change an existing memory by id. Pass only the fields to change. The old text is kept in history.",
+    description: "Change an existing memory by id. Pass only the fields to change. For text use **Title**, - *Label:* bullets, and ```bash blocks for copyable commands. The old text is kept in history.",
     inputSchema: { type: "object", properties: { memory_id: { type: "string" }, text: { type: "string" }, tags: { type: "string" } }, required: ["memory_id"] } },
   { name: "forget", annotations: T("Delete a memory", { destructiveHint: true, idempotentHint: true }),
     description: "Delete one memory by id.",

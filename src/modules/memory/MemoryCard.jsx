@@ -4,6 +4,8 @@ import Collapse from "../../components/Collapse.jsx";
 import Icon from "../../components/Icon.jsx";
 import Brand from "../../components/Brand.jsx";
 import MemoryEditor from "./MemoryEditor.jsx";
+import MemoryMarkdown from "./MemoryMarkdown.jsx";
+import { memoryTitle } from "../../lib/memoryMarkdown.js";
 import { hasRule, splitTags } from "../../lib/format.js";
 import { sourceInfo } from "../../lib/cable.js";
 
@@ -27,14 +29,18 @@ export default function MemoryCard({ m, editing, onEdit, onCancel, onSave, onDel
   }
   return (
     <div className={"mem" + (open ? " open" : "") + (rule ? " is-rule" : "")} style={{ "--cable": src.agent ? src.color : "transparent" }}>
-      <button type="button" className="mem-main" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
-        <span className="mt">{m.text}</span>
+      <div className="mem-main">
+        <button type="button" className="mem-preview" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+          <span className="mem-preview-title">{memoryTitle(m.text)}</span>
+          <span className="mem-preview-action">{open ? "Collapse" : "Read memory"} <span aria-hidden="true">{open?"⌃":"⌄"}</span></span>
+        </button>
+        {open ? <div className="mem-detail"><MemoryMarkdown text={m.text}/></div> : <p className="mem-preview-snippet">{m.text.replace(/[`*_#>]/g, "").replace(/\s+/g," ").slice(0,156)}</p>}
         <span className="meta">
           {rule ? <span className="tag-rule"><Icon name="lock" size={13} />Rule</span> : <span className="src">{src.agent ? <Brand names={[src.name]} size={18} cable={src.color} /> : <i className="cd" style={{ "--cable": src.color }} />}{src.name}</span>}
           {tags.map((t) => <span key={t}>#{t}</span>)}
           <span>{m.time}</span>
         </span>
-      </button>
+      </div>
       <Collapse open={open}>
         <div className="mem-acts">
           <span className="id mono">{m.id}</span>

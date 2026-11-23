@@ -15,6 +15,6 @@ export default function PwaRefresh() {
     return () => { display.removeEventListener?.("change", sync); window.removeEventListener("pageshow", sync); };
   }, []);
   if (!installed) return null;
-  return <button type="button" className="pwa-refresh" aria-label="Refresh installed app" title="Refresh app"
+  return <button type="button" className="ib lg pwa-refresh" aria-label="Refresh installed app" title="Refresh app"
     onClick={() => window.location.reload()}><Icon name="refresh" size={21}/></button>;
 }

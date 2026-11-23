@@ -40,7 +40,8 @@ test("settings default to 1000 estimated tokens; owner changes are immediately a
   const saved = await tool("remember", { text: long });
   assert.match(saved, /^saved /);
   const recent = JSON.parse(await tool("recent", { n: 1 }));
-  assert.equal(recent.results[0].text, long.trim(), "the MCP retrieval must not truncate at 500 characters");
+  assert.match(recent.results[0].text, /^\*\*[^\n]+\*\*\n- \*Detail:\*/);
+  assert.ok(recent.results[0].text.includes(long.trim()), "the MCP retrieval must not truncate the original text");
 
   assert.equal((await api("/api/memory-settings", "PUT", { max_tokens: 300 })).status, 200);
   const revised = (await rpc("tools/list")).tools.find(t => t.name === "remember");
@@ -50,7 +51,7 @@ test("settings default to 1000 estimated tokens; owner changes are immediately a
   assert.match(await tool("remember", { text: "bravo ".repeat(400) }), /not saved: over 300/);
   assert.equal((await (await api("/api/settings")).json()).memory_max_tokens, 300);
   assert.equal(JSON.parse(await tool("get_memory_settings", {})).max_tokens, 300);
-  assert.equal(JSON.parse(await tool("recent", { n: 1 })).results[0].text, long.trim(), "lowering limit does not mutilate existing memories");
+  assert.ok(JSON.parse(await tool("recent", { n: 1 })).results[0].text.includes(long.trim()), "lowering limit does not mutilate existing memories");
 });
 
 test("memory limit cannot be changed by an unauthenticated user or via MCP", async () => {
@@ -96,15 +97,16 @@ test("ordinary owner API bodies are bounded and bad JSON is rejected", async () 
   assert.equal((await (await api("/api/memories")).json()).count, 1);
 });
 
-test("UI has installed-PWA-only refresh, compact scroller and native chart picker", () => {
+test("UI has installed-PWA-only header refresh, compact scroller and in-app chart dropdown", () => {
   const read = name => readFileSync(new URL("../" + name, import.meta.url), "utf8");
   assert.match(read("src/shell/PwaRefresh.jsx"), /display-mode: standalone/);
   assert.match(read("src/shell/PwaRefresh.jsx"), /navigator.standalone/);
   assert.match(read("src/shell/PwaRefresh.jsx"), /window.location.reload/);
-  assert.match(read("src/shell/AppShell.jsx"), /<PwaRefresh \/>/);
+  assert.match(read("src/shell/TopBar.jsx"), /<PwaRefresh \/>/);
   assert.match(read("src/modules/skills/GithubSources.jsx"), /repo-list-scroll/);
   assert.match(read("src/styles/screens.css"), /--repo-preview-row:125px;max-height:calc\(var\(--repo-preview-row\)\*3\.5\)/);
-  assert.match(read("src/modules/home/MonitorPanel.jsx"), /showPicker\(\)/);
+  assert.match(read("src/modules/home/MonitorPanel.jsx"), /<MetricDropdown/);
+  assert.doesNotMatch(read("src/modules/home/MetricDropdown.jsx"), /showPicker\(\)/);
   assert.match(read("src/settings/SettingsSheet.jsx"), /<MemoryContext \/>/);
-  assert.match(read("package.json"), /"version": "3.3.0"/);
+  assert.match(read("package.json"), /"version": "3.3.8"/);
 });

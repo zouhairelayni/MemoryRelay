@@ -43,8 +43,14 @@ export default function HomeScreen({ active }) {
 
   return (
     <div className="screen enter home-screen">
-      <header className="phead home-title"><div className="grow"><h2>Live overview</h2><p>Your agents, knowledge, and activity at a glance.</p></div></header>
-      <section className="status" aria-live="polite" style={step()}>
+      <header className="home-hero">
+        <div className="home-hero-top"><span className="dash-eyebrow">WORKSPACE / OVERVIEW</span><span className={"dash-health " + (live===false?"down":live?"up":"loading")}><span aria-hidden="true"/>{live===false?"Needs attention":live?"Systems online":"Checking status"}</span></div>
+        <h1>Overview</h1>
+        <p>Live usage, activity and network health in one place.</p>
+      </header>
+      <MonitorPanel active={active}/>
+      <div className="home-secondary-head"><div><span className="dash-eyebrow">CONNECTED WORKSPACE</span><h2>People & knowledge</h2></div><span className="home-secondary-note">Manage what powers your agents</span></div>
+      <section className="status home-status" aria-live="polite" style={step()}>
         <div className={"ring " + tone} aria-hidden="true">
           <svg viewBox="0 0 64 64"><circle className="ring-bg" cx="32" cy="32" r="28" /><circle className="ring-fg" cx="32" cy="32" r="28" /></svg>
           <span className="mark"><Icon name={live === false ? "x" : "check"} size={28} /></span>
@@ -130,7 +136,6 @@ export default function HomeScreen({ active }) {
           <Button small onClick={install.install}>Install app</Button>
         </section>
       ) : null}
-      <MonitorPanel active={active}/>
     </div>
   );
 }

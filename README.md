@@ -237,3 +237,13 @@ with management controls retained in per-repository disclosure panels.
 
 Security: regular JSON API request bodies are bounded before parsing, and MCP housekeeping
 can only preview suggestions. The authenticated dashboard is the exclusive apply surface.
+
+## 3.3.8 visual workspace and memory formatting
+
+See [CHANGELOG.md](CHANGELOG.md), [design system](docs/DESIGN-SYSTEM.md), and [verification notes](docs/QA-2026-11-23.md) for the current release.
+
+**Markdown memory format:** `**Specific topic**` as the first line; short bullets such as `- *Decision:* ...`; fenced ` ```bash ` blocks for commands. The owner editor offers a toolbar and preview, and copy controls appear in the memory reader. HTML in memories is never executed or inserted as markup. MCP callers receive the format instructions and plain-text agent submissions are normalized server-side.
+
+**Memory context:** Settings → Memory context controls 100–8,000 estimated tokens per memory, default 1,000. `get_memory_settings` and `tools/list` on the MCP server read the persisted setting. Tool descriptions may be cached by the connecting client: reconnect/reload the MCP connection after deploying a server upgrade. Changing the owner setting itself requires no new Worker deployment.
+
+**Home/Live:** dashboard metrics and measured Chart.js analytics precede secondary management. The chart metric control is an in-app dropdown, not a browser/Android OS picker. Repositories use bounded scroll cards. Installed PWAs show a header refresh control next to Settings.

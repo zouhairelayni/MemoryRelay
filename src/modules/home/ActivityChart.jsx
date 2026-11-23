@@ -21,9 +21,9 @@ export default function ActivityChart({type='line',labels=[],values=[],label,uni
       data:{labels,datasets:[{
         label,data:values.map(x=>Number(x)||0),
         borderColor:accent,backgroundColor:isBar?bar:accent,
-        borderWidth:isBar?0:2,pointRadius:isBar?0:values.length>45?0:2,
-        pointHoverRadius:4,tension:0.23,fill:false,
-        borderRadius:isBar?4:0,maxBarThickness:24,
+        borderWidth:isBar?0:2.5,pointRadius:isBar?0:values.length>45?0:1.6,
+        pointHoverRadius:5,tension:0.36,fill:false,
+        borderRadius:isBar?6:0,maxBarThickness:16,
       }]},
       options:{responsive:true,maintainAspectRatio:false,animation:false,
         indexAxis:isBar?'y':'x',

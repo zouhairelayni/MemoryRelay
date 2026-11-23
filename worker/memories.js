@@ -1,6 +1,7 @@
 // Memory storage. The agent-facing functions are protected by the rules tag; the owner functions are not.
 import { MAX_MEMORIES, MAX_TAGS } from "./constants.js";
 import { getMemoryLimit } from "./memorySettings.js";
+import { formatAgentMemory } from "./memoryFormat.js";
 import { memoryTextError } from "../shared/memoryBudget.js";
 import { NOT_RULES_SQL, brief, clip, isProtected, newId, now, runAll, safeJson, searchWhere, similar } from "./util.js";
 
@@ -38,7 +39,7 @@ async function findDuplicate(env, text) {
 
 // `source` comes from the server (the connection's client name), never from what the agent sends.
 export async function remember(env, a, source = "agent") {
-  const text = String(a.text || "").trim();
+  const text = formatAgentMemory(a.text);
   if (!text) return "nothing saved: empty text";
   const invalid = memoryTextError(text, await getMemoryLimit(env));
   if (invalid) return `not saved: ${invalid}; split it into smaller facts`;
@@ -80,9 +81,10 @@ export async function updateMemory(env, a) {
   let text = row.text, tags = row.tags;
   const history = safeJson(row.history, []).slice(-(HISTORY_KEEP - 1));
   if (newText) {
-    const invalid = memoryTextError(newText, await getMemoryLimit(env));
+    const formatted = formatAgentMemory(newText);
+    const invalid = memoryTextError(formatted, await getMemoryLimit(env));
     if (invalid) return `not updated: ${invalid}`;
-    if (newText !== row.text) { history.push({ text: row.text, time: row.updated }); text = newText; }
+    if (formatted !== row.text) { history.push({ text: row.text, time: row.updated }); text = formatted; }
   }
   if (newTags) {
     const t = agentTags(newTags);

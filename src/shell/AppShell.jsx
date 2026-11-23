@@ -9,7 +9,6 @@ import SettingsSheet from "../settings/SettingsSheet.jsx";
 import Pager from "./Pager.jsx";
 import TabBar from "./TabBar.jsx";
 import TopBar from "./TopBar.jsx";
-import PwaRefresh from "./PwaRefresh.jsx";
 
 const ROUTES = [...TAB_IDS, "settings"];
 
@@ -56,7 +55,6 @@ export default function AppShell({ email, logout }) {
           <Pager panes={panes} index={index} onChange={go} swipe={swipeTabs && !settingsOpen} />
         </main>
         <TabBar tabs={TABS} activeId={tabId} onSelect={select} />
-        <PwaRefresh />
         <SettingsSheet open={settingsOpen} onClose={closeSettings} />
       </div>
     </AppContext.Provider>

@@ -39,7 +39,7 @@ test('skills selection uses stable selectable values; monitoring offers hour and
   assert.match(selector, /Array.from\(\{length:8\}/);
   assert.doesNotMatch(selector, /id="sk-max"[^>]*type="number"/);
   const panel=read('src/modules/home/MonitorPanel.jsx');
-  for(const period of ['1h','1d','7','30','90']) assert.ok(panel.includes(`value="${period}"`));
+  for(const period of ['1h','1d','7','30','90']) assert.ok(panel.includes(`"${period}"`));
   assert.match(panel,/All recorded functions/);
   assert.match(panel,/ActivityChart/);
   assert.doesNotMatch(panel,/<svg|ChartLine/);

@@ -148,8 +148,8 @@ export default function GithubSources({active,onUpdated}) {
     catch(e){setMessage(e.message)}finally{setBusy("")}
   }
   return <section className="card stack" aria-label="GitHub skill repositories">
-    <div className="chead"><div className="grow"><h3>GitHub skill sync</h3>
-      <div className="sub">Sync skills and their scripts daily or on demand. GitHub access: {tokenConfigured===null?'Checking…':tokenConfigured?'Token configured':'No token configured'}.</div>
+    <div className="chead"><div className="grow"><span className="dash-eyebrow">SOURCES & INTEGRATIONS</span><h3>Connected repositories</h3>
+      <div className="sub">Bring in trusted skills, scripts and reference material. Sync when you choose or automatically.</div>
     </div></div>
     {quota?<p className="muted small" role="status">GitHub requests left this hour: <b>{quota.remaining}</b> of {quota.limit}{quota.reset?` · resets ${new Date(quota.reset).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}`:""}{quota.token?"":" · no token"}{quota.estimated?" (estimated)":""}
       {typeof quota.used_by_this_worker==="number"?<span> · this app sent {quota.used_by_this_worker} in the last hour{!quota.token&&quota.limit-quota.remaining-quota.used_by_this_worker>0?`, other apps sharing this address used ${quota.limit-quota.remaining-quota.used_by_this_worker}`:""}</span>:null}</p>:null}
@@ -170,13 +170,20 @@ export default function GithubSources({active,onUpdated}) {
     </details>
     <div className="repo-list-scroll" role="region" aria-label="Tracked skill repositories" tabIndex={0}>
     {rows.map(r=><div key={r.id} className="repo-list-item stack">
-      <div className="row" style={{justifyContent:"space-between",alignItems:"center"}}>
-        <div className="grow"><strong>{r.owner}/{r.repo}</strong> <small className="muted">/ {r.root||"automatic"}</small>
-          <div className="muted small">{r.names.length?`${r.names.length} selected skills`:'All skills'} · {r.last_sha?r.last_sha.slice(0,12):'Not checked'} · Auto sync {r.enabled?'on':'off'}</div>
-          <div className="small"><b>{r.skill_count}</b> skill{r.skill_count===1?'':'s'} imported{countText(r.file_counts)?` · ${countText(r.file_counts)}`:''}</div>
+      <div className="repo-card-heading">
+        <div className="repo-card-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="15" rx="3"/><path d="M3 10h18M8 5V3m8 2V3"/></svg></div>
+        <div className="repo-card-name grow">
+          <strong>{r.repo}</strong>
+          <span className="repo-location">by {r.owner} {r.root ? `· ${r.root}` : "· Auto-discover skills"}</span>
         </div>
         <Switch checked={r.enabled} disabled={!!busy} title="Enable automatic GitHub sync" onChange={v=>perform(r.id,()=>skillRepos.toggle(r.id,v))}/>
       </div>
+      <div className="repo-meta">
+        <span className={"repo-pill "+(r.last_error?"problem":r.sync_status==="running"?"":"up")}><i/>{r.last_error?"Needs review":r.sync_status==="running"?"Syncing":r.last_sha?"Tracked":"Not checked"}</span>
+        <span className="repo-pill">{r.skill_count} imported</span>
+        <span className="repo-pill">{r.names.length?`${r.names.length} selected`:'All skills'}</span>
+      </div>
+      <div className="repo-card-subnote">{r.last_error?`Sync issue: ${r.last_error}`:r.last_checked?`Last checked ${r.last_checked} UTC`:"Ready to check GitHub"}</div>
       <details className="repo-list-details"><summary className="small">Manage repository and synced files</summary>
       <div className="stack" style={{gap:8}}>
       {r.sync_status==='running'&&r.sync_total>0?<div className="repo-progress" aria-live="polite"><div className="row" style={{justifyContent:'space-between'}}><span className="muted small">Syncing on Cloudflare</span><b className="small">{r.sync_done} / {r.sync_total} files</b></div><progress max={r.sync_total} value={r.sync_done} style={{width:'100%'}}/><p className="muted small">{blockedUntil?`Waiting for GitHub until ${new Date(blockedUntil).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}, then continues by itself.`:"Continues on Cloudflare every couple of minutes, even when the app is closed."}</p></div>:null}
@@ -201,8 +208,8 @@ export default function GithubSources({active,onUpdated}) {
       </div></details>
     </div>)}
     </div>
-    {rows.length>3?<p className="muted small" style={{margin:0}}>Scroll the repositories above to see more ({rows.length} total).</p>:null}
-    <details><summary><strong>Add GitHub skill set</strong></summary>
+    {rows.length>3?<p className="repo-scroll-hint">↓ Scroll to explore all {rows.length} repositories</p>:null}
+    <details className="repo-add"><summary><strong>+ Connect another repository</strong></summary>
       <div className="stack" style={{marginTop:10,gap:8}}>
         <input className="fld" aria-label="GitHub repository" placeholder="owner/repo or GitHub URL" value={repo} onChange={e=>setRepo(e.target.value)}/>
         <div className="row" style={{gap:8}}>
