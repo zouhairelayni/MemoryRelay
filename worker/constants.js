@@ -5,18 +5,18 @@ export const SESSION_DAYS = 14;
 export const PBKDF2_ITER = 100000;
 export const MAX_CALLS = 8; // Workers subrequest budget per request
 export const RETRYABLE = new Set([0, 500, 502, 503, 504]); // 0 = could not reach Gemini at all
-export const BUILD = "2026-11-23.2-aurora-dashboard-markdown";
+export const BUILD = "2026-11-23.3-memory-library-index";
 export const MAX_MEMORIES = 5000;        // library cap, stops a looping agent from filling the database
 export const MAX_TAGS = 5;
 export const MAX_ARG_CHARS = 100000;     // largest single string an agent may send
 export const MCP_PER_MINUTE = 300;       // requests per connection
 export const PROTOCOLS = ["2025-06-18", "2025-03-26", "2024-11-05"];
-export const SERVER_VERSION = "3.3.8";
+export const SERVER_VERSION = "3.5.0";
 export const ACCESS = ["read", "write", "full"];   // what a connection may do
 export const ACCESS_RANK = { read: 1, write: 2, full: 3 };
 export const ACCESS_LABEL = { read: "Read only", write: "Read and write", full: "Full access" };
 // The lowest access level that may call each tool.
-export const TOOL_LEVEL = { get_memory_settings: "read", search: "read", recent: "read", get_skill_template: "read", select_skills: "read", get_skill: "read", list_skills: "read", draft_skill: "read",
+export const TOOL_LEVEL = { get_memory_settings: "read", search: "read", list_memories: "read", get_memory: "read", recent: "read", get_skill_template: "read", select_skills: "read", get_skill: "read", list_skills: "read", draft_skill: "read",
   get_skill_script: "read", get_skill_resource: "read", remember: "write", update_memory: "write", upload_skill: "write", delegate: "write", get_delegation_brief: "read", forget: "full", housekeep: "full" };
 
 const T = (title, o) => ({ title, readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false, ...o });
@@ -24,18 +24,57 @@ export const TOOLS = [
   { name: "get_memory_settings", annotations: T("Current memory context limit", { readOnlyHint: true, idempotentHint: true }),
     description: "Read the current owner-configured per-memory estimated-token limit. Changes in dashboard Settings apply instantly to MCP storage and search.",
     inputSchema: { type: "object", properties: {} } },
-  { name: "remember", annotations: T("Save a memory", { idempotentHint: true }),
-    description: "Save ONE self-contained fact, preference, or decision, formatted with **Title** and - *Label:* bullets. Use ```bash fenced blocks for copyable commands. The owner-configured estimated-token limit is returned by tools/list and get_memory_settings. Never paste secrets or whole conversations. Skips duplicates.",
-    inputSchema: { type: "object", properties: { text: { type: "string" }, tags: { type: "string" } }, required: ["text"] } },
-  { name: "search", annotations: T("Search memories", { readOnlyHint: true, idempotentHint: true }),
-    description: "Find memories containing all the query words (max 20 short results). Use before answering questions about the user.",
-    inputSchema: { type: "object", properties: { query: { type: "string" }, limit: { type: "integer" } }, required: ["query"] } },
-  { name: "recent", annotations: T("Recent memories", { readOnlyHint: true, idempotentHint: true }),
-    description: "Show the most recent memories (max 20). Use only when the user asks what was saved recently.",
+  // Typed labels and memory descriptions are independent from the original context tags.
+  // Clients can discover every memory without sending entire Markdown bodies to the model.
+  { name: "remember", annotations: T("Save Markdown memory", { idempotentHint: true }),
+    description: "Save ONE durable memory. Supply a brief searchable description and optional structured metadata. Format text in Markdown: **bold title**, - *italic labels:* details, `inline commands`, and ```bash fenced code blocks (copyable in owner UI). context tags remain separate from colored app/platform/feature/version/language/stack labels. No secrets or whole chats. Server enforces owner's live estimated-token limit.",
+    inputSchema: { type: "object", properties: {
+      text: { type: "string", description: "Full Markdown content; headings, lists, fenced snippets and terminal commands are preserved as text, never executed." },
+      description: { type: "string", description: "Short, factual search description (max 280 characters); if omitted, the index displays the first existing title/line." },
+      tags: { type: "string", description: "Legacy context tags, comma separated, max 5; 'rules' is owner-only. Independent of metadata." },
+      metadata: { type: "object", description: "Editable typed labels. Use only verifiable values; never guess missing build/release versions.", properties: {
+        app: { type: "string", description: "Product/project name, e.g. RIVNA" },
+        platforms: { type: "array", items: { type: "string" }, description: "Platforms: pwa, web, android, ios, backend etc." },
+        feature: { type: "string", description: "Feature name" },
+        version: { type: "string", description: "Verified release/build version, e.g. BUILD 09 or v3.5.0" },
+        languages: { type: "array", items: { type: "string" }, description: "Programming languages, e.g. JavaScript, Python" },
+        stack: { type: "array", items: { type: "string" }, description: "Technology stack, e.g. React, Cloudflare Workers, D1" },
+      }, additionalProperties: false },
+    }, required: ["text"] } },
+  { name: "search", annotations: T("Search full memory library", { readOnlyHint: true, idempotentHint: true }),
+    description: "Search the ENTIRE memory library across Markdown, description, context tags and typed labels. Returns short index entries (ID, description, metadata, tags), NOT full text. Page with offset=next_offset until null; max 100 per page. Call get_memory(memory_id) to read selected full Markdown, fenced snippets and commands. Filter by app, platform, feature, version, language or stack.",
+    inputSchema: { type: "object", properties: {
+      query: { type: "string", description: "Keywords; all words must match. Empty query lists every memory." },
+      limit: { type: "integer", description: "Index results per page, 1–100 (default 20)." },
+      offset: { type: "integer", description: "Zero-based offset; advance using next_offset." },
+      app: { type: "string" }, platforms: { type: "string", description: "One platform e.g. pwa" },
+      feature: { type: "string" }, version: { type: "string" },
+      languages: { type: "string", description: "One language" }, stack: { type: "string", description: "One stack technology" },
+    }, required: ["query"] } },
+  { name: "list_memories", annotations: T("Browse all memory descriptions", { readOnlyHint: true, idempotentHint: true }),
+    description: "Page through ALL saved memories by short description without loading full content. Optional keyword/typed-label filters. Returns total, next_offset and index entries with colored-label metadata. Use get_memory with an ID to read full Markdown and copyable commands. Always follow next_offset until null when an exhaustive listing is needed.",
+    inputSchema: { type: "object", properties: {
+      query: { type: "string" }, limit: { type: "integer" }, offset: { type: "integer" },
+      app: { type: "string" }, platforms: { type: "string" }, feature: { type: "string" },
+      version: { type: "string" }, languages: { type: "string" }, stack: { type: "string" },
+    } } },
+  { name: "get_memory", annotations: T("Read one complete memory", { readOnlyHint: true, idempotentHint: true }),
+    description: "Retrieve ONE full memory by ID after search/list_memories. Returns the complete Markdown text with bold/italic titles, bullets, code snippets and copyable commands, plus description, legacy context tags and typed metadata (app, platforms, feature, version, languages, stack). Does not execute commands.",
+    inputSchema: { type: "object", properties: { memory_id: { type: "string" } }, required: ["memory_id"] } },
+  { name: "recent", annotations: T("Recently saved memory text", { readOnlyHint: true, idempotentHint: true }),
+    description: "Show up to 20 recent full Markdown memories. For exhaustive discovery use list_memories or search with offset/next_offset, then get_memory by ID.",
     inputSchema: { type: "object", properties: { n: { type: "integer" } } } },
-  { name: "update_memory", annotations: T("Update a memory", { destructiveHint: true, idempotentHint: true }),
-    description: "Change an existing memory by id. Pass only the fields to change. For text use **Title**, - *Label:* bullets, and ```bash blocks for copyable commands. The old text is kept in history.",
-    inputSchema: { type: "object", properties: { memory_id: { type: "string" }, text: { type: "string" }, tags: { type: "string" } }, required: ["memory_id"] } },
+  { name: "update_memory", annotations: T("Edit Markdown memory and labels", { destructiveHint: true, idempotentHint: true }),
+    description: "Edit a memory by ID: Markdown text, searchable short description, legacy context tags, or independently editable structured labels. Preserve titles, lists, inline snippets and ```bash commands. metadata patch updates specified keys; pass empty values/arrays to clear labels. Existing text history remains. Rules cannot be modified via MCP.",
+    inputSchema: { type: "object", properties: {
+      memory_id: { type: "string" }, text: { type: "string", description: "Full Markdown, optional; owner-configured estimated token limit applies" },
+      description: { type: "string", description: "Short description (max 280 chars); empty string clears override" },
+      tags: { type: "string", description: "Context tags; separate from colored metadata; blank clears context tags" },
+      metadata: { type: "object", description: "Partial replacement of typed labels; supplied keys only. Fields: app, platforms[], feature, version, languages[], stack[].", properties: {
+        app: { type: "string" }, platforms: { type: "array", items: { type: "string" } }, feature: { type: "string" },
+        version: { type: "string" }, languages: { type: "array", items: { type: "string" } }, stack: { type: "array", items: { type: "string" } },
+      }, additionalProperties: false },
+    }, required: ["memory_id"] } },
   { name: "forget", annotations: T("Delete a memory", { destructiveHint: true, idempotentHint: true }),
     description: "Delete one memory by id.",
     inputSchema: { type: "object", properties: { memory_id: { type: "string" } }, required: ["memory_id"] } },

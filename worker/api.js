@@ -1,7 +1,7 @@
 // Owner API (/api/*). Every route needs a logged-in session.
 import { currentUser } from "./auth.js";
 import { getMemoryLimit, setMemoryLimit } from "./memorySettings.js";
-import { addMemory, deleteMemory, editMemory, exportMemories, importMemories, listMemories } from "./memories.js";
+import { addMemory, deleteMemory, editMemory, exportMemories, getMemory, importMemories, listMemories } from "./memories.js";
 import { renameService, createService, deleteService, listServices, revokeService, setAccess, signOutSessions, testConnector } from "./services.js";
 import { geminiOp, geminiState, listGeminiModels } from "./gemini.js";
 import { housekeep } from "./housekeep.js";
@@ -82,7 +82,11 @@ export async function api(request, env, url) {
   }
 
   // memories
-  if (p === "/api/memories" && m === "GET") return json(await listMemories(env, url.searchParams.get("q")));
+  if (p === "/api/memories" && m === "GET") return json(await listMemories(env, { ...Object.fromEntries(url.searchParams), query: url.searchParams.get("q") || "", limit: url.searchParams.get("limit") || 30, offset: url.searchParams.get("offset") || 0 }));
+  if (/^\/api\/memories\/[^/]+$/.test(p) && m === "GET") {
+    const item = await getMemory(env, { memory_id: dec(p.split("/").pop()) });
+    return json(item, item.error ? 404 : 200);
+  }
   if (p === "/api/memories" && m === "POST") return withStatus(await addMemory(env, await body(request)));
   if (p.startsWith("/api/memories/") && m === "PUT") return withStatus(await editMemory(env, p.split("/").pop(), await body(request)));
   if (p.startsWith("/api/memories/") && m === "DELETE") return json(await deleteMemory(env, p.split("/").pop()));

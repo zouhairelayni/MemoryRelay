@@ -2,7 +2,7 @@
 import { ACCESS_LABEL, ACCESS_RANK, MAX_ARG_CHARS, PROTOCOLS, SERVER_VERSION, TOOLS, TOOL_LEVEL } from "./constants.js";
 import { activity } from "./monitor.js";
 import { json, readJson } from "./util.js";
-import { forget, recent, remember, search, updateMemory } from "./memories.js";
+import { forget, recent, remember, search, listMemoryIndex, getMemory, updateMemory } from "./memories.js";
 import { housekeep } from "./housekeep.js";
 import { formatForAgent, getSkillByName, listSkillIndex, SKILL_TEMPLATE, selectSkills, uploadSkillFromAgent } from "./skills.js";
 import { AI_PICK } from "./aifetch.js";
@@ -51,6 +51,14 @@ export function validateArgs(schema, input) {
       if (v === "true") v = true; else if (v === "false") v = false;
       if (typeof v !== "boolean") return { error: k + " must be true or false" };
       out[k] = v;
+    } else if (spec.type === "object") {
+      if (typeof v !== "object" || Array.isArray(v)) return { error: k + " must be an object" };
+      if (spec.additionalProperties === false && Object.keys(v).some((key) => !(key in (spec.properties || {})))) return { error: k + " has an unknown field" };
+      for (const [key, value] of Object.entries(v)) {
+        const field = spec.properties?.[key];
+        if (field?.type === "string" && (typeof value !== "string" || value.length > 100)) return { error: k + "." + key + " must be short text" };
+        if (field?.type === "array" && (!Array.isArray(value) || value.length > 16 || value.some((item) => typeof item !== "string" || item.length > 48))) return { error: k + "." + key + " must be a list of short strings" };
+      }
     } else if (spec.type === "array") {
       if (!Array.isArray(v) || v.length > 100) return { error: k + " must be a list of at most 100 items" };
       if (spec.items && spec.items.type === "string" && v.some((x) => typeof x !== "string" || x.length > 1000)) return { error: k + " must be a list of short strings" };
@@ -61,7 +69,11 @@ export function validateArgs(schema, input) {
 
 export async function callTool(env, name, a, agentName = "", svc = null) {
   switch (name) {
-    case "get_memory_settings": return { max_tokens: await getMemoryLimit(env), units: "estimated_tokens", note: "Conservative UTF-8 estimate; model-specific tokenizers vary. Owner changes take effect immediately. " + AGENT_MEMORY_GUIDANCE };
+    case "get_memory_settings": return { max_tokens: await getMemoryLimit(env), units: "estimated_tokens",
+      discovery: { tools: ["list_memories", "search", "get_memory"], max_index_page: 100, pagination: "Continue using next_offset until null; list/search index does not return full text." },
+      formats: ["Markdown bold titles", "italic labels", "bullets", "inline code", "fenced code snippets", "copyable terminal commands"],
+      labels: { context_tags: "legacy, independent", metadata_fields: ["app", "platforms", "feature", "version", "languages", "stack"], description: "independent short search summary" },
+      note: "Conservative UTF-8 estimate; model-specific tokenizers vary. Owner changes apply to MCP immediately. " + AGENT_MEMORY_GUIDANCE };
     case "get_skill_template": return { template: SKILL_TEMPLATE, max_tokens: 5000, note: "Keep the description to the trigger. Put detail in Steps and Rules. Or call draft_skill to have the built-in AI write one." };
     case "upload_skill": return uploadSkillFromAgent(env, a.skill_md, (svc && svc.name) || agentName);
     case "draft_skill": {
@@ -105,8 +117,14 @@ export async function callTool(env, name, a, agentName = "", svc = null) {
       if (r.error) throw new ToolError(r.error);
       return { text: r.text };
     }
-    case "remember": return remember(env, { text: a.text, tags: a.tags }, agentLabel((svc && svc.name) || agentName)); // the source is the connection name, never taken from the agent
+    case "remember": return remember(env, a, agentLabel((svc && svc.name) || agentName)); // the source is the connection name, never taken from the agent
     case "search": return search(env, a);
+    case "list_memories": return listMemoryIndex(env, a);
+    case "get_memory": {
+      const result = await getMemory(env, a);
+      if (result.error) throw new ToolError(result.error);
+      return result;
+    }
     case "recent": return recent(env, a);
     case "update_memory": return updateMemory(env, a);
     case "forget": return forget(env, a);
@@ -155,7 +173,7 @@ async function dispatch(msg, env, stats, svc) {
     if (stats) stats.app = [ci.name, ci.version].filter(Boolean).map(String).join(" ").slice(0, 60);
     const protocolVersion = PROTOCOLS.includes(params.protocolVersion) ? params.protocolVersion : PROTOCOLS[0];
     return ok({ protocolVersion, capabilities: { tools: { listChanged: false } },
-      instructions: `MemoryRelay memory length: ${memoryLimit} estimated tokens per memory (owner-configurable; not characters). ${AGENT_MEMORY_GUIDANCE} Before starting any task, call select_skills with the user's request word for word. Follow only the skills it returns. If the user names a skill, call get_skill with that exact name; list_skills shows what exists. Never tell the user a skill does not exist before checking list_skills. To save your own usage limits, hand self-contained coding jobs (snippets, functions, small features, tests, reviews) to delegate (call get_delegation_brief once for the brief form and the review checklist); it runs them on other models and returns a checked result that you must still verify. To add a skill, call draft_skill (AI writes it) or get_skill_template (write it yourself, max 5000 tokens), then call upload_skill. Uploads wait for owner approval.`,
+      instructions: `MemoryRelay v3.5.0. Memory length: ${memoryLimit} estimated tokens per memory (owner-configurable; not characters). Discover the entire memory library with list_memories or search using limit/offset/next_offset; index results include short descriptions and structured metadata. Read selected full memories with get_memory(memory_id). Metadata fields app, platforms (including pwa), feature, version, languages and stack are editable, colored in the owner UI, and separate from legacy context tags. All memory text supports Markdown **bold** titles, *italic* labels, bullet lists, inline \`commands\`, and fenced code blocks (\`\`\`bash); these display copy buttons, and commands are NEVER executed. Include reliable short descriptions and verified versions when saving new build/release memories. ${AGENT_MEMORY_GUIDANCE} Before starting any task, call select_skills with the user's request word for word. Follow only the skills it returns. If the user names a skill, call get_skill with that exact name; list_skills shows what exists. Never tell the user a skill does not exist before checking list_skills. To save your own usage limits, hand self-contained coding jobs (snippets, functions, small features, tests, reviews) to delegate (call get_delegation_brief once for the brief form and the review checklist); it runs them on other models and returns a checked result that you must still verify. To add a skill, call draft_skill (AI writes it) or get_skill_template (write it yourself, max 5000 tokens), then call upload_skill. Uploads wait for owner approval.`,
       serverInfo: { name: "my-memory", version: SERVER_VERSION } });
   }
   if (method === "ping") return ok({});

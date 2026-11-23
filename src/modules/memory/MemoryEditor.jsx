@@ -17,6 +17,14 @@ export default function MemoryEditor({ initial, saveLabel = "Save", onSave, onCa
   const tooLong = tokens > maxTokens;
   const [rule, setRule] = useState(!!initial.rule);
   const [tags, setTags] = useState(initial.rule ? "rules" : initial.tags || "");
+  const [description, setDescription] = useState(initial.description || "");
+  const original = initial.metadata || {};
+  const [app, setApp] = useState(original.app || "");
+  const [platforms, setPlatforms] = useState((original.platforms || []).join(", "));
+  const [feature, setFeature] = useState(original.feature || "");
+  const [version, setVersion] = useState(original.version || "");
+  const [languages, setLanguages] = useState((original.languages || []).join(", "));
+  const [stack, setStack] = useState((original.stack || []).join(", "));
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -76,7 +84,13 @@ export default function MemoryEditor({ initial, saveLabel = "Save", onSave, onCa
   const save = async () => {
     if (tooLong) { setError(`Memory exceeds the limit of ${maxTokens} estimated tokens.`); return; }
     setBusy(true); setError("");
-    try { await onSave({ text, tags, rule }); }
+    try {
+      const parts = (value) => [...new Set(value.split(/[,\n]/).map((v) => v.trim()).filter(Boolean))];
+      await onSave({ text, tags, rule, description, metadata: {
+        app: app.trim(), platforms: parts(platforms), feature: feature.trim(), version: version.trim(),
+        languages: parts(languages), stack: parts(stack),
+      } });
+    }
     catch (e) { setError(e.message); setBusy(false); }
   };
 
@@ -100,9 +114,27 @@ export default function MemoryEditor({ initial, saveLabel = "Save", onSave, onCa
         placeholder="One short, self-contained fact" onChange={(e) => setText(e.target.value)} />
       <p className="memory-editor-hint">Markdown supported: **bold headings**, *italic labels*, - bullets, `inline commands`, and ```bash code blocks. Inline commands and command blocks show copy actions when reading.</p>
       {preview ? <div className="memory-editor-preview"><MemoryMarkdown text={text}/></div> : null}
+      <section className="memory-editor-index" aria-label="Search index and structured labels">
+        <div className="memory-editor-section-head">
+          <strong>Memory discovery</strong>
+          <span>Independent of the Markdown content and context tags</span>
+        </div>
+        <label htmlFor={idPrefix + "-description"}>Short description</label>
+        <textarea id={idPrefix + "-description"} className="fld" rows={2} maxLength={280} value={description}
+          onChange={(e) => setDescription(e.target.value)} placeholder="What is this memory about? A concise, factual summary" />
+        <div className="memory-label-fields">
+          <label>App / product<input className="fld" value={app} onChange={(e) => setApp(e.target.value)} maxLength={100} placeholder="MemoryRelay, RIVNA…" /></label>
+          <label>Platform(s)<input className="fld" value={platforms} onChange={(e) => setPlatforms(e.target.value)} placeholder="PWA, Web, Android…" /></label>
+          <label>Feature<input className="fld" value={feature} maxLength={100} onChange={(e) => setFeature(e.target.value)} placeholder="Memory discovery" /></label>
+          <label>Build / release<input className="fld" value={version} maxLength={100} onChange={(e) => setVersion(e.target.value)} placeholder="v3.5.0 or BUILD 09" /></label>
+          <label>Language(s)<input className="fld" value={languages} onChange={(e) => setLanguages(e.target.value)} placeholder="JavaScript, Python…" /></label>
+          <label>Technology stack<input className="fld" value={stack} onChange={(e) => setStack(e.target.value)} placeholder="React, D1, Cloudflare Workers…" /></label>
+        </div>
+        <p className="memory-editor-hint">Comma-separate multiple values. These labels appear as color-coded chips and support filtering through the MCP. Leave unknown versions and stacks blank.</p>
+      </section>
       <Switch checked={rule} onChange={toggleRule} id={idPrefix + "-rule"}>Rule (only you can edit or delete)</Switch>
       <div className="tagrow">
-        <input id={idPrefix + "-tags"} className="fld" placeholder="Tags, comma separated (max 5)" value={tags}
+        <input id={idPrefix + "-tags"} className="fld" placeholder="Context tags (separate from structured labels; max 5)" value={tags}
           disabled={rule} onChange={(e) => setTags(e.target.value)} />
       </div>
       <div className="note">{note}</div>

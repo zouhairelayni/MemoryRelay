@@ -3,7 +3,8 @@ import { MAX_MEMORIES, MAX_TAGS } from "./constants.js";
 import { getMemoryLimit } from "./memorySettings.js";
 import { formatAgentMemory } from "./memoryFormat.js";
 import { memoryTextError } from "../shared/memoryBudget.js";
-import { NOT_RULES_SQL, brief, clip, isProtected, newId, now, runAll, safeJson, searchWhere, similar } from "./util.js";
+import { NOT_RULES_SQL, clip, isProtected, newId, now, runAll, safeJson, similar } from "./util.js";
+import { cleanDescription, decodeMetadata, descriptionFromText, fullEntry, normalizeMetadata, queryMemoryIndex } from "./memoryIndex.js";
 
 const HISTORY_KEEP = 20;
 const DUP_SCAN = 1000;
@@ -18,12 +19,12 @@ function agentTags(raw) {
   return { tags };
 }
 
-async function insertMemory(env, text, tags, source) {
+async function insertMemory(env, text, tags, source, description = "", metadata = {}) {
   for (let i = 0; i < 3; i++) {
     const id = newId(), t = now();
     try {
-      await env.DB.prepare("INSERT INTO memories (id, text, tags, source, created, updated, history) VALUES (?, ?, ?, ?, ?, ?, '[]')")
-        .bind(id, text, tags, clip(source, 60), t, t).run();
+      await env.DB.prepare("INSERT INTO memories (id, text, tags, source, created, updated, history, description, metadata) VALUES (?, ?, ?, ?, ?, ?, '[]', ?, ?)")
+        .bind(id, text, tags, clip(source, 60), t, t, description, JSON.stringify(metadata)).run();
       return id;
     } catch (e) {
       if (!/UNIQUE|constraint/i.test(String(e && e.message))) throw e; // id clash: try a new id
@@ -45,40 +46,55 @@ export async function remember(env, a, source = "agent") {
   if (invalid) return `not saved: ${invalid}; split it into smaller facts`;
   const t = agentTags(a.tags);
   if (t.error) return "not saved: " + t.error;
+  let description, metadata;
+  try { description = a.description === undefined ? "" : cleanDescription(a.description); metadata = normalizeMetadata(a.metadata); }
+  catch (e) { return "not saved: " + e.message; }
   const count = await env.DB.prepare("SELECT COUNT(*) AS n FROM memories").first();
   if (count.n >= MAX_MEMORIES) return `not saved: the memory is full (${MAX_MEMORIES}). Ask the owner to clean it up`;
   const dup = await findDuplicate(env, text);
   if (dup) return `duplicate of ${dup.id}, not saved`;
-  return `saved ${await insertMemory(env, text, t.tags, source)}`;
+  return `saved ${await insertMemory(env, text, t.tags, source, description, metadata)}`;
 }
 
+// The index contains descriptions, IDs, and typed labels, NEVER full Markdown bodies.
+// Cursor by offset until next_offset is null; no first-20 or first-500 truncation.
 export async function search(env, a) {
-  const limit = Math.min(Math.max(Number(a.limit) || 5, 1), 20);
-  const { where, params } = searchWhere(a.query);
-  const total = await env.DB.prepare(`SELECT COUNT(*) AS n FROM memories ${where}`).bind(...params).first();
-  const { results } = await env.DB.prepare(
-    `SELECT id, text, tags, created FROM memories ${where} ORDER BY created DESC, rowid DESC LIMIT ?`
-  ).bind(...params, limit).all();
-  return { total: total.n, results: results.map(brief) };
+  return queryMemoryIndex(env, a);
+}
+
+export async function listMemoryIndex(env, a = {}) {
+  return queryMemoryIndex(env, a);
+}
+
+export async function getMemory(env, a) {
+  const id = String(a.memory_id || "");
+  const row = await env.DB.prepare("SELECT * FROM memories WHERE id = ?").bind(id).first();
+  return row ? fullEntry(row) : { error: "memory not found" };
 }
 
 export async function recent(env, a) {
   const n = Math.min(Math.max(Number(a.n) || 5, 1), 20);
   const total = await env.DB.prepare("SELECT COUNT(*) AS n FROM memories").first();
   const { results } = await env.DB.prepare(
-    "SELECT id, text, tags, created FROM memories ORDER BY created DESC, rowid DESC LIMIT ?"
+    "SELECT * FROM memories ORDER BY created DESC, rowid DESC LIMIT ?"
   ).bind(n).all();
-  return { total: total.n, results: results.map(brief) };
+  return { total: total.n, results: results.map(fullEntry) };
 }
 
 export async function updateMemory(env, a) {
   const row = await env.DB.prepare("SELECT * FROM memories WHERE id = ?").bind(String(a.memory_id)).first();
   if (!row) return "not found";
   if (isProtected(row.tags)) return "protected: rules memories cannot be changed through the connector";
-  const newText = String(a.text || "").trim();
-  const newTags = String(a.tags || "").trim();
-  if (!newText && !newTags) return "nothing to update: pass text or tags";
-  let text = row.text, tags = row.tags;
+  const hasText = Object.hasOwn(a, "text"), hasTags = Object.hasOwn(a, "tags");
+  if (!hasText && !hasTags && !Object.hasOwn(a, "description") && !Object.hasOwn(a, "metadata"))
+    return "nothing to update: pass text, context tags, description or metadata";
+  const newText = hasText ? String(a.text || "").trim() : "";
+  if (hasText && !newText) return "not updated: text cannot be empty";
+  let text = row.text, tags = row.tags, description = row.description || "", metadata = decodeMetadata(row);
+  try {
+    if (Object.hasOwn(a, "description")) description = cleanDescription(a.description);
+    if (Object.hasOwn(a, "metadata")) metadata = normalizeMetadata({ ...metadata, ...a.metadata });
+  } catch (e) { return "not updated: " + e.message; }
   const history = safeJson(row.history, []).slice(-(HISTORY_KEEP - 1));
   if (newText) {
     const formatted = formatAgentMemory(newText);
@@ -86,13 +102,13 @@ export async function updateMemory(env, a) {
     if (invalid) return `not updated: ${invalid}`;
     if (formatted !== row.text) { history.push({ text: row.text, time: row.updated }); text = formatted; }
   }
-  if (newTags) {
-    const t = agentTags(newTags);
+  if (hasTags) {
+    const t = agentTags(a.tags);
     if (t.error) return "not updated: " + t.error;
     tags = t.tags;
   }
-  await env.DB.prepare("UPDATE memories SET text = ?, tags = ?, updated = ?, history = ? WHERE id = ?")
-    .bind(text, tags, now(), JSON.stringify(history), row.id).run();
+  await env.DB.prepare("UPDATE memories SET text = ?, tags = ?, updated = ?, history = ?, description = ?, metadata = ? WHERE id = ?")
+    .bind(text, tags, now(), JSON.stringify(history), description, JSON.stringify(metadata), row.id).run();
   return `updated ${row.id}`;
 }
 
@@ -123,11 +139,14 @@ export async function addMemory(env, b) {
   const rule = b.rule === true;
   const t = ownerTags(rule, b.tags);
   if (t.error) return t;
+  let description, metadata;
+  try { description = b.description === undefined ? "" : cleanDescription(b.description); metadata = normalizeMetadata(b.metadata); }
+  catch (e) { return { error: e.message }; }
   const count = await env.DB.prepare("SELECT COUNT(*) AS n FROM memories").first();
   if (count.n >= MAX_MEMORIES) return { error: `the memory is full (${MAX_MEMORIES}). Delete some first` };
   const dup = await findDuplicate(env, text);
   if (dup) return { error: `a similar memory already exists (${dup.id})` };
-  const id = await insertMemory(env, text, t.tags, rule ? "owner" : "dashboard");
+  const id = await insertMemory(env, text, t.tags, rule ? "owner" : "dashboard", description, metadata);
   return { ok: true, id, rule };
 }
 
@@ -146,21 +165,25 @@ export async function editMemory(env, id, b) {
     tags = t.tags;
   }
   if (!rule && isProtected(tags)) tags = "";
+  let description = row.description || "", metadata = decodeMetadata(row);
+  try {
+    if (Object.hasOwn(b, "description")) description = cleanDescription(b.description);
+    if (Object.hasOwn(b, "metadata")) metadata = normalizeMetadata({ ...metadata, ...b.metadata });
+  } catch (e) { return { error: e.message }; }
   const history = safeJson(row.history, []).slice(-(HISTORY_KEEP - 1));
   if (text !== row.text) history.push({ text: row.text, time: row.updated });
-  await env.DB.prepare("UPDATE memories SET text = ?, tags = ?, updated = ?, history = ? WHERE id = ?")
-    .bind(text, tags, now(), JSON.stringify(history), row.id).run();
+  await env.DB.prepare("UPDATE memories SET text = ?, tags = ?, updated = ?, history = ?, description = ?, metadata = ? WHERE id = ?")
+    .bind(text, tags, now(), JSON.stringify(history), description, JSON.stringify(metadata), row.id).run();
   return { ok: true, id: row.id, rule };
 }
 
 // ---- owner (dashboard) helpers: list, export, import ----
 
-export async function listMemories(env, q) {
-  const { where, params } = searchWhere(q);
-  const { results } = await env.DB.prepare(
-    `SELECT id, text, tags, source, created AS time FROM memories ${where} ORDER BY created DESC, rowid DESC LIMIT 500`
-  ).bind(...params).all();
-  return { count: results.length, items: results };
+export async function listMemories(env, options = {}) {
+  // Backward compatible with the old search-string signature.
+  const f = typeof options === "string" ? { query: options } : options;
+  const page = await queryMemoryIndex(env, f, { full: true, defaultLimit: 30 });
+  return { count: page.count, total: page.total, offset: page.offset, next_offset: page.next_offset, items: page.results };
 }
 
 export async function deleteMemory(env, id) {
@@ -180,6 +203,11 @@ export async function importMemories(env, incoming, mode) {
   // Imports never silently truncate facts; all entries are checked before any deletion.
   const oversize = incoming.find((x) => x && typeof x.text === "string" && memoryTextError(x.text.trim(), maxTokens));
   if (oversize) return { error: `import contains an oversized memory: ${memoryTextError(oversize.text.trim(), maxTokens)}` };
+  // Reject malformed new metadata before any destructive replace operation.
+  try { for (const x of incoming) if (x && typeof x === "object" && typeof x.text === "string" && x.text.trim()) {
+    if (x.description !== undefined) cleanDescription(x.description);
+    normalizeMetadata(typeof x.metadata === "string" ? JSON.parse(x.metadata) : x.metadata);
+  } } catch (e) { return { error: "invalid memory index metadata: " + e.message }; }
   const rows = incoming
     .filter((x) => x && typeof x === "object" && typeof x.text === "string" && x.text.trim())
     .map((x) => {
@@ -188,6 +216,8 @@ export async function importMemories(env, incoming, mode) {
         id: /^[A-Za-z0-9_-]{1,40}$/.test(String(x.id || "")) ? String(x.id) : newId(),
         text: x.text.trim(),
         tags: cleanTags(x.tags),
+        description: x.description === undefined ? "" : cleanDescription(x.description),
+        metadata: JSON.stringify(normalizeMetadata(typeof x.metadata === "string" ? safeJson(x.metadata, {}) : x.metadata)),
         source: clip(x.source || "import", 60),
         created: clip(x.created || x.time || now(), 32),
         updated: clip(x.updated || x.time || now(), 32),
@@ -201,8 +231,8 @@ export async function importMemories(env, incoming, mode) {
   if (mode === "replace") stmts.push(env.DB.prepare(`DELETE FROM memories WHERE ${NOT_RULES_SQL}`));
   for (const r of rows) {
     stmts.push(env.DB.prepare(
-      "INSERT OR IGNORE INTO memories (id, text, tags, source, created, updated, history) VALUES (?, ?, ?, ?, ?, ?, ?)"
-    ).bind(r.id, r.text, r.tags, r.source, r.created, r.updated, r.history));
+      "INSERT OR IGNORE INTO memories (id, text, tags, source, created, updated, history, description, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    ).bind(r.id, r.text, r.tags, r.source, r.created, r.updated, r.history, r.description, r.metadata));
   }
   await runAll(env, stmts);
   const total = await env.DB.prepare("SELECT COUNT(*) AS n FROM memories").first();

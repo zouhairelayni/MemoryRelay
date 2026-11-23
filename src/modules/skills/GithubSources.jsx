@@ -1,6 +1,8 @@
 import {useEffect,useState} from "react";
 import {skillRepos} from "../../api/endpoints.js";
 import Switch from "../../components/Switch.jsx";
+import AppSelect from "../../components/AppSelect.jsx";
+import Icon from "../../components/Icon.jsx";
 
 const TYPE_LABELS={script:"Scripts (.py .mjs .js .ts .sh)",test:"Tests (*.test.*, tests/ folders)",font:"Fonts (.woff2 .woff .ttf .otf)",reference:"Reference docs (.md .json .yaml …)"};
 const KIND_NAMES={script:["script","scripts"],test:["test","tests"],font:["font","fonts"],reference:["reference doc","reference docs"]};
@@ -30,11 +32,12 @@ function FileOptions({value,onChange,disabled,showRoot=false}){
     <textarea className="fld" rows={3} disabled={disabled} aria-label="Path filter" placeholder={"Path filter, one pattern per line (blank = all)\nscripts/**\n*.mjs\n!**/fixtures/**"} value={value.path_filter} onChange={e=>onChange({path_filter:e.target.value})}/>
     <label className="row small" style={{gap:8,alignItems:"center"}}>Largest file <input className="fld" type="number" min="50" max="1000" style={{width:90}} disabled={disabled} placeholder="750" value={value.max_kb} onChange={e=>onChange({max_kb:e.target.value})}/> KB (50–1000; blank = 750)</label>
     <label className="row small" style={{gap:8,alignItems:"center",flexWrap:"wrap"}}>Automatic updates
-      <select className="fld" disabled={disabled} value={value.update_mode||"safe"} onChange={e=>onChange({update_mode:e.target.value})}>
-        <option value="safe">Hold risky changes for my review</option>
-        <option value="review">Hold every change for my review</option>
-        <option value="all">Apply everything</option>
-      </select></label>
+      <AppSelect label="Automatic update policy" disabled={disabled} value={value.update_mode||"safe"}
+        onChange={next=>onChange({update_mode:next})} options={[
+          {value:"safe",label:"Review risky changes",description:"Safest default"},
+          {value:"review",label:"Review every change"},
+          {value:"all",label:"Automatically apply all",description:"Trusted repositories only"},
+        ]}/></label>
     <label className="row small" style={{gap:6,alignItems:"center"}}><input type="checkbox" disabled={disabled} checked={value.adopt} onChange={e=>onChange({adopt:e.target.checked})}/>Replace pasted skills that have the same name (the old text stays in history)</label>
   </div>;
 }
@@ -50,6 +53,7 @@ function RepoFiles({repoId,onChanged}){
   const [shown,setShown]=useState("");
   const [preview,setPreview]=useState(null);
   const [note,setNote]=useState("");
+  const [confirmFile,setConfirmFile]=useState("");
   const load=()=>skillRepos.files(repoId).then(d=>{setData(d);setError("");}).catch(e=>setError(e.message));
   useEffect(()=>{load();},[repoId]);
   async function togglePreview(f){
@@ -59,7 +63,7 @@ function RepoFiles({repoId,onChanged}){
     try{setPreview(await skillRepos.preview(repoId,f.skill,f.path));}catch(e){setPreview({error:e.message});}
   }
   async function remove(f){
-    if(!window.confirm(`Remove ${f.skill}/${f.path}? It stays out of future syncs until you restore it.`))return;
+    setConfirmFile("");
     try{await skillRepos.removeFile(repoId,f.skill,f.path);setShown("");setNote("");await load();onChanged&&onChanged();}catch(e){setError(e.message);}
   }
   async function restore(key){
@@ -73,10 +77,10 @@ function RepoFiles({repoId,onChanged}){
   for(const f of rows.slice(0,200)){if(!bySkill.has(f.skill))bySkill.set(f.skill,[]);bySkill.get(f.skill).push(f);}
   return <div className="stack" style={{gap:8,marginTop:8}}>
     <div className="row" style={{gap:8,flexWrap:"wrap"}}>
-      <select className="fld" aria-label="File type" value={kind} onChange={e=>setKind(e.target.value)}>
-        <option value="all">All types</option>
-        {Object.entries(KIND_NAMES).map(([k,n])=><option key={k} value={k}>{n[1]}</option>)}
-      </select>
+      <AppSelect label="File type" value={kind} onChange={setKind} options={[
+        {value:"all",label:"All types"},
+        ...Object.entries(KIND_NAMES).map(([value,labels])=>({value,label:labels[1]})),
+      ]}/>
       <input className="fld" aria-label="Search files" placeholder="Search skill or path" value={q} onChange={e=>setQ(e.target.value)}/>
     </div>
     {note?<p className="muted small" role="status">{note}</p>:null}
@@ -88,8 +92,13 @@ function RepoFiles({repoId,onChanged}){
           <code style={{wordBreak:"break-all"}}>{f.path}</code>
           <span className="muted">{f.kind} · {fmtBytes(f.bytes)}</span>
           <button className="fld" type="button" onClick={()=>togglePreview(f)}>{shown===key?"Hide":"View"}</button>
-          <button className="fld" type="button" onClick={()=>remove(f)}>Remove</button>
+          <button className="fld" type="button" onClick={()=>setConfirmFile(confirmFile===key?"":key)}>Remove</button>
         </div>
+        {confirmFile===key?<div className="repo-file-confirm" role="group" aria-label={`Confirm removal of ${f.path}`}>
+          <span>Exclude this file from future syncs?</span>
+          <button className="btn sm danger" type="button" onClick={()=>remove(f)}>Remove file</button>
+          <button className="btn sm ghost" type="button" onClick={()=>setConfirmFile("")}>Cancel</button>
+        </div>:null}
         {shown===key?<div>{preview?.loading?<span className="muted">Loading…</span>:preview?.error?<span role="alert">{preview.error}</span>:preview?.preview===null?<span className="muted">{preview.note}</span>:<pre style={{maxHeight:220,overflow:"auto",whiteSpace:"pre-wrap",wordBreak:"break-word"}}>{preview?.preview}{preview?.truncated?"\n… (first 4000 characters)":""}</pre>}</div>:null}
       </div>;})}
     </div>)}
@@ -101,7 +110,7 @@ function RepoFiles({repoId,onChanged}){
   </div>;
 }
 
-export default function GithubSources({active,onUpdated}) {
+export default function GithubSources({active,onUpdated,onOpenRepo,focusRepo,onCloseRepo}) {
   const [rows,setRows]=useState([]);
   const [tokenConfigured,setTokenConfigured]=useState(null);
   const [token,setToken]=useState("");
@@ -114,7 +123,9 @@ export default function GithubSources({active,onUpdated}) {
   const [names,setNames]=useState("");
   const [busy,setBusy]=useState("");
   const [drafts,setDrafts]=useState({});
-  const [filesOpen,setFilesOpen]=useState({});
+  const [detailTab,setDetailTab]=useState("overview");
+  const [removeArmed,setRemoveArmed]=useState(false);
+  const [removeText,setRemoveText]=useState("");
   const [newOpts,setNewOpts]=useState({file_types:["script","test"],path_filter:"",max_kb:750,adopt:false,update_mode:"safe"});
   const draftOf=(r)=>drafts[r.id]||{file_types:r.file_types||["script","test"],root:r.root||"",path_filter:r.path_filter||"",max_kb:r.max_kb!==undefined && r.max_kb!==null && r.max_kb!==""?r.max_kb:750,adopt:!!r.adopt,update_mode:r.update_mode||"safe"};
   const setDraft=(r,patch)=>setDrafts(d=>({...d,[r.id]:{...draftOf(r),...patch}}));
@@ -144,8 +155,57 @@ export default function GithubSources({active,onUpdated}) {
   }
   async function perform(key,work){
     setBusy(key);setMessage("");
-    try{const result=await work();if(result.error)throw Error(result.error);await load();onUpdated?.();setMessage(result.unchanged?(result.free?"Already up to date. This check did not use your GitHub quota.":"Already up to date."):result.running?`Paused at ${result.done} of ${result.total} files. It continues on Cloudflare every couple of minutes.`:result.complete?summaryText(result.summary):"Saved.");}
-    catch(e){setMessage(e.message)}finally{setBusy("")}
+    try{const result=await work();if(result.error)throw Error(result.error);await load();onUpdated?.();setMessage(result.unchanged?(result.free?"Already up to date. This check did not use your GitHub quota.":"Already up to date."):result.running?`Paused at ${result.done} of ${result.total} files. It continues on Cloudflare every couple of minutes.`:result.complete?summaryText(result.summary):"Saved.");return true;}
+    catch(e){setMessage(e.message);return false;}finally{setBusy("")}
+  }
+  const selected = focusRepo ? rows.find(r=>r.id===focusRepo) : null;
+  if(focusRepo){
+    if(!selected)return <section className="repo-workspace stack" aria-live="polite">
+      <button type="button" className="repo-back" onClick={onCloseRepo}><Icon name="chev" size={17}/> Back to repositories</button>
+      <div className="card"><p className="muted">{rows.length ? "This repository is no longer tracked." : "Loading repository…"}</p></div>
+    </section>;
+    const filesTotal=Object.values(selected.file_counts||{}).reduce((n,v)=>n+Number(v||0),0);
+    return <section className="repo-workspace stack" aria-label={`Repository ${selected.repo}`}>
+      <button type="button" className="repo-back" onClick={onCloseRepo}><span aria-hidden="true">←</span> All repositories</button>
+      <header className="repo-detail-hero">
+        <span className="dash-eyebrow">SKILLS / REPOSITORY</span>
+        <div className="repo-detail-title"><span className="repo-card-icon"><Icon name="skills" size={24}/></span><div>
+          <h1>{selected.repo}</h1><p>{selected.owner} · {selected.branch || "main"}</p>
+        </div></div>
+        <div className="repo-meta"><span className={`repo-pill ${selected.last_error?"problem":"up"}`}><i/>{selected.last_error?"Needs review":selected.sync_status==='running'?"Sync in progress":selected.last_sha?"Connected":"Not checked"}</span>
+          <span className="repo-pill">{selected.skill_count} imported skills</span><span className="repo-pill">{filesTotal} resources</span></div>
+      </header>
+      <div className="repo-detail-tabs" role="tablist" aria-label="Repository sections">
+        {[["overview","Overview"],["files","Files"],["settings","Settings"]].map(([key,label])=><button key={key} type="button" role="tab" aria-selected={detailTab===key} className={detailTab===key?"active":""} onClick={()=>setDetailTab(key)}>{label}</button>)}
+      </div>
+      {detailTab==="overview"?<div className="repo-detail-panel" role="tabpanel">
+        <div className="repo-stats"><div><small>Imported skills</small><b>{selected.skill_count}</b></div><div><small>Resource files</small><b>{filesTotal}</b></div><div><small>Sync mode</small><b>{selected.enabled?"Active":"Paused"}</b></div></div>
+        {selected.last_error?<p className="repo-inline-alert" role="alert">{selected.last_error}</p>:null}
+        <div className="card repo-info-card"><h3>Sync activity</h3>
+          <p className="muted small">{selected.last_checked?`Last checked ${selected.last_checked} UTC`:"Not checked yet"}</p>
+          {selected.sync_status==='running'&&selected.sync_total>0?<div className="repo-progress"><div className="row"><span>Checking files</span><b>{selected.sync_done}/{selected.sync_total}</b></div><progress max={selected.sync_total} value={selected.sync_done}/></div>:null}
+          {selected.sync_note?<p className="muted small">{selected.sync_note.split(" | ").join(" · ")}</p>:null}
+          {selected.summary?<SyncSummary s={selected.summary} when={selected.summary.at}/>:null}
+          <div className="repo-actions"><button className="btn" disabled={!!busy} onClick={()=>perform(selected.id,()=>syncAll(selected.id))}>{busy===selected.id?"Syncing…":"Sync now"}</button>
+            <button className="btn ghost" disabled={!!busy} onClick={()=>perform(selected.id,()=>syncAll(selected.id,true))}>Full re-check</button></div>
+        </div>
+        <div className="card repo-info-card"><div className="repo-card-heading"><div className="grow"><h3>Automatic sync</h3><p className="muted small">Keep this source up to date</p></div>
+          <Switch checked={selected.enabled} disabled={!!busy} title="Enable automatic repository sync" onChange={next=>perform(selected.id,()=>skillRepos.toggle(selected.id,next))}/></div></div>
+      </div>:null}
+      {detailTab==="files"?<div className="card repo-detail-panel" role="tabpanel"><h3>Imported resources</h3><p className="muted small">Browse, preview, exclude or restore files from this repository.</p><RepoFiles repoId={selected.id} onChanged={load}/></div>:null}
+      {detailTab==="settings"?<div className="repo-detail-panel" role="tabpanel">
+        <div className="card stack"><h3>Import preferences</h3><p className="muted small">Control which files this repository can import. Existing memories and skills are not deleted.</p>
+          <FileOptions showRoot value={draftOf(selected)} onChange={patch=>setDraft(selected,patch)} disabled={!!busy}/>
+          <div className="repo-actions"><button className="btn" disabled={!!busy} onClick={()=>perform(selected.id,async()=>{const saved=await skillRepos.filter(selected.id,draftOf(selected));if(saved.error)throw Error(saved.error);return syncAll(selected.id);})}>Save & sync</button></div>
+        </div>
+        <div className="card repo-danger-zone"><h3>Disconnect repository</h3><p className="muted small">Stop syncing this source. Previously installed skills will remain.</p>
+          {!removeArmed?<button className="btn danger" type="button" onClick={()=>setRemoveArmed(true)}>Disconnect repository</button>:
+          <div className="stack"><label className="small">Type <strong>{selected.repo}</strong> to confirm<input className="fld" autoComplete="off" value={removeText} onChange={e=>setRemoveText(e.target.value)}/></label>
+            <div className="repo-actions"><button className="btn danger" type="button" disabled={!!busy||removeText!==selected.repo} onClick={async()=>{if(await perform(selected.id,()=>skillRepos.remove(selected.id)))onCloseRepo?.();}}>Confirm disconnect</button><button className="btn ghost" type="button" onClick={()=>{setRemoveArmed(false);setRemoveText("");}}>Cancel</button></div>
+          </div>}</div>
+      </div>:null}
+      {message?<p className="small repo-action-message" role="status">{message}</p>:null}
+    </section>;
   }
   return <section className="card stack" aria-label="GitHub skill repositories">
     <div className="chead"><div className="grow"><span className="dash-eyebrow">SOURCES & INTEGRATIONS</span><h3>Connected repositories</h3>
@@ -171,41 +231,18 @@ export default function GithubSources({active,onUpdated}) {
     <div className="repo-list-scroll" role="region" aria-label="Tracked skill repositories" tabIndex={0}>
     {rows.map(r=><div key={r.id} className="repo-list-item stack">
       <div className="repo-card-heading">
-        <div className="repo-card-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="15" rx="3"/><path d="M3 10h18M8 5V3m8 2V3"/></svg></div>
-        <div className="repo-card-name grow">
-          <strong>{r.repo}</strong>
-          <span className="repo-location">by {r.owner} {r.root ? `· ${r.root}` : "· Auto-discover skills"}</span>
-        </div>
-        <Switch checked={r.enabled} disabled={!!busy} title="Enable automatic GitHub sync" onChange={v=>perform(r.id,()=>skillRepos.toggle(r.id,v))}/>
+        <div className="repo-card-icon" aria-hidden="true"><Icon name="skills" size={21}/></div>
+        <div className="repo-card-name grow"><strong>{r.repo}</strong><span className="repo-location">{r.owner} · {r.root || "Auto-discover"}</span></div>
+        <Switch checked={r.enabled} disabled={!!busy} title={`Automatic sync for ${r.repo}`} onChange={v=>perform(r.id,()=>skillRepos.toggle(r.id,v))}/>
       </div>
       <div className="repo-meta">
-        <span className={"repo-pill "+(r.last_error?"problem":r.sync_status==="running"?"":"up")}><i/>{r.last_error?"Needs review":r.sync_status==="running"?"Syncing":r.last_sha?"Tracked":"Not checked"}</span>
-        <span className="repo-pill">{r.skill_count} imported</span>
-        <span className="repo-pill">{r.names.length?`${r.names.length} selected`:'All skills'}</span>
+        <span className={`repo-pill ${r.last_error?"problem":"up"}`}><i/>{r.last_error?"Needs review":r.sync_status==='running'?"Syncing":r.last_sha?"Tracked":"Not checked"}</span>
+        <span className="repo-pill">{r.skill_count} skills</span>
+        <span className="repo-pill">{Object.values(r.file_counts||{}).reduce((n,v)=>n+Number(v||0),0)} files</span>
       </div>
-      <div className="repo-card-subnote">{r.last_error?`Sync issue: ${r.last_error}`:r.last_checked?`Last checked ${r.last_checked} UTC`:"Ready to check GitHub"}</div>
-      <details className="repo-list-details"><summary className="small">Manage repository and synced files</summary>
-      <div className="stack" style={{gap:8}}>
-      {r.sync_status==='running'&&r.sync_total>0?<div className="repo-progress" aria-live="polite"><div className="row" style={{justifyContent:'space-between'}}><span className="muted small">Syncing on Cloudflare</span><b className="small">{r.sync_done} / {r.sync_total} files</b></div><progress max={r.sync_total} value={r.sync_done} style={{width:'100%'}}/><p className="muted small">{blockedUntil?`Waiting for GitHub until ${new Date(blockedUntil).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}, then continues by itself.`:"Continues on Cloudflare every couple of minutes, even when the app is closed."}</p></div>:null}
-      {r.sync_note?<div className="muted small" role="status">{r.sync_note.split(" | ").map((n,i)=><div key={i}>• {n}</div>)}</div>:null}
-      {r.last_error?<div className="small" role="alert" style={{color:"var(--danger, #b92a44)"}}>Last check failed: {r.last_error}</div>:null}
-      {r.sync_status==='up-to-date'?<p className="muted small">Up to date: no changes on GitHub{r.last_checked?' · '+r.last_checked+' UTC':''}</p>:null}
-      {r.summary&&r.sync_status!=='running'?<SyncSummary s={r.summary} when={r.summary.at}/>:r.sync_status==='complete'?<p className="muted small">Sync completed{r.last_checked?' · '+r.last_checked+' UTC':''}</p>:null}
-      <details onToggle={e=>{const open=e.currentTarget.open;setFilesOpen(o=>({...o,[r.id]:open}));}}><summary className="small">Imported files ({Object.values(r.file_counts||{}).reduce((a,b)=>a+b,0)})</summary>
-        {filesOpen[r.id]?<RepoFiles repoId={r.id} onChanged={load}/>:null}
-      </details>
-      <details><summary className="small">File settings</summary>
-        <div className="stack" style={{marginTop:8,gap:8}}>
-          <FileOptions showRoot value={draftOf(r)} onChange={patch=>setDraft(r,patch)} disabled={!!busy}/>
-          <button className="fld" type="button" disabled={!!busy} onClick={()=>perform(r.id,()=>syncAll(r.id,true))}>Re-check everything (uses 2 GitHub requests)</button>
-          <button className="fld" type="button" disabled={!!busy} onClick={()=>perform(r.id,async()=>{const saved=await skillRepos.filter(r.id,draftOf(r));if(saved.error)throw Error(saved.error);return syncAll(r.id);})}>Save and sync</button>
-        </div>
-      </details>
-      <div className="row" style={{gap:8}}>
-        <button className="fld" type="button" disabled={!!busy} onClick={()=>perform(r.id,()=>syncAll(r.id))}>{busy===r.id?"Checking…":"Sync now"}</button>
-        <button className="fld" type="button" disabled={!!busy} onClick={()=>{if(window.confirm(`Stop tracking ${r.id}? Installed skills will remain.`))perform(r.id,()=>skillRepos.remove(r.id));}}>Remove repo</button>
-      </div>
-      </div></details>
+      <button className="repo-card-open" type="button" onClick={()=>onOpenRepo?.(r.id)}>
+        <span>Open repository</span><span aria-hidden="true">→</span>
+      </button>
     </div>)}
     </div>
     {rows.length>3?<p className="repo-scroll-hint">↓ Scroll to explore all {rows.length} repositories</p>:null}

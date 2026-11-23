@@ -13,6 +13,7 @@ import Collapse from "../../components/Collapse.jsx";
 
 import Icon from "../../components/Icon.jsx";
 import SkillStudio from "./SkillStudio.jsx";
+import AppSelect from "../../components/AppSelect.jsx";
 
 // The Skill Genie. Agents send their request; the Genie returns only the skills that fit.
 export default function SkillSelector({ active, onDeleted }) {
@@ -40,6 +41,9 @@ export default function SkillSelector({ active, onDeleted }) {
     return !q || hay.includes(q.toLowerCase());
   }).sort((a,b)=>filter==='used'?b.uses-a.uses:filter==='updated'?b.updated.localeCompare(a.updated):filter==='new'?b.created.localeCompare(a.created):a.name.localeCompare(b.name)), [sk.items,filter,q]);
   const pendingCount = sk.items.filter((s) => s.pending).length;
+  const humanSource = (source="") => source.startsWith("github:")
+    ? `GitHub · ${source.slice(7).split(":")[0]}`
+    : source === "file" ? "Uploaded file" : source === "paste" ? "Created here" : source || "Custom skill";
 
   const readFile = (f) => f.text().then((t) => sk.add(t, "file"));
   const addText = async () => { if (await sk.add(text, "paste")) { setText(""); setAdding(false); } };
@@ -77,16 +81,20 @@ export default function SkillSelector({ active, onDeleted }) {
           ) : null}
         </Collapse>
         <div className="filter">
-          <select aria-label="Sort and filter skills" className="fld" style={{width:'auto',maxWidth:'65%',fontSize:13}} value={filter} onChange={e=>{setFilter(e.target.value);setShown(10);}}>
-            <option value="new">Newly added</option><option value="updated">Recently updated</option><option value="used">Most used</option><option value="all">All A–Z</option><option value="on">Enabled</option><option value="off">Disabled</option>
-          </select>
+          <AppSelect label="Sort and filter skills" value={filter} onChange={next=>{setFilter(next);setShown(10);}}
+            options={[
+              {value:"new",label:"Newly added"}, {value:"updated",label:"Recently updated"},
+              {value:"used",label:"Most used"}, {value:"all",label:"All A–Z"},
+              {value:"on",label:"Enabled"}, {value:"off",label:"Disabled"},
+            ]}/>
           <div className="cluster">
             {pendingCount ? <Badge tone="rule">{pendingCount} to review</Badge> : null}
-            <label className="count-pill" htmlFor="sk-max" title="Total maximum number of skills selected per request">
-              Skills per request <select id="sk-max" aria-label="Maximum skills per request" value={sk.max} onChange={(e) => sk.saveMax(Number(e.target.value))}>
-                {Array.from({length:8},(_,i)=><option key={i+1} value={i+1}>{i+1}</option>)}
-              </select>
-            </label>
+            <div className="skill-cap" title="Maximum skills sent for one agent request">
+              <span>Skills per request</span>
+              <AppSelect id="sk-max" label="Skills per request" className="app-select-compact" value={sk.max}
+                onChange={next=>sk.saveMax(Number(next))}
+                options={Array.from({length:8},(_,i)=>({value:i+1,label:String(i+1)}))}/>
+            </div>
           </div>
         </div>
         <Notice tone={sk.message.tone} id="sk-msg">{sk.message.text}</Notice>
@@ -101,7 +109,7 @@ export default function SkillSelector({ active, onDeleted }) {
               <div className="dhead">
                 <button type="button" className="dmain" aria-expanded={isOpen} onClick={() => setOpen((o) => ({ ...o, [key]: !o[key] }))}>
                   <span className={"ic " + (s.enabled ? "ok" : "lock")}><Icon name={s.enabled ? "skills" : "lock"} size={18} /></span>
-                  <span className="tt"><code>{s.name}</code><small>{s.pending ? <b className="ok-amber">Needs review </b> : null}{s.core ? "Prioritized " : ""}{s.tokens} tokens, from {s.source}</small></span>
+                  <span className="tt"><span className="skill-card-name" title={s.name}>{s.name.replace(/[-_]/g," ")}</span><small className="skill-card-meta">{s.pending ? <b className="ok-amber">Needs review · </b> : null}{s.core ? "Prioritized · " : ""}{s.tokens} tokens · {humanSource(s.source)}</small></span>
                   <span className="chev"><Icon name="chev" size={18} /></span>
                 </button>
                 <Switch checked={s.enabled} onChange={(v) => sk.toggle(s.name, "enabled", v)} title={s.pending ? "Approve and enable" : "Enable or disable"} />

@@ -31,6 +31,11 @@ export const memorySettings = {
 
 export const memories = {
   list: (q = "") => get("/api/memories?q=" + encodeURIComponent(q)).then((d) => d.items),
+  page: ({ q = "", rule = "all", limit = 30, offset = 0, ...filters } = {}) => {
+    const params = new URLSearchParams({ q, rule, limit: String(limit), offset: String(offset), ...filters });
+    return get("/api/memories?" + params.toString());
+  },
+  one: (id) => get("/api/memories/" + encodeURIComponent(id)),
   add: (body) => post("/api/memories", body),
   edit: (id, body) => put("/api/memories/" + id, body),
   remove: (id) => del("/api/memories/" + id),

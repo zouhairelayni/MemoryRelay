@@ -247,3 +247,39 @@ See [CHANGELOG.md](CHANGELOG.md), [design system](docs/DESIGN-SYSTEM.md), and [v
 **Memory context:** Settings → Memory context controls 100–8,000 estimated tokens per memory, default 1,000. `get_memory_settings` and `tools/list` on the MCP server read the persisted setting. Tool descriptions may be cached by the connecting client: reconnect/reload the MCP connection after deploying a server upgrade. Changing the owner setting itself requires no new Worker deployment.
 
 **Home/Live:** dashboard metrics and measured Chart.js analytics precede secondary management. The chart metric control is an in-app dropdown, not a browser/Android OS picker. Repositories use bounded scroll cards. Installed PWAs show a header refresh control next to Settings.
+
+
+## 3.4.7 — Premium app branding, full UI consistency and welcome motion
+
+This release upgrades the logo across the browser, Android installed PWA, Apple touch icon, and in-app shell; adds a one-time welcome animation; and ships the v3.4.0–v3.4.5 Overview, chart, selector, and repository workspace refinements. The shared brand source is `src/components/Logo.jsx`; vector fallback is `public/icons/icon.svg`. See `docs/releases/3.4.0.md` through `3.4.7.md` and `docs/QA-2026-11-23-3.4.7.md` for acceptance evidence and limitations. Run `npm test && npm run build` locally before release.
+
+
+## 3.4.7 — Premium app branding, full UI consistency and welcome motion
+
+This release upgrades the logo across the browser, Android installed PWA, Apple touch icon, and in-app shell; adds a one-time welcome animation; and ships the v3.4.0–v3.4.5 Overview, chart, selector, and repository workspace refinements. The shared brand source is `src/components/Logo.jsx`; vector fallback is `public/icons/icon.svg`. See `docs/releases/3.4.0.md` through `3.4.7.md` and `docs/QA-2026-11-23-3.4.7.md` for acceptance evidence and limitations. Run `npm test && npm run build` locally before release.
+
+
+## v3.5.0 — Search every memory by description, labels and build version
+
+MemoryRelay's MCP now offers **`list_memories`**, **`search`** with `offset`/`next_offset`, and **`get_memory`** to load complete selected Markdown content. The full library is discoverable in pages of up to 100 index records without consuming the token budget for every memory body. Each result contains an explicit description or a factual excerpt from the first Markdown title, as well as separate typed metadata fields: `app`, `platforms` (including PWA), `feature`, `version`, `languages`, and `stack`. New and legacy context tags are separate and keep the original rule protections.
+
+The owner can edit descriptions and these fields in the Memory screen; the new colored chips are displayed in each card. The memory editor continues supporting bold/italic Markdown, bulleted lists, inline code and fenced command blocks with **copy-only** actions. The owner-configured per-memory token limit still applies; metadata is a bounded search index, not a replacement for the content.
+
+Example MCP workflow:
+
+```json
+{"name":"list_memories","arguments":{"app":"RIVNA","limit":100,"offset":0}}
+```
+
+For every page, follow `next_offset` until `null`; choose an ID and call:
+
+```json
+{"name":"get_memory","arguments":{"memory_id":"the-returned-id"}}
+```
+
+Search and filter by individual typed fields, for example `{"query":"routing","version":"BUILD 09","platforms":"backend"}`. New MCP tools and schemas are visible after deploying the Worker and reconnecting the client. See [`docs/releases/3.5.0.md`](docs/releases/3.5.0.md) for schema, limits, API, safeguards, and test details. No existing memory body is rewritten by the migration.
+
+
+## Consolidated v3.5.0 source installation
+
+The v3.5.0 FULL SOURCE release ZIP is cumulative: it includes all v3.4.7 design/logo/PWA changes, all v3.5.0 memory/MCP changes, tests and versioned documents. To install from a clean v3.3.0/v3.3.8/v3.4.7 Git checkout, use `INSTALL_MEMORYRELAY_v3.5.0.sh` supplied alongside the `MemoryRelay/` folder in the extracted ZIP. The script verifies checksums, runs `npm test` and `npm run build`, then commits/pushes the currently checked-out branch only after both pass. It never automatically deploys Cloudflare.

@@ -48,8 +48,23 @@ export default function HomeScreen({ active }) {
         <h1>Overview</h1>
         <p>Live usage, activity and network health in one place.</p>
       </header>
+      <section className="overview-library" aria-label="Knowledge library">
+        <div className="overview-library-head"><span className="dash-eyebrow">YOUR LIBRARY</span><span>Everything your agents can use</span></div>
+        <div className="overview-library-grid">
+          {[
+            {to:"memory",icon:"memory",label:"Memories",number:memories},
+            {to:"memory",icon:"lock",label:"Rules",number:rules},
+            {to:"skills",icon:"skills",label:"Skills",number:skillsN},
+            {to:"keys",icon:"keys",label:"AI keys",number:keysN},
+          ].map(item=><button type="button" key={item.label} className="overview-library-card" onClick={()=>go(item.to)}>
+            <span className="overview-library-icon"><Icon name={item.icon} size={17}/></span>
+            <strong>{item.number}</strong>
+            <span>{item.label}</span>
+          </button>)}
+        </div>
+      </section>
       <MonitorPanel active={active}/>
-      <div className="home-secondary-head"><div><span className="dash-eyebrow">CONNECTED WORKSPACE</span><h2>People & knowledge</h2></div><span className="home-secondary-note">Manage what powers your agents</span></div>
+      <div className="home-secondary-head"><div><span className="dash-eyebrow">CONNECTIONS</span><h2>Connected agents</h2></div><span className="home-secondary-note">Your agent network</span></div>
       <section className="status home-status" aria-live="polite" style={step()}>
         <div className={"ring " + tone} aria-hidden="true">
           <svg viewBox="0 0 64 64"><circle className="ring-bg" cx="32" cy="32" r="28" /><circle className="ring-fg" cx="32" cy="32" r="28" /></svg>
@@ -109,24 +124,7 @@ export default function HomeScreen({ active }) {
         </div>
       </section>
 
-      <section className="home-library" style={step()}>
-        <h3 className="section-title">Library</h3>
-        <div className="stack list" style={{ marginTop: 8 }}>
-          {[
-            { to: "memory", icon: "memory", label: "Memories", n: memories, key: "memories" },
-            { to: "memory", icon: "lock", label: "Rules", n: rules, key: "rules" },
-            { to: "skills", icon: "skills", label: "Skills", n: skillsN, key: "skills" },
-            { to: "keys", icon: "keys", label: "AI keys", n: keysN, key: "keys" },
-          ].map((r) => (
-            <button key={r.label} type="button" className="lib-row" onClick={() => go(r.to)}>
-              <span className="chip"><Icon name={r.icon} size={18} /></span>
-              <span className="tt"><b>{r.label}</b></span>
-              <span className="lib-n" data-stat={r.key}>{r.n}</span>
-              <Icon name="chev" className="chev-r" />
-            </button>
-          ))}
-        </div>
-      </section>
+
 
       </div>
       {install.canInstall ? (

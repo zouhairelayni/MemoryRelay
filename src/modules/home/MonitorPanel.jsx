@@ -2,6 +2,7 @@ import {useEffect,useMemo,useState} from 'react';
 import {monitoring} from '../../api/endpoints.js';
 import ActivityChart from './ActivityChart.jsx';
 import MetricDropdown from './MetricDropdown.jsx';
+import { colorForMetric } from './metricColors.js';
 
 const fmt=n=>Intl.NumberFormat().format(Number(n)||0);
 const time=ts=>new Date(ts).toLocaleString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
@@ -35,11 +36,11 @@ function Heat({hourly}){
   </div></div>;
 }
 export default function MonitorPanel({active}) {
-  const [period,setPeriod]=useState('30'),[metric,setMetric]=useState('mcp'),[data,setData]=useState(null),[error,setError]=useState('');
+  const [period,setPeriod]=useState('30'),[metric,setMetric]=useState('mcp'),[data,setData]=useState(null),[error,setError]=useState(''),[reload,setReload]=useState(0);
   useEffect(()=>{if(!active)return;let alive=true;setData(null);
     const load=()=>monitoring.get(period).then(d=>{if(alive){setData(d);setError('');}}).catch(e=>{if(alive)setError(e.message)});
     load();const id=setInterval(load,8000);return()=>{alive=false;clearInterval(id)};
-  },[active,period]);
+  },[active,period,reload]);
   const timeline=useMemo(()=>{
     if(!data)return {buckets:[],totals:[],byMetric:{},byAction:new Map()};
     const {step,series}=data;
@@ -73,8 +74,11 @@ export default function MonitorPanel({active}) {
   return <section className="monitor-root" aria-label="Activity monitoring">
     <div className="monitor-header"><div><span className="dash-eyebrow">PERFORMANCE</span><h3>Usage at a glance</h3><p className="muted small">All figures reflect recorded activity, not billing totals.</p></div>
       <div className="monitor-period" role="group" aria-label="Activity period">{[["1h","1h"],["1d","24h"],["7","7d"],["30","30d"],["90","90d"]].map(([value,label])=><button key={value} type="button" className={period===value?"on":""} aria-pressed={period===value} onClick={()=>{setPeriod(value);setMetric("mcp");}}>{label}</button>)}</div></div>
-    {error?<p className="small" role="alert">Unable to load activity: {error}</p>:null}
-    {!data?<p className="muted small">Loading activity…</p>:<>
+    {error?<div className="monitor-load-error" role="alert"><strong>Activity data is unavailable</strong><span>{error}</span><button type="button" className="btn sm ghost" onClick={()=>setReload(n=>n+1)}>Try again</button></div>:null}
+    {!data?<div className="monitor-loading" aria-label="Loading usage data">
+      <div className="monitor-metrics">{[0,1,2,3].map(i=><div className="monitor-metric" key={i}><span className="monitor-shimmer monitor-shimmer-label"/><span className="monitor-shimmer monitor-shimmer-number"/><span className="monitor-shimmer monitor-shimmer-foot"/></div>)}</div>
+      <div className="monitor-shimmer monitor-shimmer-graph"/>
+    </div>:<>
       <div className="monitor-metrics">
         {primaryMetrics.map(metricCard)}
       </div>
@@ -82,12 +86,13 @@ export default function MonitorPanel({active}) {
         <div className="monitor-chart-title"><div><span className="dash-eyebrow">ACTIVITY INSIGHTS</span><h4>Activity trend</h4><p className="muted small">{data.label} · Recorded data, not cumulative totals</p></div>
           <MetricDropdown value={metric} onChange={setMetric} metrics={METRICS} functions={functionRows}/>
         </div>
-        <ActivityChart type="line" labels={timeLabels} values={plotValues} label={`${selectedLabel} over ${data.label}`} unit={metric==='tokens'?'tokens':metric==='skill'?'selections':metric==='delegate'?'tasks':metric==='errors'?'errors':'calls'}/>
+        <div className="monitor-plot-key" style={{"--plot-color":colorForMetric(metric)}}><span className="monitor-plot-swatch"/>{selectedLabel}<span className="monitor-plot-count">{fmt(plotValues.reduce((a,b)=>a+(Number(b)||0),0))}</span></div>
+        <ActivityChart type="line" color={colorForMetric(metric)} labels={timeLabels} values={plotValues} label={`${selectedLabel} over ${data.label}`} unit={metric==='tokens'?'tokens':metric==='skill'?'selections':metric==='delegate'?'tasks':metric==='errors'?'errors':'calls'}/>
         {period==='1h'||period==='1d'?null:<><h4>Hourly activity (UTC)</h4><Heat hourly={data.hourly}/></>}
       </div>
       <div className="monitor-supporting"><div className="monitor-secondary-label"><span className="dash-eyebrow">MORE USAGE SIGNALS</span></div><div className="monitor-metrics monitor-metrics-secondary">{supportingMetrics.map(metricCard)}</div></div>
       <div className="card monitor-figure monitor-functions"><div className="monitor-chart-title"><h4>Most used functions</h4><span className="muted small">Top {topFunctions.length} in {data.label}</span></div>
-        {topFunctions.length?<ActivityChart type="bar" labels={functionNames} values={functionCounts} label="Most used functions"/>:<p className="muted small">No functions recorded for this period.</p>}
+        {topFunctions.length?<ActivityChart type="bar" color={colorForMetric("functions")} labels={functionNames} values={functionCounts} label="Most used functions"/>:<p className="muted small">No functions recorded for this period.</p>}
         <details className="monitor-details"><summary>All recorded functions ({functionRows.length})</summary>
           <div className="monitor-function-list">{functionRows.map(x=><div key={`${x.category}:${x.action}`} className="monitor-breakdown"><span>{x.category} / {x.action}</span><b>{fmt(x.n)}</b></div>)}</div>
         </details>

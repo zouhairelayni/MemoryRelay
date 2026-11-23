@@ -74,6 +74,16 @@ export async function ensureSchema(env) {
     env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_delegations_ts ON delegations (ts)"),
   ]);
   // Columns added after the first release. Older databases get them here; "already exists" from a racing instance is fine.
+  // Non-destructive, idempotent migration: source text and context tags remain untouched.
+  const memoryColumns = new Set((await env.DB.prepare("SELECT name FROM pragma_table_info('memories')").all()).results.map((c) => c.name));
+  for (const [key, ddl] of [
+    ["description", "description TEXT NOT NULL DEFAULT ''"],
+    ["metadata", "metadata TEXT NOT NULL DEFAULT '{\"app\":\"\",\"platforms\":[],\"feature\":\"\",\"version\":\"\",\"languages\":[],\"stack\":[]}'"],
+  ]) {
+    if (memoryColumns.has(key)) continue;
+    try { await env.DB.prepare("ALTER TABLE memories ADD COLUMN " + ddl).run(); }
+    catch (e) { if (!/duplicate column/i.test(String(e))) throw e; }
+  }
   const have = new Set((await env.DB.prepare("SELECT name FROM pragma_table_info('services')").all()).results.map((c) => c.name));
   for (const [col, ddl] of [
     ["access", "access TEXT NOT NULL DEFAULT 'full'"],   // read / write / full (older connections keep full)

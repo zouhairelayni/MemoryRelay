@@ -5,6 +5,7 @@ import Icon from "../../components/Icon.jsx";
 import Brand from "../../components/Brand.jsx";
 import MemoryEditor from "./MemoryEditor.jsx";
 import MemoryMarkdown from "./MemoryMarkdown.jsx";
+import MemoryLabels from "./MemoryLabels.jsx";
 import { memoryTitle } from "../../lib/memoryMarkdown.js";
 import { hasRule, splitTags } from "../../lib/format.js";
 import { sourceInfo } from "../../lib/cable.js";
@@ -21,7 +22,7 @@ export default function MemoryCard({ m, editing, onEdit, onCancel, onSave, onDel
     return (
       <div className={"mem open" + (rule ? " is-rule" : "")}>
         <div className="pad">
-          <MemoryEditor idPrefix="edit" autoFocus saveLabel="Save" initial={{ text: m.text, tags: rule ? "" : m.tags, rule }}
+          <MemoryEditor idPrefix="edit" autoFocus saveLabel="Save" initial={{ text: m.text, tags: rule ? "" : m.tags, description: m.description || "", metadata: m.metadata || {}, rule }}
             onSave={(body) => onSave(m.id, body)} onCancel={onCancel} />
         </div>
       </div>
@@ -34,7 +35,8 @@ export default function MemoryCard({ m, editing, onEdit, onCancel, onSave, onDel
           <span className="mem-preview-title">{memoryTitle(m.text)}</span>
           <span className="mem-preview-action">{open ? "Collapse" : "Read memory"} <span aria-hidden="true">{open?"⌃":"⌄"}</span></span>
         </button>
-        {open ? <div className="mem-detail"><MemoryMarkdown text={m.text}/></div> : <p className="mem-preview-snippet">{m.text.replace(/[`*_#>]/g, "").replace(/\s+/g," ").slice(0,156)}</p>}
+        {open ? <div className="mem-detail"><MemoryMarkdown text={m.text}/></div> : <p className="mem-preview-snippet">{m.description || m.text.replace(/[`*_#>]/g, "").replace(/\s+/g," ").slice(0,156)}</p>}
+        <MemoryLabels metadata={m.metadata} />
         <span className="meta">
           {rule ? <span className="tag-rule"><Icon name="lock" size={13} />Rule</span> : <span className="src">{src.agent ? <Brand names={[src.name]} size={18} cable={src.color} /> : <i className="cd" style={{ "--cable": src.color }} />}{src.name}</span>}
           {tags.map((t) => <span key={t}>#{t}</span>)}

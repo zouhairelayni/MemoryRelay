@@ -1,11 +1,11 @@
 import {useEffect,useRef} from 'react';
-import {Chart,LineController,BarController,LineElement,BarElement,PointElement,CategoryScale,LinearScale,Tooltip} from 'chart.js';
+import {Chart,LineController,BarController,LineElement,BarElement,PointElement,CategoryScale,LinearScale,Tooltip,Filler} from 'chart.js';
 
 // Register only the two chart types we use; avoid the larger chart.js/auto bundle.
-Chart.register(LineController,BarController,LineElement,BarElement,PointElement,CategoryScale,LinearScale,Tooltip);
+Chart.register(LineController,BarController,LineElement,BarElement,PointElement,CategoryScale,LinearScale,Tooltip,Filler);
 
 const css=(styles,name,fallback)=>styles.getPropertyValue(name).trim()||fallback;
-export default function ActivityChart({type='line',labels=[],values=[],label,unit='calls'}){
+export default function ActivityChart({type='line',labels=[],values=[],label,unit='calls',color}){
   const canvas=useRef(null);
   useEffect(()=>{
     if(!canvas.current||!labels.length||!values.length)return;
@@ -13,16 +13,23 @@ export default function ActivityChart({type='line',labels=[],values=[],label,uni
     const ink=css(colors,'--ink2','#9aa8bb');
     const muted=css(colors,'--muted','#8091a4');
     const grid=css(colors,'--hair','rgba(120,140,160,.12)');
-    const accent=css(colors,'--cobalt','#95aaff');
-    const bar=css(colors,'--ink2','#8399ae');
+    const accent=color||css(colors,'--cobalt','#95aaff');
+    const canvasContext=canvas.current.getContext('2d');
+    const gradient=canvasContext.createLinearGradient(0,0,0,canvas.current.clientHeight||210);
+    // Chart.js Filler plugin uses the canvas gradient below the line; never a flat block.
+    const rgb=/^#([0-9a-f]{6})$/i.exec(accent);
+    const channels=rgb?[1,3,5].map(i=>parseInt(rgb[1].slice(i-1,i+1),16)):[170,165,255];
+    const rgba=(opacity)=>`rgba(${channels.join(',')},${opacity})`;
+    gradient.addColorStop(0,rgba(.34));gradient.addColorStop(.55,rgba(.11));gradient.addColorStop(1,rgba(0));
+    const bar=accent;
     const isBar=type==='bar';
     const chart=new Chart(canvas.current,{
       type,
       data:{labels,datasets:[{
         label,data:values.map(x=>Number(x)||0),
-        borderColor:accent,backgroundColor:isBar?bar:accent,
+        borderColor:accent,backgroundColor:isBar?bar:gradient,
         borderWidth:isBar?0:2.5,pointRadius:isBar?0:values.length>45?0:1.6,
-        pointHoverRadius:5,tension:0.36,fill:false,
+        pointHoverRadius:5,pointHoverBackgroundColor:accent,pointHoverBorderWidth:2,pointHoverBorderColor:css(colors,"--card","#152232"),tension:0.36,fill:isBar?false:"origin",
         borderRadius:isBar?6:0,maxBarThickness:16,
       }]},
       options:{responsive:true,maintainAspectRatio:false,animation:false,
@@ -42,7 +49,7 @@ export default function ActivityChart({type='line',labels=[],values=[],label,uni
       },
     });
     return()=>chart.destroy();
-  },[type,labels,values,label,unit]);
+  },[type,labels,values,label,unit,color]);
   return <div className={`activity-chart ${type==='bar'?'activity-chart-bar':''}`} role="img" aria-label={`${label}. ${values.reduce((s,x)=>s+(Number(x)||0),0).toLocaleString()} ${unit} over ${labels.length} intervals`}>
     {labels.length?<canvas ref={canvas}/>:<p className="muted small">No recorded activity for this period.</p>}
   </div>;

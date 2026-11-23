@@ -13,9 +13,18 @@ const PROPOSAL_MS = 10 * 60 * 1000;
 function cleanGroups(groups, byId) {
   const list = (Array.isArray(groups) ? groups : []).map((grp) => {
     const keep = String((grp && grp.keep) || "");
+    const keepMeta = safeJson(byId.get(keep)?.metadata, {});
     return {
       keep,
-      drop: (Array.isArray(grp && grp.drop) ? grp.drop : []).map(String).filter((d) => d !== keep && byId.has(d)),
+      // Never combine separate build/release memories or projects. They are
+      // distinct audit records even if their prose looks similar.
+      drop: (Array.isArray(grp && grp.drop) ? grp.drop : []).map(String).filter((d) => {
+        if (d === keep || !byId.has(d)) return false;
+        const candidate = safeJson(byId.get(d).metadata, {});
+        if ((keepMeta.version || candidate.version) && keepMeta.version !== candidate.version) return false;
+        if ((keepMeta.app || candidate.app) && keepMeta.app !== candidate.app) return false;
+        return true;
+      }),
       merged_text: String((grp && grp.merged_text) || "").trim(),
       reason: String((grp && grp.reason) || "").slice(0, 300),
     };
@@ -27,7 +36,7 @@ function cleanGroups(groups, byId) {
 
 export async function housekeep(env, a = {}) {
   const { results } = await env.DB.prepare(
-    `SELECT id, text FROM memories WHERE ${NOT_RULES_SQL} ORDER BY created DESC, rowid DESC LIMIT 200`
+    `SELECT id, text, metadata FROM memories WHERE ${NOT_RULES_SQL} ORDER BY created DESC, rowid DESC LIMIT 200`
   ).all();
   if (!results.length) {
     const rules = await env.DB.prepare(`SELECT COUNT(*) AS n FROM memories WHERE ${RULES_SQL}`).first();
