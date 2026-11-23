@@ -10,7 +10,7 @@ import { meter } from "./metering.js";
 import { activity, pruneActivity } from "./monitor.js";
 import { CORS, bearerChallenge, isOauthPath, oauth, serviceByBearer } from "./oauth.js";
 import { serviceBySecret } from "./services.js";
-import { json } from "./util.js";
+import { InputError, json } from "./util.js";
 import { syncEnabledSkillRepos } from "./githubSkills.js";
 
 // Headers for the app itself: no framing (clickjacking), no MIME sniffing, no referrer leaks, strict scripts.
@@ -96,6 +96,7 @@ export default {
       if (env.ASSETS) return withSecurityHeaders(await env.ASSETS.fetch(request));
       return new Response("not found", { status: 404 });
     } catch (e) {
+      if (e instanceof InputError) return json({ error: e.message }, e.status);
       console.error("request failed:", request.method, p.startsWith("/mcp/") ? "/mcp/[redacted]" : p, e && e.stack || e); // Secret-link tokens must not enter logs.
       return json({ error: "internal error, please try again" }, 500);
     }

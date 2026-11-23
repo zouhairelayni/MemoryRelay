@@ -168,7 +168,8 @@ export default function GithubSources({active,onUpdated}) {
       <p className="muted small">Classic and fine-grained tokens are supported. For a fine-grained token, grant Contents: Read-only for the repositories you want to sync. The token is checked before saving. Encryption at rest is optional, as with the app’s other API keys. Removing it falls back to the Worker secret, if configured.</p>
       <p className="muted small"><a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer">Manage GitHub tokens</a></p>
     </details>
-    {rows.map(r=><div key={r.id} className="stack" style={{borderTop:"1px solid var(--line)",paddingTop:12,gap:6}}>
+    <div className="repo-list-scroll" role="region" aria-label="Tracked skill repositories" tabIndex={0}>
+    {rows.map(r=><div key={r.id} className="repo-list-item stack">
       <div className="row" style={{justifyContent:"space-between",alignItems:"center"}}>
         <div className="grow"><strong>{r.owner}/{r.repo}</strong> <small className="muted">/ {r.root||"automatic"}</small>
           <div className="muted small">{r.names.length?`${r.names.length} selected skills`:'All skills'} · {r.last_sha?r.last_sha.slice(0,12):'Not checked'} · Auto sync {r.enabled?'on':'off'}</div>
@@ -176,6 +177,8 @@ export default function GithubSources({active,onUpdated}) {
         </div>
         <Switch checked={r.enabled} disabled={!!busy} title="Enable automatic GitHub sync" onChange={v=>perform(r.id,()=>skillRepos.toggle(r.id,v))}/>
       </div>
+      <details className="repo-list-details"><summary className="small">Manage repository and synced files</summary>
+      <div className="stack" style={{gap:8}}>
       {r.sync_status==='running'&&r.sync_total>0?<div className="repo-progress" aria-live="polite"><div className="row" style={{justifyContent:'space-between'}}><span className="muted small">Syncing on Cloudflare</span><b className="small">{r.sync_done} / {r.sync_total} files</b></div><progress max={r.sync_total} value={r.sync_done} style={{width:'100%'}}/><p className="muted small">{blockedUntil?`Waiting for GitHub until ${new Date(blockedUntil).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}, then continues by itself.`:"Continues on Cloudflare every couple of minutes, even when the app is closed."}</p></div>:null}
       {r.sync_note?<div className="muted small" role="status">{r.sync_note.split(" | ").map((n,i)=><div key={i}>• {n}</div>)}</div>:null}
       {r.last_error?<div className="small" role="alert" style={{color:"var(--danger, #b92a44)"}}>Last check failed: {r.last_error}</div>:null}
@@ -195,7 +198,10 @@ export default function GithubSources({active,onUpdated}) {
         <button className="fld" type="button" disabled={!!busy} onClick={()=>perform(r.id,()=>syncAll(r.id))}>{busy===r.id?"Checking…":"Sync now"}</button>
         <button className="fld" type="button" disabled={!!busy} onClick={()=>{if(window.confirm(`Stop tracking ${r.id}? Installed skills will remain.`))perform(r.id,()=>skillRepos.remove(r.id));}}>Remove repo</button>
       </div>
+      </div></details>
     </div>)}
+    </div>
+    {rows.length>3?<p className="muted small" style={{margin:0}}>Scroll the repositories above to see more ({rows.length} total).</p>:null}
     <details><summary><strong>Add GitHub skill set</strong></summary>
       <div className="stack" style={{marginTop:10,gap:8}}>
         <input className="fld" aria-label="GitHub repository" placeholder="owner/repo or GitHub URL" value={repo} onChange={e=>setRepo(e.target.value)}/>

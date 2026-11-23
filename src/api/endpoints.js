@@ -24,6 +24,11 @@ export const services = {
   remove: (id) => del("/api/services/" + id),
 };
 
+export const memorySettings = {
+  get: () => get("/api/memory-settings"),
+  set: (max_tokens) => put("/api/memory-settings", { max_tokens }),
+};
+
 export const memories = {
   list: (q = "") => get("/api/memories?q=" + encodeURIComponent(q)).then((d) => d.items),
   add: (body) => post("/api/memories", body),

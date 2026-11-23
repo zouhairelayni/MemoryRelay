@@ -1,5 +1,7 @@
 // Memory storage. The agent-facing functions are protected by the rules tag; the owner functions are not.
-import { MAX_LEN, MAX_MEMORIES, MAX_TAGS } from "./constants.js";
+import { MAX_MEMORIES, MAX_TAGS } from "./constants.js";
+import { getMemoryLimit } from "./memorySettings.js";
+import { memoryTextError } from "../shared/memoryBudget.js";
 import { NOT_RULES_SQL, brief, clip, isProtected, newId, now, runAll, safeJson, searchWhere, similar } from "./util.js";
 
 const HISTORY_KEEP = 20;
@@ -38,7 +40,8 @@ async function findDuplicate(env, text) {
 export async function remember(env, a, source = "agent") {
   const text = String(a.text || "").trim();
   if (!text) return "nothing saved: empty text";
-  if (text.length > MAX_LEN) return `not saved: over ${MAX_LEN} chars, split it into smaller facts`;
+  const invalid = memoryTextError(text, await getMemoryLimit(env));
+  if (invalid) return `not saved: ${invalid}; split it into smaller facts`;
   const t = agentTags(a.tags);
   if (t.error) return "not saved: " + t.error;
   const count = await env.DB.prepare("SELECT COUNT(*) AS n FROM memories").first();
@@ -77,7 +80,8 @@ export async function updateMemory(env, a) {
   let text = row.text, tags = row.tags;
   const history = safeJson(row.history, []).slice(-(HISTORY_KEEP - 1));
   if (newText) {
-    if (newText.length > MAX_LEN) return `not updated: over ${MAX_LEN} chars`;
+    const invalid = memoryTextError(newText, await getMemoryLimit(env));
+    if (invalid) return `not updated: ${invalid}`;
     if (newText !== row.text) { history.push({ text: row.text, time: row.updated }); text = newText; }
   }
   if (newTags) {
@@ -112,7 +116,8 @@ export function ownerTags(rule, rawTags) {
 export async function addMemory(env, b) {
   const text = String(b.text || "").trim();
   if (!text) return { error: "write the memory first" };
-  if (text.length > MAX_LEN) return { error: `over ${MAX_LEN} characters` };
+  const invalid = memoryTextError(text, await getMemoryLimit(env));
+  if (invalid) return { error: invalid };
   const rule = b.rule === true;
   const t = ownerTags(rule, b.tags);
   if (t.error) return t;
@@ -129,7 +134,8 @@ export async function editMemory(env, id, b) {
   if (!row) return { error: "memory not found" };
   const text = String(b.text || "").trim();
   if (!text) return { error: "text cannot be empty" };
-  if (text.length > MAX_LEN) return { error: `over ${MAX_LEN} characters` };
+  const invalid = memoryTextError(text, await getMemoryLimit(env));
+  if (invalid) return { error: invalid };
   const rule = typeof b.rule === "boolean" ? b.rule : isProtected(row.tags);
   let tags = row.tags;
   if (rule || typeof b.tags === "string") {
@@ -168,19 +174,23 @@ export async function exportMemories(env) {
 export async function importMemories(env, incoming, mode) {
   if (!Array.isArray(incoming)) return { error: "expected a list of memories" };
   if (incoming.length > MAX_MEMORIES) return { error: `too many memories in one file (max ${MAX_MEMORIES})` };
+  const maxTokens = await getMemoryLimit(env);
+  // Imports never silently truncate facts; all entries are checked before any deletion.
+  const oversize = incoming.find((x) => x && typeof x.text === "string" && memoryTextError(x.text.trim(), maxTokens));
+  if (oversize) return { error: `import contains an oversized memory: ${memoryTextError(oversize.text.trim(), maxTokens)}` };
   const rows = incoming
     .filter((x) => x && typeof x === "object" && typeof x.text === "string" && x.text.trim())
     .map((x) => {
       const hist = typeof x.history === "string" ? safeJson(x.history, []) : x.history;
       return {
         id: /^[A-Za-z0-9_-]{1,40}$/.test(String(x.id || "")) ? String(x.id) : newId(),
-        text: x.text.trim().slice(0, MAX_LEN),
+        text: x.text.trim(),
         tags: cleanTags(x.tags),
         source: clip(x.source || "import", 60),
         created: clip(x.created || x.time || now(), 32),
         updated: clip(x.updated || x.time || now(), 32),
         history: JSON.stringify((Array.isArray(hist) ? hist : []).slice(-HISTORY_KEEP)
-          .map((h) => ({ text: clip(h && h.text, MAX_LEN), time: clip(h && h.time, 32) }))),
+          .map((h) => ({ text: clip(h && h.text, 32000), time: clip(h && h.time, 32) }))),
       };
     })
     .filter((r) => !isProtected(r.tags));

@@ -4,7 +4,7 @@ import Sheet from "../../components/Sheet.jsx";
 import Button from "../../components/Button.jsx";
 import Notice from "../../components/Notice.jsx";
 import { skills as api } from "../../api/endpoints.js";
-import { estimateTokens } from "../../lib/tokens.js";
+import { estimateTokens } from "../../../shared/skillTokens.js";
 
 // Skill Studio: write a skill with AI, or edit one by hand or with AI. Nothing is saved until you press Save.
 // target: null (closed) | { fresh: true } (new skill) | { name } (edit an existing skill)

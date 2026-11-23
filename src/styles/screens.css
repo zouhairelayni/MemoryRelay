@@ -94,3 +94,18 @@
 .monitor-metrics b{font-variant-numeric:tabular-nums}
 @media(max-width:600px){.activity-chart{height:208px}.activity-chart-bar{height:235px}.monitor-chart-title select.fld{width:100%;flex:1 1 100%}}
 @media(min-width:800px){.monitor-metrics{grid-template-columns:repeat(4,minmax(0,1fr))}}
+
+/* Compact tracked-repository viewport: 3.5 collapsed rows, independent scroll. */
+.repo-list-scroll{--repo-preview-row:125px;max-height:calc(var(--repo-preview-row)*3.5);overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;touch-action:pan-y;scrollbar-width:thin;border:1px solid var(--line);border-radius:13px;background:var(--paper2);min-width:0;}
+.repo-list-item{padding:12px 14px;min-height:var(--repo-preview-row);gap:7px;min-width:0;overflow-wrap:anywhere;}
+.repo-list-item+.repo-list-item{border-top:1px solid var(--line);}
+.repo-list-item .row{min-width:0;margin-top:0;}
+.repo-list-item .grow{min-width:0;}
+.repo-list-details>summary{color:var(--ink2);cursor:pointer;list-style-position:inside;}
+.repo-list-details[open]{padding-bottom:8px;}
+.repo-list-details>div{margin-top:10px;}
+.meter-native-picker{position:relative;min-width:0;max-width:100%;}
+.meter-native-trigger{min-width:150px;max-width:min(100%,320px);display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:left;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;}
+.meter-native-trigger span{flex:none;}
+/* showPicker requires the real select to remain rendered; do not display:none. */
+.meter-native-select-hidden{position:absolute!important;top:0;left:0;width:1px!important;min-width:1px!important;height:1px!important;min-height:1px!important;padding:0!important;opacity:0;pointer-events:none;}

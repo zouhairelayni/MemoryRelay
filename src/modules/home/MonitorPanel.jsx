@@ -1,4 +1,4 @@
-import {useEffect,useMemo,useState} from 'react';
+import {useEffect,useMemo,useRef,useState} from 'react';
 import {monitoring} from '../../api/endpoints.js';
 import ActivityChart from './ActivityChart.jsx';
 
@@ -35,6 +35,9 @@ function Heat({hourly}){
 }
 export default function MonitorPanel({active}) {
   const [period,setPeriod]=useState('30'),[metric,setMetric]=useState('mcp'),[data,setData]=useState(null),[error,setError]=useState('');
+  const metricSelect = useRef(null);
+  const [nativePicker,setNativePicker]=useState(()=>typeof HTMLSelectElement !== 'undefined' && typeof HTMLSelectElement.prototype.showPicker==='function');
+  const openMetricPicker=()=>{try{metricSelect.current.showPicker();}catch{setNativePicker(false);metricSelect.current?.focus();}};
   useEffect(()=>{if(!active)return;let alive=true;setData(null);
     const load=()=>monitoring.get(period).then(d=>{if(alive){setData(d);setError('');}}).catch(e=>{if(alive)setError(e.message)});
     load();const id=setInterval(load,8000);return()=>{alive=false;clearInterval(id)};
@@ -78,11 +81,14 @@ export default function MonitorPanel({active}) {
       </div>
       <div className="card monitor-figure">
         <div className="monitor-chart-title"><div><h4>Activity trend</h4><p className="muted small">{data.label} · Recorded data, not cumulative totals</p></div>
-          <select className="fld" aria-label="Chart metric" value={metric} onChange={e=>setMetric(e.target.value)}>
+          <div className="meter-native-picker">
+          {nativePicker?<button type="button" className="fld meter-native-trigger" aria-label={`Choose chart metric. Current: ${selectedLabel}`} onClick={openMetricPicker}>{selectedLabel} <span aria-hidden="true">▾</span></button>:null}
+          <select ref={metricSelect} className={`fld${nativePicker?" meter-native-select-hidden":""}`} tabIndex={nativePicker?-1:0} aria-label="Chart metric" value={metric} onChange={e=>setMetric(e.target.value)}>
             <option value="all">All recorded events</option>
             <optgroup label="Metrics">{METRICS.map(([id,name])=><option key={id} value={id}>{name}</option>)}</optgroup>
             <optgroup label="Functions">{functionRows.map(x=><option key={`${x.category}:${x.action}`} value={`fn:${x.category}:${x.action}`}>{x.category} / {x.action}</option>)}</optgroup>
           </select>
+          </div>
         </div>
         <ActivityChart type="line" labels={timeLabels} values={plotValues} label={`${selectedLabel} over ${data.label}`} unit={metric==='tokens'?'tokens':metric==='skill'?'selections':metric==='delegate'?'tasks':metric==='errors'?'errors':'calls'}/>
         {period==='1h'||period==='1d'?null:<><h4>Hourly activity (UTC)</h4><Heat hourly={data.hourly}/></>}

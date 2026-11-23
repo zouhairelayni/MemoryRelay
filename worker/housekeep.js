@@ -1,7 +1,8 @@
 // Duplicate detection and merge through an AI model.
 // Agents can only apply what a dry run proposed (proposal_id, valid 10 minutes), so a prompt-injected
 // memory can never make an agent delete things the user has not seen.
-import { MAX_LEN } from "./constants.js";
+import { getMemoryLimit } from "./memorySettings.js";
+import { memoryTextError } from "../shared/memoryBudget.js";
 import { getConfig, setConfig } from "./db.js";
 import { complete } from "./llm.js";
 import { NOT_RULES_SQL, RULES_SQL, extractJson, now, randomHex, runAll, safeJson } from "./util.js";
@@ -68,11 +69,18 @@ export async function housekeep(env, a = {}) {
     };
   }
 
+  const maxTokens = await getMemoryLimit(env);
+  for (const group of groups) {
+    if (group.merged_text) {
+      const invalid = memoryTextError(group.merged_text, maxTokens);
+      if (invalid) return { error: `merge exceeds memory context limit: ${invalid}. No memories were changed.` };
+    }
+  }
   const drop = new Set(), stmts = [];
   let updated = 0;
   for (const grp of groups) {
     for (const d of grp.drop) drop.add(d);
-    if (grp.merged_text && grp.merged_text.length <= MAX_LEN) {
+    if (grp.merged_text) {
       updated++;
       stmts.push(env.DB.prepare(
         "UPDATE memories SET history = json_insert(history, '$[#]', json_object('text', text, 'time', updated)), text = ?, updated = ? WHERE id = ?"

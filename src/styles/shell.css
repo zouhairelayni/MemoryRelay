@@ -42,3 +42,9 @@
   body{background:var(--paper2)}
   .shell{height:min(100dvh,900px);margin-top:max(0px,calc((100dvh - 900px)/2));border-radius:28px}
 }
+
+/* Installed PWA only: translucent corner refresh, above the tab bar, below sheets. */
+.pwa-refresh{position:absolute;right:14px;bottom:calc(var(--tabbar,64px) + env(safe-area-inset-bottom) + 24px);z-index:8;width:44px;height:44px;display:grid;place-items:center;border:1px solid var(--hair);border-radius:50%;background:color-mix(in srgb,var(--card) 75%,transparent);color:var(--ink);opacity:.5;box-shadow:var(--float);cursor:pointer;touch-action:manipulation;transition:opacity .16s ease,transform .16s ease;}
+.pwa-refresh:hover,.pwa-refresh:focus-visible,.pwa-refresh:active{opacity:1;}
+.pwa-refresh:active{transform:scale(.95)}
+.pwa-refresh:focus-visible{outline:2px solid var(--cobalt);outline-offset:3px}

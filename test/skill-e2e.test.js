@@ -1,7 +1,7 @@
 // End to end: a complex skill repository -> GitHub sync -> MCP tools an agent calls -> files rebuilt on disk -> delivered tests really run.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";

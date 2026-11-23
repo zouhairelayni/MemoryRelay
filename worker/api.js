@@ -1,5 +1,6 @@
 // Owner API (/api/*). Every route needs a logged-in session.
 import { currentUser } from "./auth.js";
+import { getMemoryLimit, setMemoryLimit } from "./memorySettings.js";
 import { addMemory, deleteMemory, editMemory, exportMemories, importMemories, listMemories } from "./memories.js";
 import { renameService, createService, deleteService, listServices, revokeService, setAccess, signOutSessions, testConnector } from "./services.js";
 import { geminiOp, geminiState, listGeminiModels } from "./gemini.js";
@@ -27,6 +28,7 @@ export async function settings(env) {
   return {
     last_call: last && last.last ? last.last : "",
     memories: mem.n, rules: mem.rules, connections: svc.n, keys: keys.n,
+    memory_max_tokens: await getMemoryLimit(env),
   };
 }
 
@@ -41,6 +43,8 @@ export async function api(request, env, url) {
 
   if (p === '/api/monitor' && m === 'GET') return json(await monitor(env,url.searchParams.get('days')));
   if (p === "/api/settings" && m === "GET") return json(await settings(env));
+  if (p === "/api/memory-settings" && m === "GET") return json({ max_tokens: await getMemoryLimit(env) });
+  if (p === "/api/memory-settings" && m === "PUT") return withStatus(await setMemoryLimit(env, (await body(request)).max_tokens));
 
   // connections
   if (p === "/api/services" && m === "GET") return json({ services: await listServices(env) });
@@ -84,7 +88,7 @@ export async function api(request, env, url) {
   if (p.startsWith("/api/memories/") && m === "DELETE") return json(await deleteMemory(env, p.split("/").pop()));
   if (p === "/api/housekeep" && m === "POST") {
     const b = await body(request);
-    return json(await housekeep(env, { apply: !!b.apply, groups: b.groups }));
+    return withStatus(await housekeep(env, { apply: !!b.apply, groups: b.groups }));
   }
 
   // Read-only Python script bank, available only to the signed-in owner.
@@ -119,7 +123,7 @@ export async function api(request, env, url) {
     const id=dec(repoRoute[1]), action=repoRoute[2];
     if(action==='enabled' && m==='PUT') return withStatus(await setSkillRepoSync(env,id,!!(await body(request)).enabled));
     if(action==='filter' && m==='PUT') return withStatus(await setSkillRepoFilter(env,id,await body(request)));
-    if(action==='sync' && m==='POST'){const b=await request.json().catch(()=>({}));return withStatus(await syncSkillRepo(env,id,{importMissing:true,force:!!(b&&b.force)}));}
+    if(action==='sync' && m==='POST'){const b=await body(request);return withStatus(await syncSkillRepo(env,id,{importMissing:true,force:!!b.force}));}
     if(!action && m==='DELETE') return json(await removeSkillRepo(env,id));
   }
   // skills (Skill Genie)

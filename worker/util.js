@@ -26,7 +26,7 @@ export function similar(a, b) {
   return common / (A.size + B.size - common) >= 0.8;
 }
 
-export const brief = (m) => ({ id: m.id, text: String(m.text).slice(0, 500), tags: m.tags || "", time: m.created });
+export const brief = (m) => ({ id: m.id, text: String(m.text), tags: m.tags || "", time: m.created });
 
 // "rules" is a whole tag, never a substring: "rules", "a, rules", "RULES" count; "bylaws" or "rules-of-thumb" do not.
 export const isProtected = (tags) => String(tags || "").split(",").map((t) => t.trim().toLowerCase()).includes("rules");
@@ -77,10 +77,17 @@ export async function readJson(request, max = 262144) {
   try { return { value: JSON.parse(text) }; } catch { return { error: "invalid JSON", status: 400, parse: true }; }
 }
 
-// A JSON body that must be an object. Anything else (null, a list, a number, bad JSON) counts as an empty object.
+// The ordinary JSON APIs must not use unbounded request.json(): a large body can
+// exhaust a Worker before validation. Imports use a separate 12 MB reader.
+export class InputError extends Error {
+  constructor(message, status = 400) { super(message); this.status = status; }
+}
 export async function readObject(request) {
-  const b = await request.json().catch(() => null);
-  return b && typeof b === "object" && !Array.isArray(b) ? b : {};
+  const parsed = await readJson(request);
+  if (parsed.error) throw new InputError(parsed.error, parsed.status);
+  if (!parsed.value || typeof parsed.value !== "object" || Array.isArray(parsed.value))
+    throw new InputError("expected a JSON object");
+  return parsed.value;
 }
 
 export async function runAll(env, stmts) {

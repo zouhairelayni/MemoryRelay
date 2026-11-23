@@ -129,7 +129,7 @@ Skills tab → **Write with AI** to make a new skill, or open a skill and tap **
 
 ## Security and limits
 
-* **Agents never get more power than you gave them.** They cannot set the `rules` tag (also not by editing a tag), cannot choose the `source` of a memory, and can only apply a housekeeping proposal that a dry run showed (`proposal_id`, valid 10 minutes, one use).
+* **Agents never get more power than you gave them.** They cannot set the `rules` tag (also not by editing a tag), cannot choose the `source` of a memory, and cannot apply housekeeping deletions or merges through MCP; only the authenticated owner dashboard can confirm them.
 * **Hidden text:** agent skills with invisible or direction-changing characters are refused; the same pattern is flagged on owner skills. Pending agent skills show their warnings before you approve them. At most 20 agent skills can wait for review.
 * **MCP endpoint:** the address must look like a secret before the database is touched; browser requests (Origin header) are refused; 300 requests per minute per connection; bodies over 256 KB are refused; JSON-RPC errors use the standard codes; tool arguments are checked against the schema; tools carry read-only / destructive hints so clients can ask before risky calls. Supports protocol versions 2025-06-18, 2025-03-26, 2024-11-05.
 * **Errors:** internal details go to the Worker logs, never to the client.
@@ -217,3 +217,23 @@ Open **GitHub token** in that section to save or replace a classic or fine-grain
 
 
 Automatic checks update only skills already installed, so deleting a skill also deletes its resources and does not silently recreate it. An owner can manually import the same skill again, and an agent can propose it via the existing approval flow. Removing a GitHub source stops tracking; it does not delete skills. Owner-edited skills are not overwritten. The repository URL must be GitHub, and no downloaded script is executed.
+
+## Memory context and installed-PWA refresh (v3.3.0)
+
+The limit for a single memory now defaults to **1,000 estimated tokens** (previously 500 characters).
+Under **Settings → Memory context**, the owner can set a new limit from **100 to 8,000 estimated tokens**.
+The value is stored in the existing D1 `config` table and is enforced by the dashboard,
+imports, housekeeping and the MCP `remember` / `update_memory` tools immediately, without redeployment.
+MCP `initialize`, `tools/list` and the read-only `get_memory_settings` tool expose the current limit.
+The estimate uses a conservative UTF-8 byte/word heuristic: token counts vary by model.
+Memories saved before a limit reduction remain intact and can still be read. Oversized imports
+and housekeeping merges are rejected, not silently truncated.
+
+Installed PWAs display a translucent **Refresh app** floating button above the tab bar.
+Ordinary browser tabs do not display it. The activity chart's metric control uses the browser's
+native picker (`showPicker` where available; native select fallback otherwise). The tracked
+GitHub repositories appear in a separate scrollable panel with approximately 3½ collapsed entries,
+with management controls retained in per-repository disclosure panels.
+
+Security: regular JSON API request bodies are bounded before parsing, and MCP housekeeping
+can only preview suggestions. The authenticated dashboard is the exclusive apply surface.

@@ -39,7 +39,6 @@ export default function SkillSelector({ active, onDeleted }) {
     const hay = (s.name + " " + s.description).toLowerCase();
     return !q || hay.includes(q.toLowerCase());
   }).sort((a,b)=>filter==='used'?b.uses-a.uses:filter==='updated'?b.updated.localeCompare(a.updated):filter==='new'?b.created.localeCompare(a.created):a.name.localeCompare(b.name)), [sk.items,filter,q]);
-  const enabledCount = sk.items.filter((s) => s.enabled).length;
   const pendingCount = sk.items.filter((s) => s.pending).length;
 
   const readFile = (f) => f.text().then((t) => sk.add(t, "file"));

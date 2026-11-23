@@ -10,6 +10,7 @@ import { generateSkill } from "./skillstudio.js";
 import { delegate } from "./delegate.js";
 import { BRIEF_FORM, GUIDE } from "./delegateguide.js";
 import { rateLimit } from "./limits.js";
+import { getMemoryLimit } from "./memorySettings.js";
 import { tally } from "./metering.js";
 
 // Errors whose message is safe to show to an agent. Anything else becomes a generic "internal error".
@@ -20,6 +21,13 @@ const levelOf = (svc) => (svc && ACCESS_RANK[svc.access] ? svc.access : "full");
 const mayCall = (svc, name) => ACCESS_RANK[levelOf(svc)] >= (ACCESS_RANK[TOOL_LEVEL[name]] || 99);
 
 const TOOL_BY_NAME = new Map(TOOLS.map((t) => [t.name, t]));
+export function describedTools(limit, svc) {
+  return TOOLS.filter((t) => mayCall(svc, t.name)).map((t) => {
+    if (t.name !== "remember" && t.name !== "update_memory") return t;
+    return { ...t, description: t.description + ` Current memory context limit: ${limit} estimated tokens, including rules memories; changes in owner settings take effect immediately.`,
+      inputSchema: { ...t.inputSchema, properties: { ...t.inputSchema.properties, text: { ...t.inputSchema.properties.text, description: `Up to ${limit} estimated tokens (UTF-8 estimate; model tokenizers vary).` } } } };
+  });
+}
 const agentLabel = (name) => "agent:" + (String(name || "").replace(/[^a-z0-9 ._-]/gi, "").trim().slice(0, 40) || "unknown");
 
 // Checks the arguments against the tool's schema. Numbers and booleans sent as text ("5", "true") are accepted.
@@ -52,6 +60,7 @@ export function validateArgs(schema, input) {
 
 export async function callTool(env, name, a, agentName = "", svc = null) {
   switch (name) {
+    case "get_memory_settings": return { max_tokens: await getMemoryLimit(env), units: "estimated_tokens", note: "Conservative UTF-8 estimate; model-specific tokenizers vary. Owner changes take effect immediately." };
     case "get_skill_template": return { template: SKILL_TEMPLATE, max_tokens: 5000, note: "Keep the description to the trigger. Put detail in Steps and Rules. Or call draft_skill to have the built-in AI write one." };
     case "upload_skill": return uploadSkillFromAgent(env, a.skill_md, (svc && svc.name) || agentName);
     case "draft_skill": {
@@ -102,7 +111,9 @@ export async function callTool(env, name, a, agentName = "", svc = null) {
     case "forget": return forget(env, a);
     case "housekeep": {
       if (!a.apply && svc && !(await rateLimit(env, "hk:" + svc.id, 10, 3600e3)).ok) throw new ToolError("too many housekeeping checks this hour.");
-      return housekeep(env, { apply: !!a.apply, proposal_id: a.proposal_id }); // agents cannot inject groups
+      // A caller cannot attest the owner approved its proposal. Only the authenticated dashboard can apply it.
+      if (a.apply) throw new ToolError("Housekeeping merges and deletions require confirmation in the owner dashboard; MCP can only preview.");
+      return housekeep(env, { apply: false });
     }
     case "select_skills": {
       // Past the hourly AI budget the pick silently falls back to keywords, so agents keep working.
@@ -138,15 +149,16 @@ async function dispatch(msg, env, stats, svc) {
   const ok = (result) => ({ jsonrpc: "2.0", id, result });
 
   if (method === "initialize") {
+    const memoryLimit = await getMemoryLimit(env);
     const ci = params.clientInfo && typeof params.clientInfo === "object" ? params.clientInfo : {};
     if (stats) stats.app = [ci.name, ci.version].filter(Boolean).map(String).join(" ").slice(0, 60);
     const protocolVersion = PROTOCOLS.includes(params.protocolVersion) ? params.protocolVersion : PROTOCOLS[0];
     return ok({ protocolVersion, capabilities: { tools: { listChanged: false } },
-      instructions: "Before starting any task, call select_skills with the user's request word for word. Follow only the skills it returns. If the user names a skill, call get_skill with that exact name; list_skills shows what exists. Never tell the user a skill does not exist before checking list_skills. To save your own usage limits, hand self-contained coding jobs (snippets, functions, small features, tests, reviews) to delegate (call get_delegation_brief once for the brief form and the review checklist); it runs them on other models and returns a checked result that you must still verify. To add a skill, call draft_skill (AI writes it) or get_skill_template (write it yourself, max 5000 tokens), then call upload_skill. Uploads wait for owner approval.",
+      instructions: `MemoryRelay memory length: ${memoryLimit} estimated tokens per memory (owner-configurable). Before starting any task, call select_skills with the user's request word for word. Follow only the skills it returns. If the user names a skill, call get_skill with that exact name; list_skills shows what exists. Never tell the user a skill does not exist before checking list_skills. To save your own usage limits, hand self-contained coding jobs (snippets, functions, small features, tests, reviews) to delegate (call get_delegation_brief once for the brief form and the review checklist); it runs them on other models and returns a checked result that you must still verify. To add a skill, call draft_skill (AI writes it) or get_skill_template (write it yourself, max 5000 tokens), then call upload_skill. Uploads wait for owner approval.`,
       serverInfo: { name: "my-memory", version: SERVER_VERSION } });
   }
   if (method === "ping") return ok({});
-  if (method === "tools/list") return ok({ tools: TOOLS.filter((t) => mayCall(svc, t.name)) });
+  if (method === "tools/list") return ok({ tools: describedTools(await getMemoryLimit(env), svc) });
   if (method === "tools/call") {
     if (typeof params.name !== "string") return rpcError(id, -32602, "tool name is required");
     const tool = TOOL_BY_NAME.get(params.name);

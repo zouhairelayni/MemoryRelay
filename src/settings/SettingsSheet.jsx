@@ -4,6 +4,7 @@ import Appearance from "./Appearance.jsx";
 import Gestures from "./Gestures.jsx";
 import Install from "./Install.jsx";
 import Backup from "./Backup.jsx";
+import MemoryContext from "./MemoryContext.jsx";
 import About from "./About.jsx";
 
 // Add a new settings section: create a component and list it here.
@@ -13,6 +14,7 @@ export default function SettingsSheet({ open, onClose }) {
       <Account />
       <Appearance />
       <Gestures />
+      <MemoryContext />
       <Install />
       <Backup />
       <About />

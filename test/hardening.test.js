@@ -131,20 +131,20 @@ test("an internal error never logs the secret MCP URL", async () => {
   assert.ok(!lines[0].includes(secret));
 });
 
-test("agents can only apply a housekeeping proposal they have seen", async () => {
+test("MCP housekeeping cannot self-approve deletions; owner dashboard can apply a reviewed proposal", async () => {
   const { mcp, api } = await setup();
   await mcp("remember", { text: "Likes strong black coffee every morning" });
   await mcp("remember", { text: "Drinks strong black coffee each morning" });
   await addKey(api);
-  assert.match((await mcp("housekeep", { apply: true })).content[0].text, /proposal_id/);
+  assert.match((await mcp("housekeep", { apply: true })).content[0].text, /owner dashboard/);
   const ids = JSON.parse((await mcp("recent", { n: 5 })).content[0].text).results.map((m) => m.id);
   await withAI([JSON.stringify({ groups: [{ keep: ids[0], drop: [ids[1]], merged_text: "Drinks strong black coffee in the morning", reason: "same" }] })], async () => {
     const dry = JSON.parse((await mcp("housekeep", {})).content[0].text);
     assert.ok(dry.proposal_id);
-    assert.match((await mcp("housekeep", { apply: true, proposal_id: "wrong" })).content[0].text, /proposal_id/);
-    const done = JSON.parse((await mcp("housekeep", { apply: true, proposal_id: dry.proposal_id })).content[0].text);
-    assert.equal(done.removed, 1);
-    assert.match((await mcp("housekeep", { apply: true, proposal_id: dry.proposal_id })).content[0].text, /proposal_id/, "a proposal works once");
+    assert.match((await mcp("housekeep", { apply: true, proposal_id: dry.proposal_id })).content[0].text, /owner dashboard/);
+    assert.equal((await (await api("/api/memories")).json()).count, 2, "the agent has not deleted anything");
+    const done = await (await api("/api/housekeep", "POST", { apply: true, groups: dry.proposed })).json();
+    assert.equal(done.removed, 1, "the owner can confirm the exact groups reviewed in the dashboard");
   });
 });
 

@@ -4,6 +4,8 @@
 import { complete } from "./llm.js";
 import { getConfig, setConfig } from "./db.js";
 import { extractJson, now } from "./util.js";
+export { estimateTokens } from "../shared/skillTokens.js";
+import { estimateTokens } from "../shared/skillTokens.js";
 
 export const NAME_RE = /^[a-z0-9][a-z0-9._-]{0,63}$/i;
 export const MAX_TOKENS = 5000;   // hard limit per skill, enforced for owner and agent uploads
@@ -11,12 +13,6 @@ export const MAX_SKILLS = 200;    // library size cap
 export const MAX_PENDING = 20;    // agent uploads waiting for review, so an agent cannot fill the library
 const HISTORY_KEEP = 10;           // earlier versions kept per skill (undo)
 const RESERVED = new Set(["max", "try", "generate", "improve"]); // names used by routes
-// Rough but conservative token count: the larger of chars/4 and words*1.3 (English text).
-export function estimateTokens(text) {
-  const t = String(text || "");
-  const words = (t.match(/\S+/g) || []).length;
-  return Math.ceil(Math.max(t.length / 4, words * 1.3));
-}
 export const SKILL_TEMPLATE = `---
 name: lowercase-with-dashes
 description: Use when <the exact situations that should trigger this skill>. <one sentence on what it gives the agent>.

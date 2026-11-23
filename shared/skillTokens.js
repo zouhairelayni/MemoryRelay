@@ -1,4 +1,4 @@
-// Same estimate the server uses (the larger of chars/4 and words x 1.3), so the counter matches the limit.
+// Shared conservative token estimate for skill sizes (not the memory context budget).
 export function estimateTokens(text) {
   const t = String(text || "");
   const words = (t.match(/\S+/g) || []).length;
