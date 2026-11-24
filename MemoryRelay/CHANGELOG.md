@@ -1,11 +1,5 @@
 # MemoryRelay release history
 
-## 3.5.3 — Edit API keys, real Gemini errors, text-only model list, Errors screen fixes (2026-11-24)
-Every provider key (Gemini, OpenRouter, NVIDIA, OpenAI) can now be renamed or replaced in place with **Edit key**; a replaced key is re-enabled and its cooldowns cleared. Gemini model loading shows Google's actual reason (status and message, key redacted) instead of "check the key", follows all result pages, and lists only text-generation models. Pasted keys are cleaned (quotes, invisible characters) and rejected if they contain spaces. Model browsing for OpenRouter/NVIDIA/OpenAI now opens encrypted keys before calling the provider. The Errors screen scrolls, and Back to overview works. See [`docs/releases/3.5.3.md`](docs/releases/3.5.3.md).
-
-## 3.5.2 — Key-free housekeeping and paged `recent` (2026-11-24)
-MCP `housekeep` now works with no API key: it lists duplicate candidate groups (same app and version only, rules memories never listed) and the calling agent merges with `get_memory`, `update_memory` and `forget`. `ai: true` keeps the server-AI preview; applying an AI proposal stays in the owner dashboard, which now falls back to an offline exact/near-identical check when no AI provider works. `recent` accepts `offset` and returns `next_offset`. See [`docs/releases/3.5.2.md`](docs/releases/3.5.2.md).
-
 ## 3.5.0 — Full-library memory discovery and metadata (2026-11-23)
 Paged MCP `list_memories`, `search`, and `get_memory` enable agents to discover and selectively retrieve the entire memory library. Added descriptions and colored typed metadata (app, platform, feature, version, languages, stack) independent of context tags, with owner UI editing, legacy-safe D1 migration, import/export preservation, and expanded MCP tool descriptions for Markdown and copyable code. Release-aware housekeeping protections, full pagination, and regression tests included. See [`docs/releases/3.5.0.md`](docs/releases/3.5.0.md) and [`docs/QA-2026-11-23-3.5.0.md`](docs/QA-2026-11-23-3.5.0.md).
 

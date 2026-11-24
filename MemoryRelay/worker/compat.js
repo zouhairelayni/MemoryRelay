@@ -3,7 +3,7 @@
 // A request tries each enabled model in order and, for each model, the keys in turn starting from a
 // round-robin position. 429 cools that key+model down, 5xx and network errors retry once, 401/403 disable the key.
 import { MAX_CALLS, RETRYABLE } from "./constants.js";
-import { LOCKED_MESSAGE, hasKey, keyTail, openKey, openRows, sealKey } from "./secrets.js";
+import { LOCKED_MESSAGE, hasKey, keyTail, openRows, sealKey } from "./secrets.js";
 import { AI_FAST, AI_LONG, fetchIdle, isSse, sseEvents } from "./aifetch.js";
 import { getConfig, setConfig } from "./db.js";
 import { newId, now, runAll, safeJson, sleep, readObject } from "./util.js";
@@ -37,10 +37,7 @@ export function makeCompat(cfg) {
     } catch {
       return { error: "could not reach " + label + " (network error)" };
     }
-    if (!r.ok) {
-      const body = await r.text().catch(() => ""), j = safeJson(body, null), m = String((j && j.error && (j.error.message || j.error)) || "").replace(/[A-Za-z0-9_-]{28,}/g, "[redacted]").replace(/\s+/g, " ").slice(0, 160);
-      return { error: label + " returned HTTP " + r.status + (m ? ": " + m : "") + (r.status === 401 ? " (check the key)" : "") };
-    }
+    if (!r.ok) return { error: label + " returned HTTP " + r.status + (r.status === 401 ? " (check the key)" : "") };
     return { models: filterModels(await r.json().catch(() => null)) };
   }
 
@@ -132,24 +129,6 @@ export function makeCompat(cfg) {
         if (await hasKey(env, T.keys, key)) break; // already saved
         await env.DB.prepare(`INSERT OR IGNORE INTO ${T.keys} (id, label, key, created) VALUES (?, ?, ?, ?)`)
           .bind(newId(), String(b.label || id).trim().slice(0, 40) || id, await sealKey(env, key), now()).run();
-        break;
-      }
-      case "edit_key": {
-        const kid = String(b.id || "");
-        if (!(await env.DB.prepare(`SELECT id FROM ${T.keys} WHERE id = ?`).bind(kid).first())) return { error: "key not found" };
-        const hasLabel = typeof b.label === "string" && b.label.trim(), newKey = typeof b.key === "string" ? b.key.trim() : "";
-        if (!hasLabel && !newKey) return { error: "change the label or paste a new key" };
-        const stmts = [];
-        if (newKey) {
-          if (newKey.length > 400 || /\s/.test(newKey)) return { error: "that does not look like a key" };
-          const bad = checkKey(newKey);
-          if (bad) return { error: bad };
-          for (const o of (await env.DB.prepare(`SELECT id, key FROM ${T.keys} WHERE id != ?`).bind(kid).all()).results) if ((await openKey(env, o.key)) === newKey) return { error: "that key is already saved under another label" };
-          stmts.push(env.DB.prepare(`UPDATE ${T.keys} SET key = ?, enabled = 1 WHERE id = ?`).bind(await sealKey(env, newKey), kid));
-          stmts.push(env.DB.prepare(`DELETE FROM ${T.cool} WHERE key_id = ?`).bind(kid));
-        }
-        if (hasLabel) stmts.push(env.DB.prepare(`UPDATE ${T.keys} SET label = ? WHERE id = ?`).bind(b.label.trim().slice(0, 40), kid));
-        await runAll(env, stmts);
         break;
       }
       case "delete_key": await env.DB.prepare(`DELETE FROM ${T.keys} WHERE id = ?`).bind(String(b.id)).run(); break;

@@ -4,11 +4,11 @@ This archive contains the full current working source tree for the ongoing conso
 
 ## Package identity
 - Working directory snapshot: `memoryrelay-v3.6.0-work`
-- `package.json` version: `3.5.3`
+- `package.json` version: `3.5.1` (not bumped; final consolidated release versioning is intentionally deferred)
 - Package type: **working source snapshot**, not a release-ready build
 
 ## Verification performed at packaging
-- `npm test`: **194 passed, 0 failed, 1 skipped (195 total) after Round 8 patches P19-P20**
+- `npm test`: **183 passed, 0 failed, 1 skipped (184 total)**
 - The skipped test requires an upstream sync and is explicitly skipped in the offline runner.
 - `npm run build`: **not verified** — local dependencies were incomplete and `vite` was unavailable (`sh: 1: vite: not found`). Dependency restoration previously timed out.
 - No production bundle, deployment, browser visual regression, or release installer was verified as part of this package.

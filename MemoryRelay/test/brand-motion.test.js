@@ -46,6 +46,6 @@ test('Welcome runs once on startup and respects reduced motion',()=>{
 });
 test('CSS changes are source-scoped and cache is bumped',()=>{
   assert.match(source('src/styles/redesign.css'),/\.welcome-screen/);
-  assert.match(source('public/sw.js'),/memory-relay-v3\.5\.3/);
-  assert.match(source('package.json'),/"version": "3\.5\.3"/);
+  assert.match(source('public/sw.js'),/memory-relay-v3\.5\.1/);
+  assert.match(source('package.json'),/"version": "3\.5\.1"/);
 });

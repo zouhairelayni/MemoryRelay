@@ -108,5 +108,5 @@ test("UI has installed-PWA-only header refresh, compact scroller and in-app char
   assert.match(read("src/modules/home/MonitorPanel.jsx"), /<MetricDropdown/);
   assert.doesNotMatch(read("src/modules/home/MetricDropdown.jsx"), /showPicker\(\)/);
   assert.match(read("src/settings/SettingsSheet.jsx"), /<MemoryContext \/>/);
-  assert.match(read("package.json"), /"version": "3.5.3"/);
+  assert.match(read("package.json"), /"version": "3.5.1"/);
 });

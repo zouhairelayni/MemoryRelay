@@ -5,7 +5,6 @@ import { gemini } from "../api/endpoints.js";
 export function useGemini({ onChange } = {}) {
   const [state, setState] = useState({ keys: [], models: [] });
   const [message, setMessage] = useState("");
-  const [messageTone, setMessageTone] = useState("muted");
   const [available, setAvailable] = useState([]);
   const [loadingAvailable, setLoadingAvailable] = useState(false);
 
@@ -16,21 +15,21 @@ export function useGemini({ onChange } = {}) {
   const op = useCallback(async (body) => {
     try {
       const s = await gemini.op(body);
-      setState(s); setMessage(""); setMessageTone("muted");
+      setState(s); setMessage("");
       if (onChange) onChange();
       return true;
-    } catch (e) { setMessage(e.message); setMessageTone("bad"); load(); return false; }
+    } catch (e) { setMessage(e.message); load(); return false; }
   }, [load, onChange]);
 
   const loadAvailable = useCallback(async () => {
-    setLoadingAvailable(true); setMessageTone("muted"); setMessage("Loading models from saved keys...");
+    setLoadingAvailable(true); setMessage("Loading models from saved keys...");
     try {
       const list = await gemini.models();
       setAvailable(list);
       setMessage(list.length + " models available.");
-    } catch (e) { setAvailable([]); setMessage(e.message); setMessageTone("bad"); }
+    } catch (e) { setAvailable([]); setMessage(e.message); }
     finally { setLoadingAvailable(false); }
   }, []);
 
-  return { ...state, message, messageTone, available, loadingAvailable, load, op, loadAvailable };
+  return { ...state, message, available, loadingAvailable, load, op, loadAvailable };
 }

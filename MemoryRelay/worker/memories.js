@@ -82,13 +82,11 @@ export async function getMemory(env, a) {
 
 export async function recent(env, a) {
   const n = Math.min(Math.max(Number(a.n) || 5, 1), 20);
-  const offset = Math.min(Math.max(Math.floor(Number(a.offset)) || 0, 0), 100000);
   const total = await env.DB.prepare("SELECT COUNT(*) AS n FROM memories").first();
   const { results } = await env.DB.prepare(
-    "SELECT * FROM memories ORDER BY created DESC, rowid DESC LIMIT ? OFFSET ?"
-  ).bind(n, offset).all();
-  const next = offset + results.length < total.n ? offset + results.length : null;
-  return { total: total.n, offset, next_offset: next, results: results.map(fullEntry) };
+    "SELECT * FROM memories ORDER BY created DESC, rowid DESC LIMIT ?"
+  ).bind(n).all();
+  return { total: total.n, results: results.map(fullEntry) };
 }
 
 export async function updateMemory(env, a) {
