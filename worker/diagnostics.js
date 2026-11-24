@@ -3,7 +3,7 @@
 import { activity } from './monitor.js';
 
 const SAFE_CATEGORIES = new Set(['mcp','api','provider','skill','client','worker','system']);
-const PERIOD_MS = Object.freeze({ '1h': 3600000, '1d': 86400000, '7': 604800000, '30': 2592000000, '90': 7776000000 });
+const PERIOD_MS = Object.freeze({ '1h': 3600000, '1d': 86400000, '7': 604800000 });
 const SCREENS = new Set(['home','memory','skills','agents','keys','settings','errors']);
 const EVENTS = Object.freeze({ error:'CLIENT_JS_ERROR', unhandledrejection:'CLIENT_UNHANDLED_REJECTION' });
 
@@ -50,7 +50,7 @@ export function diagnosticView(row) {
   };
 }
 function filters(opts={}) {
-  const period = Object.hasOwn(PERIOD_MS,String(opts.period)) ? String(opts.period) : '30';
+  const period = Object.hasOwn(PERIOD_MS,String(opts.period)) ? String(opts.period) : '7';
   const category = categoryOf(opts.category);
   const code = opts.code && /^[A-Z][A-Z0-9_]{0,47}$/.test(String(opts.code)) ? String(opts.code) : '';
   const limit = Math.max(1,wholeNumber(opts.limit,50,100));
@@ -67,7 +67,7 @@ export async function listErrors(env, opts={}) {
   const rows=await env.DB.prepare(`SELECT id,ts,category,action,error_code FROM activity_events WHERE ${f.where} ORDER BY id DESC LIMIT ? OFFSET ?`).bind(...f.params,f.limit,f.offset).all();
   const count=Number(total?.n)||0;
   return {total:count,limit:f.limit,offset:f.offset,next_offset:f.offset+rows.results.length<count?f.offset+rows.results.length:null,
-    period:f.period,category:f.category,code:f.code,retention_days:90,
+    period:f.period,category:f.category,code:f.code,retention_days:7,
     diagnostics:rows.results.map(diagnosticView)};
 }
 export async function recordClientError(env,input) {

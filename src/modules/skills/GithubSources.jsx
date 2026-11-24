@@ -140,7 +140,7 @@ export default function GithubSources({active,onUpdated,onOpenRepo,focusRepo,onC
     if(!active)return undefined;
     load();
     const tick=()=>{if(document.visibilityState==="visible")load();};
-    const timer=setInterval(tick,15000);
+    const timer=setInterval(tick,30000);
     document.addEventListener("visibilitychange",tick);
     return()=>{clearInterval(timer);document.removeEventListener("visibilitychange",tick);};
   },[active]);

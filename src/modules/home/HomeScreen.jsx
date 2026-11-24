@@ -17,7 +17,7 @@ export default function HomeScreen({ active }) {
   usePolling(() => skillsApi.list().then(d => {
     const items = d.skills || [];
     setSkillInfo({ total: items.length, pending: items.filter(s => s.pending).length });
-  }).catch(() => {}), 30000, active);
+  }).catch(() => {}), 60000, active);
   const memories = useCountUp(counts.memories);
   const rules = useCountUp(counts.rules);
   const skills = useCountUp(skillInfo?.total || 0);

@@ -50,10 +50,16 @@ function Heat({hourly}){
 }
 export default function MonitorPanel({active}) {
   const { go } = useApp();
-  const [period,setPeriod]=useState('30'),[metric,setMetric]=useState('mcp'),[data,setData]=useState(null),[error,setError]=useState(''),[reload,setReload]=useState(0);
+  const [period,setPeriod]=useState('7'),[metric,setMetric]=useState('mcp'),[data,setData]=useState(null),[error,setError]=useState(''),[reload,setReload]=useState(0);
   useEffect(()=>{if(!active)return;let alive=true;setData(null);
-    const load=()=>monitoring.get(period).then(d=>{if(alive){setData(d);setError('');}}).catch(e=>{if(alive)setError(e.message)});
-    load();const id=setInterval(load,8000);return()=>{alive=false;clearInterval(id)};
+    // This endpoint aggregates activity rows, so it is the most expensive poll in the
+    // app. Poll once a minute, and never from a hidden tab: background tabs used to
+    // keep re-scanning the log all day and could exhaust the D1 daily read limit.
+    const load=()=>{if(document.visibilityState!=="visible")return;monitoring.get(period).then(d=>{if(alive){setData(d);setError('');}}).catch(e=>{if(alive)setError(e.message)})};
+    load();const id=setInterval(load,60000);
+    const wake=()=>{if(document.visibilityState==="visible")load();};
+    document.addEventListener("visibilitychange",wake);
+    return()=>{alive=false;clearInterval(id);document.removeEventListener("visibilitychange",wake)};
   },[active,period,reload]);
   const timeline=useMemo(()=>{
     if(!data)return {buckets:[],totals:[],byMetric:{},byAction:new Map()};
@@ -89,13 +95,13 @@ export default function MonitorPanel({active}) {
     {error?<div className="monitor-load-error" role="alert"><strong>Activity data is unavailable</strong><span>{error}</span><button type="button" className="btn sm ghost" onClick={()=>setReload(n=>n+1)}>Try again</button></div>:null}
     {!data?<div className="monitor-loading" aria-label="Loading usage data">
       <div className="monitor-metrics">{[0,1,2,3].map(i=><div className="monitor-metric" key={i}><span className="monitor-shimmer monitor-shimmer-label"/><span className="monitor-shimmer monitor-shimmer-number"/><span className="monitor-shimmer monitor-shimmer-foot"/></div>)}</div>
-      <div className="monitor-period-row"><span>Time range</span><div className="monitor-period" role="group" aria-label="Activity period">{[["1h","1h"],["1d","24h"],["7","7d"],["30","30d"],["90","90d"]].map(([value,label])=><button key={value} type="button" className={period===value?"on":""} aria-pressed={period===value} onClick={()=>setPeriod(value)}>{label}</button>)}</div></div>
+      <div className="monitor-period-row"><span>Time range</span><div className="monitor-period" role="group" aria-label="Activity period">{[["1h","1h"],["1d","24h"],["7","7d"]].map(([value,label])=><button key={value} type="button" className={period===value?"on":""} aria-pressed={period===value} onClick={()=>setPeriod(value)}>{label}</button>)}</div></div>
       <div className="monitor-shimmer monitor-shimmer-graph"/>
     </div>:<>
       <div className="monitor-metrics">
         {primaryMetrics.map(metricCard)}
       </div>
-      <div className="monitor-period-row"><span>Time range</span><div className="monitor-period" role="group" aria-label="Activity period">{[["1h","1h"],["1d","24h"],["7","7d"],["30","30d"],["90","90d"]].map(([value,label])=><button key={value} type="button" className={period===value?"on":""} aria-pressed={period===value} onClick={()=>setPeriod(value)}>{label}</button>)}</div></div>
+      <div className="monitor-period-row"><span>Time range</span><div className="monitor-period" role="group" aria-label="Activity period">{[["1h","1h"],["1d","24h"],["7","7d"]].map(([value,label])=><button key={value} type="button" className={period===value?"on":""} aria-pressed={period===value} onClick={()=>setPeriod(value)}>{label}</button>)}</div></div>
       <div className="card monitor-figure monitor-figure-primary">
         <div className="monitor-chart-title"><div><span className="dash-eyebrow">ACTIVITY INSIGHTS</span><h4>Activity trend</h4><p className="muted small">{data.label} · Recorded data, not cumulative totals</p></div>
           <MetricDropdown value={metric} onChange={setMetric} metrics={METRICS} functions={functionRows}/>

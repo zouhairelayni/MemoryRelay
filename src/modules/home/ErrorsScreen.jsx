@@ -5,10 +5,10 @@ import PageHead from "../../components/PageHead.jsx";
 import Button from "../../components/Button.jsx";
 import ScreenSkeleton from "../../components/ScreenSkeleton.jsx";
 
-const PERIODS = [["1h", "1h"], ["1d", "24h"], ["7", "7d"], ["30", "30d"], ["90", "90d"]];
+const PERIODS = [["1h", "1h"], ["1d", "24h"], ["7", "7d"]];
 export default function ErrorsScreen({ active = true }) {
   const { go } = useApp();
-  const [period, setPeriod] = useState("30"), [offset, setOffset] = useState(0), [data, setData] = useState(null), [busy, setBusy] = useState(false), [error, setError] = useState("");
+  const [period, setPeriod] = useState("7"), [offset, setOffset] = useState(0), [data, setData] = useState(null), [busy, setBusy] = useState(false), [error, setError] = useState("");
   const load = useCallback(async () => {
     setBusy(true); setError("");
     try { setData(await diagnostics.list({ period, offset, limit: 50 })); }

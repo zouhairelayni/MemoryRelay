@@ -19,6 +19,21 @@ import { monitor } from "./monitor.js";
 import { listErrors, recordClientError } from "./diagnostics.js";
 import { addSkillRepo, githubTokenStatus, saveGitHubToken, removeGitHubToken, githubBlockedUntil, githubQuota, listRepoFiles, listSkillRepos, previewRepoFile, removeRepoFile, removeSkillRepo, restoreRepoFile, setSkillRepoFilter, setSkillRepoSync, syncSkillRepo } from "./githubSkills.js";
 
+// The dashboard can have several tabs open. Analytic aggregates cost far more reads
+// than a normal row lookup, so share one result per database/period for a short while.
+const MONITOR_TTL = 60000;
+const monitorCache = new WeakMap();
+async function cachedMonitor(env, period) {
+  const key = String(period ?? "7");
+  let perDb = monitorCache.get(env.DB);
+  if (!perDb) { perDb = new Map(); monitorCache.set(env.DB, perDb); }
+  const hit = perDb.get(key);
+  if (hit && Date.now() - hit.at < MONITOR_TTL) return hit.data;
+  const data = await monitor(env, key);
+  perDb.set(key, { at: Date.now(), data });
+  return data;
+}
+
 export async function settings(env) {
   const last = await env.DB.prepare("SELECT MAX(last_seen) AS last FROM services").first();
   const mem = await env.DB.prepare(
@@ -42,7 +57,7 @@ export async function api(request, env, url) {
   if (!user) return json({ error: "log in first" }, 401);
   const p = url.pathname, m = request.method;
 
-  if (p === '/api/monitor' && m === 'GET') return json(await monitor(env,url.searchParams.get('days')));
+  if (p === '/api/monitor' && m === 'GET') return json(await cachedMonitor(env,url.searchParams.get('days')));
   if (p === '/api/errors' && m === 'GET') return json(await listErrors(env,Object.fromEntries(url.searchParams)));
   if (p === '/api/errors/client' && m === 'POST') {
     const input = await body(request);

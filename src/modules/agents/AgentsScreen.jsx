@@ -23,7 +23,7 @@ export default function AgentsScreen({ active }) {
   const { items, focusId } = svc;
 
   const [jobData, setJobData] = useState(null);
-  usePolling(() => monitoring.get("30").then(setJobData).catch(() => {}), 15000, active);
+  usePolling(() => monitoring.get("7").then(setJobData).catch(() => {}), 60000, active);
   const jobs = jobData?.jobs || [];
   const activeJobs = jobs.filter(j => j.state === "running");
   const recentJobs = jobs.filter(j => j.state !== "running").slice(0, 8);
@@ -36,7 +36,7 @@ export default function AgentsScreen({ active }) {
   const live = useApp().status.live;
   const lastCall = useApp().counts.last_call;
 
-  usePolling(() => svc.load(), 20000, active);
+  usePolling(() => svc.load(), 60000, active);
 
   // jump to a connection we just added; keep the index valid when the list shrinks
   useEffect(() => {

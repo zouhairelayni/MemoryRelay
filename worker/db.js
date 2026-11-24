@@ -1,5 +1,6 @@
 // D1 access helpers and the one-time schema check.
 import { FALLBACK_MODELS } from "./constants.js";
+import { backfillActivityRollups } from "./monitor.js";
 import { newId, now, randomHex, runAll } from "./util.js";
 
 export async function getConfig(env, key) {
@@ -17,10 +18,21 @@ export async function setConfig(env, key, value) {
 // on first run, a default "Claude" service that keeps your current connector address.
 // It also creates the Gemini key/model pool and migrates the old single key and model.
 let schemaReady = false;
+// Bump this whenever a table, column or index below is added or changed. Once the
+// marker is stored, a cold Worker instance costs ONE small indexed read instead of
+// re-running the whole ~40-statement migration on every cold start and every cron
+// tick. That migration was responsible for tens of thousands of D1 queries a day.
+const SCHEMA_VERSION = "2026-11-24.4";
 // Tests create a fresh database per case, so they need to reset the once-per-instance flag.
 export const resetSchemaCache = () => { schemaReady = false; };
 export async function ensureSchema(env) {
   if (schemaReady) return;
+  // Fast path for an already migrated database. A fresh database has no config
+  // table yet, so the error is expected and the full migration below creates it.
+  try {
+    const marker = await env.DB.prepare("SELECT value FROM config WHERE key = 'schema_version'").first();
+    if (marker && marker.value === SCHEMA_VERSION) { schemaReady = true; return; }
+  } catch { /* first run: no config table yet */ }
   // Core tables (no-ops when they already exist, so a fresh database also works).
   await env.DB.batch([
     env.DB.prepare("CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT NOT NULL)"),
@@ -38,6 +50,13 @@ export async function ensureSchema(env) {
     env.DB.prepare("CREATE TABLE IF NOT EXISTS activity_events (id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL, service_id TEXT NOT NULL DEFAULT '', category TEXT NOT NULL, action TEXT NOT NULL, detail TEXT NOT NULL DEFAULT '', provider TEXT NOT NULL DEFAULT '', model TEXT NOT NULL DEFAULT '', tokens_in INTEGER NOT NULL DEFAULT 0, tokens_out INTEGER NOT NULL DEFAULT 0, ok INTEGER NOT NULL DEFAULT 1, error_code TEXT NOT NULL DEFAULT '', error_message TEXT NOT NULL DEFAULT '')"),
     env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_activity_ts ON activity_events (ts)"),
     env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_activity_cat ON activity_events (category, action, detail)"), // skill "uses" counts
+    // Grouped activity: the home screen reads these instead of scanning every raw event.
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS activity_daily (day TEXT NOT NULL, category TEXT NOT NULL, action TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 0, tin INTEGER NOT NULL DEFAULT 0, tout INTEGER NOT NULL DEFAULT 0, errors INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (day, category, action))"),
+    env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_activity_daily_day ON activity_daily (day)"),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS activity_hourly (hour INTEGER NOT NULL, category TEXT NOT NULL, action TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 0, tin INTEGER NOT NULL DEFAULT 0, tout INTEGER NOT NULL DEFAULT 0, errors INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (hour, category, action))"),
+    env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_activity_hourly_hour ON activity_hourly (hour)"),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS activity_heat (day TEXT NOT NULL, weekday TEXT NOT NULL, hour TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (day, weekday, hour))"),
+    env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_activity_heat_day ON activity_heat (day)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS memories (id TEXT PRIMARY KEY, text TEXT NOT NULL, tags TEXT NOT NULL DEFAULT '', source TEXT NOT NULL DEFAULT '', created TEXT NOT NULL, updated TEXT NOT NULL, history TEXT NOT NULL DEFAULT '[]')"),
   ]);
   await env.DB.prepare(
@@ -150,5 +169,23 @@ export async function ensureSchema(env) {
     await runAll(env, seed.map((name, i) =>
       env.DB.prepare("INSERT OR IGNORE INTO gemini_models (name, enabled, pos) VALUES (?, 1, ?)").bind(name, i)));
   }
+  // Seed the grouped tables from the old raw log once. The insert claims the work,
+  // so two cold instances cannot both run it; a failure removes the claim so the
+  // next instance retries.
+  if ((await getConfig(env, "activity_rollup_v1")) !== "done") {
+    const claim = await env.DB.prepare(
+      "INSERT INTO config (key, value) VALUES ('activity_rollup_v1', 'building') ON CONFLICT(key) DO NOTHING RETURNING value"
+    ).first();
+    if (claim) {
+      try {
+        await backfillActivityRollups(env);
+        await setConfig(env, "activity_rollup_v1", "done");
+      } catch (e) {
+        await env.DB.prepare("DELETE FROM config WHERE key = 'activity_rollup_v1'").run().catch(() => {});
+        throw e;
+      }
+    }
+  }
+  await setConfig(env, "schema_version", SCHEMA_VERSION);
   schemaReady = true;
 }

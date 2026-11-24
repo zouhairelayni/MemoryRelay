@@ -4,7 +4,7 @@ import { usePolling } from "./usePolling.js";
 
 const EMPTY = { memories: 0, rules: 0, connections: 0, keys: 0, last_call: "" };
 
-// Counts for the home screen plus the live check of the connector (refreshes every 20 s).
+// Counts for the home screen plus the live check of the connector (refreshes every minute).
 export function useOverview(active) {
   const [counts, setCounts] = useState(EMPTY);
   const [status, setStatus] = useState({ live: null, text: "Checking...", meta: "" });
@@ -24,6 +24,6 @@ export function useOverview(active) {
     }
   }, []);
 
-  usePolling(() => { loadCounts(); test(); }, 20000, active);
+  usePolling(() => { loadCounts(); test(); }, 60000, active);
   return { counts, status, loadCounts, test };
 }

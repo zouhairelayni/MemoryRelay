@@ -34,7 +34,7 @@ test('hour and day periods keep separate five-minute and hourly trend buckets', 
     assert.ok(result.series.every(x=>Number(x.bucket)%step===0));
     assert.equal(result.totals.find(x=>x.category==='api').errors,1);
   }
-  assert.equal((await monitor(env,'not-a-period')).period,'30');
+  assert.equal((await monitor(env,'not-a-period')).period,'7');
 });
 
 test('skill selection limit persists and rejects invalid values',async()=>{

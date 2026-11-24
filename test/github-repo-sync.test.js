@@ -603,6 +603,8 @@ test('repos created before automatic detection are looked at again once', async(
  await ensureSchema(env);
  db.prepare("INSERT INTO skill_repos (id,owner,repo,root,ref,names,enabled,last_sha,etag,last_checked) VALUES ('o/r:skills','o','r','skills','main','[]',1,?,'\"e\"','2026-11-13 05:08')").run(sha1);
  db.exec('ALTER TABLE skill_repos DROP COLUMN detect_v');
+ // Simulate a database created by an older code version, which also had an older schema marker.
+ db.prepare("UPDATE config SET value='2026-01-01.0' WHERE key='schema_version'").run();
  resetSchemaCache();
  await ensureSchema(env);
  const row=db.prepare("SELECT last_sha,etag,last_checked FROM skill_repos WHERE id='o/r:skills'").get();

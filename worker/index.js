@@ -26,6 +26,19 @@ function withSecurityHeaders(res) {
   return new Response(res.body, { status: res.status, headers: h });
 }
 
+// D1 reports quota exhaustion as a generic database error. Detect it so the user
+// sees the real reason instead of "internal error, please try again".
+function dailyReadLimitReached(e) {
+  const text = [e?.message, e?.cause?.message, e?.cause?.cause?.message, e?.code, e?.cause?.code]
+    .filter(Boolean).join(" ");
+  return /row read limit|daily read limit|D1[^\n]*quota|code[: ]*7500/i.test(text);
+}
+function secondsUntilUtcMidnight() {
+  const now = new Date();
+  const next = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
+  return Math.max(60, Math.ceil((next - now.getTime()) / 1000));
+}
+
 // One MCP request for an authenticated connection: rate limit, handle, count.
 async function serveMcp(request, env, ctx, svc, extraHeaders) {
   const rl = await rateLimit(env, "mcp:" + svc.id, MCP_PER_MINUTE, 60000);
@@ -86,7 +99,9 @@ export default {
         if (p.startsWith("/auth/")) return await auth(request, env, url);
         const response = await api(request, env, url);
         // Polled GETs (dashboard refresh) are not logged unless they fail: they used to add a D1 write per poll and grow the table without limit.
-        if(!p.startsWith('/api/monitor') && !p.startsWith('/api/errors') && !p.startsWith('/api/build') && (request.method!=='GET' || response.status>=400)){
+        // Health checks and polled reads are not activity: logging them made the
+        // dashboard's own polling the largest source of rows in activity_events.
+        if(!p.startsWith('/api/monitor') && !p.startsWith('/api/errors') && !p.startsWith('/api/build') && p !== '/api/connector/test' && (request.method!=='GET' || response.status>=400)){
           // Record status and route category only. API error messages can contain
           // user-controlled values and must never enter diagnostic exports.
           ctx.waitUntil(activity(env,{category:'api',action:request.method+' '+p.replace(/[a-f0-9]{12,}/ig,':id'),ok:response.status<400,code:response.status>=400?'HTTP_'+response.status:''}).catch(()=>{}));
@@ -97,6 +112,14 @@ export default {
       return new Response("not found", { status: 404 });
     } catch (e) {
       if (e instanceof InputError) return json({ error: e.message }, e.status);
+      if (dailyReadLimitReached(e)) {
+        // Do not try to record this failure in D1: the database is refusing reads.
+        console.error("request failed", request.method, "[path redacted]", "D1 daily row read limit");
+        return json(
+          { error: "database daily read limit reached. Access returns after 00:00 UTC, or upgrade the Cloudflare plan.", code: "d1_daily_read_limit" },
+          503, null, { "retry-after": String(secondsUntilUtcMidnight()) }
+        );
+      }
       // Unexpected exceptions are recorded without stacks, credentials or route parameters.
       console.error("request failed", request.method, "[path redacted]", e?.name || "Error");
       if (env.DB) ctx.waitUntil(recordUnexpectedError(env).catch(()=>{}));
