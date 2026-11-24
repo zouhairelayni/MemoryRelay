@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Memory Relay">
+ <defs>
+  <radialGradient id="bg" cx="30%" cy="0%" r="110%"><stop stop-color="#202755"/><stop offset=".58" stop-color="#10193b"/><stop offset="1" stop-color="#080e20"/></radialGradient>
+  <linearGradient id="rear" x1=".1" y1=".1" x2=".8" y2="1"><stop stop-color="#ddbbff"/><stop offset=".58" stop-color="#7163f3"/><stop offset="1" stop-color="#3f45c8"/></linearGradient>
+  <linearGradient id="front" x1="0" y1="1" x2="1" y2="0"><stop stop-color="#7f7eff"/><stop offset=".5" stop-color="#c8c9ff"/><stop offset="1" stop-color="#f5f6ff"/></linearGradient>
+ </defs>
+ <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+ <path d="M116 356V193c0-42 38-56 69-28l165 151" fill="none" stroke="url(#rear)" stroke-width="66" stroke-linecap="round" stroke-linejoin="round"/>
+ <path d="M116 356V249c0-44 40-58 73-30l43 38c20 17 35 22 58 0l102-94c31-29 66-15 66 29v164" fill="none" stroke="url(#front)" stroke-width="66" stroke-linecap="round" stroke-linejoin="round"/>
+ </svg>
