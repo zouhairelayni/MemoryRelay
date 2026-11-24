@@ -43,7 +43,7 @@ worker/            server logic (plain .js, no UI)
   mcp.js             the MCP endpoint agents talk to
   services.js        connections (one address per agent)
   gemini.js          key and model pools, rotation, 429/503 handling
-  housekeep.js       duplicate detection and merge (agents can only apply a proposal they were shown)
+  housekeep.js       duplicate detection and merge (key-free candidate list for agents; AI preview and apply in the owner dashboard)
   skillstudio.js     AI that writes and edits skills (drafts only)
   oauth.js           OAuth 2.1 sign-in for MCP (discovery, registration, PKCE, tokens)
   aifetch.js         AI calls with an idle watchdog (never cuts off a model that is still answering)
@@ -129,7 +129,7 @@ Skills tab → **Write with AI** to make a new skill, or open a skill and tap **
 
 ## Security and limits
 
-* **Agents never get more power than you gave them.** They cannot set the `rules` tag (also not by editing a tag), cannot choose the `source` of a memory, and cannot apply housekeeping deletions or merges through MCP; only the authenticated owner dashboard can confirm them.
+* **Agents never get more power than you gave them.** They cannot set the `rules` tag (also not by editing a tag), cannot choose the `source` of a memory, and cannot apply AI housekeeping proposals through MCP; only the authenticated owner dashboard can confirm those. Agents can still tidy duplicates themselves, one memory at a time, with `housekeep` (no API key), `get_memory`, `update_memory` and `forget`; rules memories are never listed and cannot be changed or deleted.
 * **Hidden text:** agent skills with invisible or direction-changing characters are refused; the same pattern is flagged on owner skills. Pending agent skills show their warnings before you approve them. At most 20 agent skills can wait for review.
 * **MCP endpoint:** the address must look like a secret before the database is touched; browser requests (Origin header) are refused; 300 requests per minute per connection; bodies over 256 KB are refused; JSON-RPC errors use the standard codes; tool arguments are checked against the schema; tools carry read-only / destructive hints so clients can ask before risky calls. Supports protocol versions 2025-06-18, 2025-03-26, 2024-11-05.
 * **Errors:** internal details go to the Worker logs, never to the client.
@@ -149,7 +149,7 @@ Each connection has an **access level** (the eye / pencil / shield control on th
 
 | Level | Can do |
 | --- | --- |
-| Read only | search, recent, select_skills, get_skill_template, draft_skill |
+| Read only | search, list_memories, get_memory, recent (with offset), select_skills, get_skill_template, draft_skill |
 | Read and write | also remember, update_memory, upload_skill, delegate |
 | Full access | also forget and housekeep |
 
@@ -236,7 +236,7 @@ GitHub repositories appear in a separate scrollable panel with approximately 3½
 with management controls retained in per-repository disclosure panels.
 
 Security: regular JSON API request bodies are bounded before parsing, and MCP housekeeping
-can only preview suggestions. The authenticated dashboard is the exclusive apply surface.
+needs no API key: it lists duplicate candidates and the agent merges them with `update_memory` and `forget`. AI proposals can only be previewed over MCP; the authenticated dashboard is the exclusive apply surface for those.
 
 ## 3.3.8 visual workspace and memory formatting
 

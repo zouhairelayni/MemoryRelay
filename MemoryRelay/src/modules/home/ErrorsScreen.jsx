@@ -23,7 +23,7 @@ export default function ErrorsScreen({ active = true }) {
     const url = URL.createObjectURL(blob), a = document.createElement("a"); a.href = url; a.download = `memoryrelay-errors-${period}-${Date.now()}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
   return <div className="screen errors-screen enter"><PageHead title="Errors" sub="Sanitized diagnostics"><Button small variant="ghost" icon="download" disabled={!data?.diagnostics?.length} onClick={exportJson}>Export JSON</Button></PageHead>
-    <Button small variant="ghost" icon="arrow-left" onClick={() => go("home")}>Back to overview</Button>
+    <Button small variant="ghost" icon="back" onClick={() => go("home")}>Back to overview</Button>
     <div className="monitor-period-row"><span>Time range</span><div className="monitor-period" role="group" aria-label="Error time range">{PERIODS.map(([v, label]) => <button key={v} type="button" className={period === v ? "on" : ""} aria-pressed={period === v} onClick={() => setPeriod(v)}>{label}</button>)}</div></div>
     {error ? <div className="notice bad" role="alert">{error} <Button small variant="ghost" onClick={load}>Retry</Button></div> : null}
     {!data && !error ? <ScreenSkeleton label="Loading diagnostics" /> : null}

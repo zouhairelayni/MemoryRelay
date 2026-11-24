@@ -1,24 +1,57 @@
 // Gemini key and model pools with rotation, cooldowns and retry handling.
 import { MAX_CALLS, RETRYABLE } from "./constants.js";
-import { LOCKED_MESSAGE, hasKey, keyTail, openRows, sealKey } from "./secrets.js";
+import { LOCKED_MESSAGE, hasKey, keyTail, openKey, openRows, sealKey } from "./secrets.js";
 import { AI_FAST, AI_LONG, fetchIdle, isSse, sseEvents } from "./aifetch.js";
 import { newId, now, runAll, safeJson, sleep, readObject } from "./util.js";
 
+// Pasted keys often carry invisible characters or quotes. Returns { key } or { error }.
+export function cleanApiKey(raw) {
+  const key = String(raw || "").replace(/[\u200b-\u200f\u2060\ufeff]/g, "").trim().replace(/^["'`]+|["'`]+$/g, "").trim();
+  if (!key) return { error: "paste a key" };
+  if (/\s/.test(key) || /[\u0000-\u001f]/.test(key)) return { error: "that does not look like a key (it contains spaces or line breaks)" };
+  if (key.length > 400) return { error: "that does not look like a key (too long)" };
+  return { key };
+}
+
+// What Google actually said, with anything key-like removed, so the dashboard can show the real reason.
+export function describeGeminiError(status, body) {
+  const j = safeJson(body, null), e = j && j.error;
+  const msg = String((e && e.message) || "").replace(/[A-Za-z0-9_-]{28,}/g, "[redacted]").replace(/\s+/g, " ").trim().slice(0, 180);
+  const code = e && e.status ? " " + e.status : "";
+  const hint = /location|region/i.test(msg) ? " The Worker's region is not allowed for this key; try another key/project or a different model."
+    : /expired/i.test(msg) ? " The key has expired; paste a new one with Edit key."
+    : /not valid|invalid/i.test(msg) || status === 401 ? " (check the key)" : "";
+  return "Gemini returned HTTP " + status + code + (msg ? ": " + msg : "") + hint;
+}
+
+// Text-generation models only: no embeddings, image/video/audio/speech or live-session models.
+export const isTextGeminiModel = (m) => {
+  const name = String((m && m.name) || "").replace(/^models\//, "");
+  return (m.supportedGenerationMethods || []).includes("generateContent")
+    && /^(gemini|gemma)/.test(name)
+    && !/embed|aqa|imagen|veo|tts|image|audio|live|native|robotics|computer-use|vision-only/i.test(name);
+};
+
 export async function listGeminiModels(key) {
-  let r;
-  try {
-    r = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=100", {
-      headers: { "x-goog-api-key": key },
-    });
-  } catch {
-    return { error: "could not reach Gemini (network error)" };
+  const names = [];
+  let pageToken = "";
+  for (let page = 0; page < 5; page++) {
+    let r;
+    try {
+      r = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200" + (pageToken ? "&pageToken=" + encodeURIComponent(pageToken) : ""), {
+        headers: { "x-goog-api-key": key }, signal: AbortSignal.timeout(20000),
+      });
+    } catch {
+      return { error: "could not reach Gemini (network error)" };
+    }
+    if (!r.ok) return { error: describeGeminiError(r.status, await r.text().catch(() => "")) };
+    const d = await r.json().catch(() => ({}));
+    for (const m of d.models || []) if (isTextGeminiModel(m)) names.push(m.name.replace(/^models\//, ""));
+    pageToken = d.nextPageToken || "";
+    if (!pageToken) break;
   }
-  if (!r.ok) return { error: "Gemini returned HTTP " + r.status + " (check the key)" };
-  const d = await r.json();
-  const models = (d.models || [])
-    .filter((m) => (m.supportedGenerationMethods || []).includes("generateContent") && /gemini/.test(m.name))
-    .map((m) => m.name.replace(/^models\//, ""));
-  return { models };
+  const models = [...new Set(names)].sort();
+  return models.length ? { models } : { error: "Gemini answered but listed no text models for this key. Type a model name such as gemini-2.5-flash instead." };
 }
 
 export async function callGemini(key, model, prompt, opts = {}) {
@@ -140,11 +173,36 @@ export async function geminiOp(env, request) {
   const b = await readObject(request);
   switch (b.op) {
     case "add_key": {
-      const key = String(b.key || "").trim();
-      if (!key) return { error: "paste a key" };
+      const c = cleanApiKey(b.key);
+      if (c.error) return { error: c.error };
+      const key = c.key;
       if (await hasKey(env, "gemini_keys", key)) break; // already saved
       await env.DB.prepare("INSERT OR IGNORE INTO gemini_keys (id, label, key, created) VALUES (?, ?, ?, ?)")
         .bind(newId(), String(b.label || "key").trim().slice(0, 40) || "key", await sealKey(env, key), now()).run();
+      break;
+    }
+    case "edit_key": {
+      // Change the label, replace the key itself, or both. A replaced key is switched back on and its cooldowns cleared.
+      const id = String(b.id || "");
+      const row = await env.DB.prepare("SELECT id FROM gemini_keys WHERE id = ?").bind(id).first();
+      if (!row) return { error: "key not found" };
+      const hasLabel = typeof b.label === "string" && b.label.trim(), hasKey_ = typeof b.key === "string" && b.key.trim();
+      if (!hasLabel && !hasKey_) return { error: "change the label or paste a new key" };
+      let sealed = null;
+      if (hasKey_) {
+        const c = cleanApiKey(b.key);
+        if (c.error) return { error: c.error };
+        const others = (await env.DB.prepare("SELECT id, key FROM gemini_keys WHERE id != ?").bind(id).all()).results;
+        for (const o of others) if ((await openKey(env, o.key)) === c.key) return { error: "that key is already saved under another label" };
+        sealed = await sealKey(env, c.key);
+      }
+      const stmts = [];
+      if (hasLabel) stmts.push(env.DB.prepare("UPDATE gemini_keys SET label = ? WHERE id = ?").bind(b.label.trim().slice(0, 40), id));
+      if (sealed) {
+        stmts.push(env.DB.prepare("UPDATE gemini_keys SET key = ?, enabled = 1 WHERE id = ?").bind(sealed, id));
+        stmts.push(env.DB.prepare("DELETE FROM gemini_cooldowns WHERE key_id = ?").bind(id));
+      }
+      await runAll(env, stmts);
       break;
     }
     case "delete_key":

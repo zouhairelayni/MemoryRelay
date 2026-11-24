@@ -139,7 +139,7 @@ test("MCP housekeeping cannot self-approve deletions; owner dashboard can apply 
   assert.match((await mcp("housekeep", { apply: true })).content[0].text, /owner dashboard/);
   const ids = JSON.parse((await mcp("recent", { n: 5 })).content[0].text).results.map((m) => m.id);
   await withAI([JSON.stringify({ groups: [{ keep: ids[0], drop: [ids[1]], merged_text: "Drinks strong black coffee in the morning", reason: "same" }] })], async () => {
-    const dry = JSON.parse((await mcp("housekeep", {})).content[0].text);
+    const dry = JSON.parse((await mcp("housekeep", { ai: true })).content[0].text);
     assert.ok(dry.proposal_id);
     assert.match((await mcp("housekeep", { apply: true, proposal_id: dry.proposal_id })).content[0].text, /owner dashboard/);
     assert.equal((await (await api("/api/memories")).json()).count, 2, "the agent has not deleted anything");
@@ -550,4 +550,23 @@ test("the dashboard session cookie is Lax", async () => {
   const r = await ctx.call("/auth/login", { method: "POST", headers: JSONH, body: JSON.stringify({ email: "o@x.io", password: "longenough12" }) });
   assert.match(r.headers.get("set-cookie"), /SameSite=Lax/);
   assert.match(r.headers.get("set-cookie"), /HttpOnly/);
+});
+
+test("MCP housekeeping works with no API key: agent gets candidates, rules stay protected, merge via update_memory + forget", async () => {
+  const { mcp, api } = await setup();
+  const rule = await (await api("/api/memories", "POST", { text: "Always answer in short plain sentences every time", rule: true })).json();
+  await mcp("remember", { text: "Likes strong black coffee every morning before work" });
+  await mcp("remember", { text: "Likes strong black coffee every morning before work, no sugar, with oat milk" });
+  const out = JSON.parse((await mcp("housekeep", {})).content[0].text);
+  assert.equal(out.mode, "agent-review");
+  assert.equal(out.candidate_groups.length, 1);
+  const ids = out.candidate_groups[0].memories.map((m) => m.id);
+  assert.equal(ids.length, 2);
+  assert.ok(!JSON.stringify(out).includes("short plain sentences"), "rules memories are never listed");
+  assert.equal(out.rules_memories_skipped, 1);
+  assert.match((await mcp("housekeep", { apply: true })).content[0].text, /dashboard/);
+  assert.match((await mcp("update_memory", { memory_id: ids[0], text: "Likes strong black coffee every morning, no sugar" })).content[0].text, /updated/);
+  assert.equal((await mcp("forget", { memory_id: ids[1] })).content[0].text, "deleted");
+  if (rule.id) assert.match((await mcp("forget", { memory_id: rule.id })).content[0].text, /protected/);
+  assert.equal((await mcp("housekeep", { min_similarity: "0.5" })).isError, undefined);
 });

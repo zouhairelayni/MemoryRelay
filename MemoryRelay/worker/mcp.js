@@ -3,7 +3,7 @@ import { ACCESS_LABEL, ACCESS_RANK, MAX_ARG_CHARS, PROTOCOLS, SERVER_VERSION, TO
 import { activity } from "./monitor.js";
 import { json, readJson } from "./util.js";
 import { forget, recent, remember, search, listMemoryIndex, getMemory, updateMemory } from "./memories.js";
-import { housekeep } from "./housekeep.js";
+import { housekeep, housekeepCandidates } from "./housekeep.js";
 import { formatForAgent, getSkillByName, listSkillIndex, SKILL_TEMPLATE, selectSkills, uploadSkillFromAgent } from "./skills.js";
 import { AI_PICK } from "./aifetch.js";
 import { generateSkill } from "./skillstudio.js";
@@ -46,6 +46,10 @@ export function validateArgs(schema, input) {
     } else if (spec.type === "integer") {
       if (typeof v === "string" && /^-?\d{1,9}$/.test(v.trim())) v = Number(v);
       if (!Number.isInteger(v)) return { error: k + " must be a whole number" };
+      out[k] = v;
+    } else if (spec.type === "number") {
+      if (typeof v === "string" && /^-?\d+(\.\d+)?$/.test(v.trim())) v = Number(v);
+      if (typeof v !== "number" || !Number.isFinite(v)) return { error: k + " must be a number" };
       out[k] = v;
     } else if (spec.type === "boolean") {
       if (v === "true") v = true; else if (v === "false") v = false;
@@ -129,10 +133,11 @@ export async function callTool(env, name, a, agentName = "", svc = null) {
     case "update_memory": return updateMemory(env, a);
     case "forget": return forget(env, a);
     case "housekeep": {
-      if (!a.apply && svc && !(await rateLimit(env, "hk:" + svc.id, 10, 3600e3)).ok) throw new ToolError("too many housekeeping checks this hour.");
-      // A caller cannot attest the owner approved its proposal. Only the authenticated dashboard can apply it.
-      if (a.apply) throw new ToolError("Housekeeping merges and deletions require confirmation in the owner dashboard; MCP can only preview.");
-      return housekeep(env, { apply: false });
+      // An agent cannot attest that the owner approved an AI proposal, so applying stays in the dashboard.
+      if (a.apply) throw new ToolError("Applying an AI proposal needs confirmation in the owner dashboard. To clean up from here, call housekeep (no apply), read each memory with get_memory, then use update_memory and forget.");
+      if (svc && !(await rateLimit(env, "hk:" + svc.id, 10, 3600e3)).ok) throw new ToolError("too many housekeeping checks this hour.");
+      if (a.ai) return housekeep(env, { apply: false });
+      return housekeepCandidates(env, { min_similarity: a.min_similarity });
     }
     case "select_skills": {
       // Past the hourly AI budget the pick silently falls back to keywords, so agents keep working.
@@ -173,7 +178,7 @@ async function dispatch(msg, env, stats, svc) {
     if (stats) stats.app = [ci.name, ci.version].filter(Boolean).map(String).join(" ").slice(0, 60);
     const protocolVersion = PROTOCOLS.includes(params.protocolVersion) ? params.protocolVersion : PROTOCOLS[0];
     return ok({ protocolVersion, capabilities: { tools: { listChanged: false } },
-      instructions: `MemoryRelay v3.5.1. Skill selection supports up to 10 skills per request (owner-adjustable). Memory length: ${memoryLimit} estimated tokens per memory (owner-configurable; not characters). Discover the entire memory library with list_memories or search using limit/offset/next_offset; index results include short descriptions and structured metadata. Read selected full memories with get_memory(memory_id). Metadata fields app, platforms (including pwa), feature, version, languages and stack are editable, colored in the owner UI, and separate from legacy context tags. All memory text supports Markdown **bold** titles, *italic* labels, bullet lists, inline \`commands\`, and fenced code blocks (\`\`\`bash); these display copy buttons, and commands are NEVER executed. Include reliable short descriptions and verified versions when saving new build/release memories. ${AGENT_MEMORY_GUIDANCE} If a client exposes only old search(query,limit), use search query="@page:100 keywords" to page and "@read:memoryid" to fetch full Markdown; reconnect to refresh tool schemas. Before starting any task, call select_skills with the user's request word for word. Follow only the skills it returns. If the user names a skill, call get_skill with that exact name; list_skills shows what exists. Never tell the user a skill does not exist before checking list_skills. To save your own usage limits, hand self-contained coding jobs (snippets, functions, small features, tests, reviews) to delegate (call get_delegation_brief once for the brief form and the review checklist); it runs them on other models and returns a checked result that you must still verify. To add a skill, call draft_skill (AI writes it) or get_skill_template (write it yourself, max 5000 tokens), then call upload_skill. Uploads wait for owner approval.`,
+      instructions: `MemoryRelay v3.5.3. Skill selection supports up to 10 skills per request (owner-adjustable). Memory length: ${memoryLimit} estimated tokens per memory (owner-configurable; not characters). Discover the entire memory library with list_memories or search using limit/offset/next_offset; index results include short descriptions and structured metadata. Read selected full memories with get_memory(memory_id). Metadata fields app, platforms (including pwa), feature, version, languages and stack are editable, colored in the owner UI, and separate from legacy context tags. All memory text supports Markdown **bold** titles, *italic* labels, bullet lists, inline \`commands\`, and fenced code blocks (\`\`\`bash); these display copy buttons, and commands are NEVER executed. Include reliable short descriptions and verified versions when saving new build/release memories. ${AGENT_MEMORY_GUIDANCE} If a client exposes only old search(query,limit), use search query="@page:100 keywords" to page and "@read:memoryid" to fetch full Markdown; reconnect to refresh tool schemas. Before starting any task, call select_skills with the user's request word for word. Follow only the skills it returns. If the user names a skill, call get_skill with that exact name; list_skills shows what exists. Never tell the user a skill does not exist before checking list_skills. To save your own usage limits, hand self-contained coding jobs (snippets, functions, small features, tests, reviews) to delegate (call get_delegation_brief once for the brief form and the review checklist); it runs them on other models and returns a checked result that you must still verify. To add a skill, call draft_skill (AI writes it) or get_skill_template (write it yourself, max 5000 tokens), then call upload_skill. Uploads wait for owner approval. To clean up duplicate memories with no API key, call housekeep (no arguments): it lists candidate groups, then you read each with get_memory, merge with update_memory and remove extra copies with forget. Rules memories are never listed and stay protected.`,
       serverInfo: { name: "my-memory", version: SERVER_VERSION } });
   }
   if (method === "ping") return ok({});

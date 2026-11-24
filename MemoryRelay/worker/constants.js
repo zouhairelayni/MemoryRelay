@@ -11,7 +11,7 @@ export const MAX_TAGS = 5;
 export const MAX_ARG_CHARS = 100000;     // largest single string an agent may send
 export const MCP_PER_MINUTE = 300;       // requests per connection
 export const PROTOCOLS = ["2025-06-18", "2025-03-26", "2024-11-05"];
-export const SERVER_VERSION = "3.5.1";
+export const SERVER_VERSION = "3.5.3";
 export const ACCESS = ["read", "write", "full"];   // what a connection may do
 export const ACCESS_RANK = { read: 1, write: 2, full: 3 };
 export const ACCESS_LABEL = { read: "Read only", write: "Read and write", full: "Full access" };
@@ -113,6 +113,6 @@ export const TOOLS = [
     description: "List the enabled skills (name and one-line description). Optional query narrows it. Use it to check whether a skill exists before saying it does not.",
     inputSchema: { type: "object", properties: { query: { type: "string" }, limit: { type: "integer" } } } },
   { name: "housekeep", annotations: T("Find duplicate memories", { destructiveHint: true, openWorldHint: true }),
-    description: "Preview duplicate/conflicting memories with AI. Merging or deleting memories requires explicit confirmation in the authenticated owner dashboard; MCP calls cannot apply proposals.",
-    inputSchema: { type: "object", properties: { apply: { type: "boolean" }, proposal_id: { type: "string" } } } },
+    description: "Find duplicate memories WITHOUT any API key: returns candidate groups (ids, dates, previews). You then read each with get_memory, merge with update_memory and remove extra copies with forget. Rules memories are never listed and stay protected. Optional min_similarity (0.3-1, default 0.6). Pass ai=true to ask the server's own AI provider for a preview instead (the owner applies those in the dashboard).",
+    inputSchema: { type: "object", properties: { ai: { type: "boolean" }, min_similarity: { type: "number" }, apply: { type: "boolean" }, proposal_id: { type: "string" } } } },
 ];

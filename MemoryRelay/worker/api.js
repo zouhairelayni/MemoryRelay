@@ -176,8 +176,10 @@ export async function api(request, env, url) {
     if (pv[2] && m === "GET") {
       const rows = (await env.DB.prepare(`SELECT key FROM ${c.tables.keys} WHERE enabled = 1 ORDER BY created LIMIT 5`).all()).results;
       if (!rows.length && pv[1] !== "openrouter") return json({ error: "enable a saved " + c.label + " key first" }, 400);
+      const usable = (await openRows(env, rows)).rows;
+      if (rows.length && !usable.length) return json({ error: LOCKED_MESSAGE }, 400);
       let result;
-      for (const row of rows.length ? rows : [{key:""}]) {
+      for (const row of usable.length ? usable : [{ key: "" }]) {
         result = await c.list(row.key);
         if (result.models) break;
       }

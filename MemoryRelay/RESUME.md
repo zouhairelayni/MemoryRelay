@@ -47,3 +47,11 @@ Findings: live MCP already exposes get_memory / get_memory_settings / 8000-token
 - Needs the owner (not code): the Gemini key "Sport Report" is rejected by Google and was auto-disabled; add a valid key or enable an NVIDIA/OpenRouter model in the dashboard for the full AI review. Rule-protected memory 7cebebe47918 is protected on purpose.
 - Not changed: separate snippet/command fields (they live in the Markdown text, fenced blocks) 
 Tests: 184 passed, 0 failed, 1 skipped (185). npm run build still not run here (no node_modules).
+- [x] P18 (2026-11-24) key-free housekeeping through MCP: `housekeep` (default) lists candidate groups with no API key (worker/housekeep.js housekeepCandidates, worker/mcp.js, worker/constants.js); the calling agent reads with get_memory, merges with update_memory, removes copies with forget. `ai:true` still asks the server AI for a preview; applying an AI proposal stays in the owner dashboard. Rules memories are never listed and stay protected (update/forget refuse). Dashboard keeps using AI via API (with offline fallback from P17). Test in test/hardening.test.js. Tests: 185 passed, 0 failed, 1 skipped (186). Zip r8.
+- [x] version bumped 3.5.1 -> 3.5.2 (package.json, lock, SERVER_VERSION, MCP instructions, sw.js cache), CHANGELOG, docs/releases/3.5.2.md, README updated. Zip r9.
+
+## Round 8 (2026-11-24) screenshot report
+- [x] P19 Errors screen scroll (own .pane in AppShell) + Back to overview (select() navigates unless that tab is showing; icon back)
+- [x] P20 Edit key (all providers, KeyRow Edit form), Gemini real error text, text-only model filter + paging, key cleaning, sealed-key fix in compat models route
+- Version 3.5.3, CHANGELOG, docs/releases/3.5.3.md. Tests 194 passed, 0 failed, 1 skipped. Zip r10.
+- Open: exact cause of the live Gemini HTTP 400 unknown (cannot call Google from here); new message will show it.

@@ -50,6 +50,7 @@ export default function GeminiPanel({ active }) {
           <div id="gk-list" className="stack list">
             {g.keys.map((k) => (
               <KeyRow key={k.id} enabled={k.enabled} onToggle={() => g.op({ op: "toggle_key", id: k.id })}
+                onEdit={({ label: l, key: kk }) => g.op({ op: "edit_key", id: k.id, label: l, key: kk })}
                 lead={<span className={"ic " + (k.enabled ? "ok" : "lock")}><Icon name={k.enabled ? "check" : "lock"} size={18} /></span>}
                 title={k.label} sub={"Ends in " + k.tail + (k.cooling.length ? ", cooling down" : "")}
                 note={(k.enabled ? "Used in rotation." : "Switched off. It is skipped until you turn it back on.") +
@@ -97,7 +98,7 @@ export default function GeminiPanel({ active }) {
           </div>
         </div>
       )}
-      <Notice id="gm-msg" tone="muted">{g.message}</Notice>
+      <Notice id="gm-msg" tone={g.messageTone || "muted"}>{g.message}</Notice>
     </div>
   );
 }

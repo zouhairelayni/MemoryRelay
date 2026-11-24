@@ -77,6 +77,7 @@ export default function CompatPanel({ id, title, intro, keyHint, browseLabel = "
           <div className="stack list">
             {state.keys.map((k) => (
               <KeyRow key={k.id} enabled={k.enabled} onToggle={() => op({ op: "toggle_key", id: k.id })}
+                onEdit={({ label: l, key: kk }) => op({ op: "edit_key", id: k.id, label: l, key: kk })}
                 lead={<span className={"ic " + (k.enabled ? "ok" : "lock")}><Icon name={k.enabled ? "check" : "lock"} size={18} /></span>}
                 title={k.label} sub={"Ends in " + k.tail + (k.cooling.length ? ", cooling down" : "")}
                 note={(k.enabled ? "Used in rotation." : "Switched off, or rejected by " + title + ".") + (k.cooling.length ? " Cooling down for: " + k.cooling.join(", ") + "." : "")}

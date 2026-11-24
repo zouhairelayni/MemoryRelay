@@ -60,6 +60,49 @@ export function localDuplicateGroups(rows) {
   return groups;
 }
 
+// Housekeeping that needs no API key: the calling agent does the thinking through MCP.
+// This only lists candidate groups (never touches rules memories, never writes). The agent then reads each
+// memory with get_memory, writes the merged text with update_memory and removes the extra copy with forget.
+const words = (t) => new Set(String(t).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim().split(" ").filter(Boolean));
+function jaccard(a, b) {
+  if (!a.size || !b.size) return 0;
+  let c = 0; for (const w of a) if (b.has(w)) c++;
+  return c / (a.size + b.size - c);
+}
+export async function housekeepCandidates(env, { min_similarity = 0.6, limit = 200 } = {}) {
+  const lim = Math.min(Math.max(Math.floor(Number(limit)) || 200, 1), 500);
+  const threshold = Math.min(Math.max(Number(min_similarity) || 0.6, 0.3), 1);
+  const { results } = await env.DB.prepare(
+    `SELECT id, text, description, metadata, created FROM memories WHERE ${NOT_RULES_SQL} ORDER BY created ASC, rowid ASC LIMIT ?`
+  ).bind(lim).all();
+  const rules = await env.DB.prepare(`SELECT COUNT(*) AS n FROM memories WHERE ${RULES_SQL}`).first();
+  const sets = results.map((m) => words(m.text));
+  const used = new Set(), groups = [];
+  for (let i = 0; i < results.length; i++) {
+    if (used.has(results[i].id)) continue;
+    const mi = safeJson(results[i].metadata, {});
+    const members = [{ row: results[i], score: 1 }];
+    for (let j = i + 1; j < results.length; j++) {
+      if (used.has(results[j].id)) continue;
+      const mj = safeJson(results[j].metadata, {});
+      // Different app or version = distinct build/release records, never candidates.
+      if ((mi.app || "") !== (mj.app || "") || (mi.version || "") !== (mj.version || "")) continue;
+      const score = jaccard(sets[i], sets[j]);
+      if (score >= threshold) members.push({ row: results[j], score });
+    }
+    if (members.length < 2) continue;
+    members.forEach((m) => used.add(m.row.id));
+    groups.push({
+      similarity: Math.round(Math.min(...members.slice(1).map((m) => m.score)) * 100) / 100,
+      memories: members.map((m) => ({ id: m.row.id, created: m.row.created, description: m.row.description || "", chars: String(m.row.text).length, preview: String(m.row.text).slice(0, 160) })),
+    });
+  }
+  return {
+    mode: "agent-review", scanned: results.length, rules_memories_skipped: rules.n, candidate_groups: groups,
+    next: groups.length ? "For each group: call get_memory for every id and read the full text. If they are true duplicates, call update_memory on the one to keep (merged Markdown, keep the distinct facts, dates and evidence), then call forget on the others. If they differ in meaning, leave them. Rules memories are never listed and cannot be changed or deleted through MCP." : "No duplicate candidates found. Lower min_similarity (minimum 0.3) to look wider.",
+  };
+}
+
 export async function housekeep(env, a = {}) {
   const { results } = await env.DB.prepare(
     `SELECT id, text, description, tags, metadata FROM memories WHERE ${NOT_RULES_SQL} ORDER BY created DESC, rowid DESC LIMIT 200`
