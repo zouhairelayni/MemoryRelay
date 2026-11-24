@@ -1,0 +1,122 @@
+// One function per server route. Components and hooks never build URLs themselves.
+import { del, get, post, put, request } from "./client.js";
+
+export const auth = {
+  status: () => get("/auth/status"),
+  login: (email, password) => post("/auth/login", { email, password }),
+  setup: (email, password, setup_token) => post("/auth/setup", { email, password, setup_token }),
+  logout: () => post("/auth/logout"),
+};
+
+export const overview = {
+  settings: () => get("/api/settings"),
+  test: () => post("/api/connector/test"),
+  build: () => get("/api/build"),
+};
+
+export const services = {
+  list: () => get("/api/services").then((d) => d.services),
+  create: (name, access) => post("/api/services", { name, access }),
+  rename: (id,name) => put("/api/services/" + encodeURIComponent(id) + "/name",{name}),
+  setAccess: (id, access) => put("/api/services/" + id + "/access", { access }),
+  signOut: (id) => post("/api/services/" + id + "/sessions/revoke"),
+  revoke: (id) => post("/api/services/" + id + "/revoke"),
+  remove: (id) => del("/api/services/" + id),
+};
+
+export const memorySettings = {
+  get: () => get("/api/memory-settings"),
+  set: (max_tokens) => put("/api/memory-settings", { max_tokens }),
+};
+
+export const memories = {
+  list: (q = "") => get("/api/memories?q=" + encodeURIComponent(q)).then((d) => d.items),
+  page: ({ q = "", rule = "all", limit = 30, offset = 0, ...filters } = {}) => {
+    const params = new URLSearchParams({ q, rule, limit: String(limit), offset: String(offset), ...filters });
+    return get("/api/memories?" + params.toString());
+  },
+  one: (id) => get("/api/memories/" + encodeURIComponent(id)),
+  add: (body) => post("/api/memories", body),
+  edit: (id, body) => put("/api/memories/" + id, body),
+  remove: (id) => del("/api/memories/" + id),
+};
+
+export const housekeeping = {
+  check: () => post("/api/housekeep", { apply: false }),
+  apply: (groups) => post("/api/housekeep", { apply: true, groups }),
+};
+
+export const gemini = {
+  state: () => get("/api/gemini"),
+  op: (body) => post("/api/gemini", body),
+  models: () => get("/api/gemini/models").then((d) => d.models),
+};
+
+export const backup = {
+  exportJson: async () => {
+    const res = await request("/api/export", { raw: true });
+    if (!res.ok) throw new Error("Export failed (" + res.status + ")");
+    return res.blob();
+  },
+  importJson: async (text, mode) => {
+    const res = await request("/api/import?mode=" + mode, { method: "POST", body: text, raw: true });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || d.error) throw new Error(d.error || "Import failed (" + res.status + ")");
+    return d;
+  },
+};
+
+export const skillRepos = {
+  saveToken: (token) => put("/api/github-token", {token}),
+  removeToken: () => del("/api/github-token"),
+  list: () => get("/api/skill-repos").then(d=>d.repositories),
+  info: () => get("/api/skill-repos"),
+  add: (repo, root, ref, names, options={}) => post("/api/skill-repos", {repo,root,ref,names,...options}),
+  files: (id) => get("/api/skill-repos/"+encodeURIComponent(id)+"/files"),
+  preview: (id, skill, path) => get("/api/skill-repos/"+encodeURIComponent(id)+"/file?skill="+encodeURIComponent(skill)+"&path="+encodeURIComponent(path)),
+  removeFile: (id, skill, path) => post("/api/skill-repos/"+encodeURIComponent(id)+"/files/remove", {skill,path}),
+  restoreFile: (id, key) => post("/api/skill-repos/"+encodeURIComponent(id)+"/files/restore", {key}),
+  filter: (id, settings) => put("/api/skill-repos/"+encodeURIComponent(id)+"/filter", settings),
+  toggle: (id, enabled) => put("/api/skill-repos/"+encodeURIComponent(id)+"/enabled",{enabled}),
+  sync: (id, force=false) => post("/api/skill-repos/"+encodeURIComponent(id)+"/sync", force?{force:true}:undefined),
+  remove: (id) => del("/api/skill-repos/"+encodeURIComponent(id)),
+};
+
+export const skills = {
+  scripts: () => get("/api/skill-scripts").then((d) => d.scripts),
+  resources: () => get("/api/skill-resources").then((d) => d.resources),
+  resource: (skill, path) => get("/api/skill-resource?skill=" + encodeURIComponent(skill) + "&path=" + encodeURIComponent(path)),
+  list: () => get("/api/skills"),
+  add: (text, source = "paste") => post("/api/skills", { text, source }),
+  setFlag: (name, flag, value) => put("/api/skills/" + encodeURIComponent(name) + "/" + flag, { value }),
+  remove: (name) => del("/api/skills/" + encodeURIComponent(name)),
+  setMax: (max) => put("/api/skills/max", { max }),
+  try: (request) => post("/api/skills/try", { request }),
+  get: (name) => get("/api/skills/" + encodeURIComponent(name)),
+  update: (name, text) => put("/api/skills/" + encodeURIComponent(name), { text }),
+  revert: (name) => post("/api/skills/" + encodeURIComponent(name) + "/revert"),
+  generate: (goal) => post("/api/skills/generate", { goal }),
+  improve: (text, instruction) => post("/api/skills/improve", { text, instruction }),
+};
+
+// OpenRouter, NVIDIA and OpenAI share one set of routes: /api/<id> and /api/<id>/models.
+export const provider = (id) => ({
+  state: () => get("/api/" + id),
+  op: (body) => post("/api/" + id, body),
+  models: () => get("/api/" + id + "/models").then((d) => d.models),
+});
+
+// Sub-agents: switch, hourly limit, routing, usage.
+export const monitoring = { get: (period="30") => get("/api/monitor?days="+encodeURIComponent(period)) };
+export const diagnostics = {
+  list: ({ period = '30', category = '', code = '', offset = 0, limit = 50 } = {}) =>
+    get('/api/errors?' + new URLSearchParams({period,category,code,offset:String(offset),limit:String(limit)})),
+  report: (type,screen) => post('/api/errors/client',{type,screen}),
+};
+
+export const delegation = {
+  get: () => get("/api/delegation"),
+  save: (patch) => put("/api/delegation", patch),
+  guide: () => get("/api/delegation/guide").then((d) => d.guide),
+  tryIt: (body) => post("/api/delegation/try", body),
+};

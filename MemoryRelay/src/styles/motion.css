@@ -1,0 +1,61 @@
+/* Memory Relay motion language: focus and clarity, not decor. Transform + opacity only.
+   The welcome sequence is one visual gesture, controls respond inside 180ms, and repeated
+   list content never staggers. Slower transitions are reserved for full screen layers. */
+@keyframes ping {from {transform:scale(1);opacity:.45}to {transform:scale(2.6);opacity:0}}
+@keyframes ringdraw {to {stroke-dashoffset:0}}
+@keyframes draw {to {stroke-dashoffset:0}}
+@keyframes shimmer {to {background-position:-200% 0}}
+@keyframes enter-soft {from {opacity:0;transform:translateY(8px)}to {opacity:1;transform:translateY(0)}}
+@keyframes select-in {from {opacity:0;transform:translateY(-5px)}to {opacity:1;transform:none}}
+@keyframes welcome-mark-in {from {opacity:0;transform:translateY(12px) scale(.95)}to {opacity:1;transform:translateY(0) scale(1)}}
+@keyframes welcome-text-in {from {opacity:0;transform:translateY(6px)}to {opacity:1;transform:translateY(0)}}
+
+/* A single entrance per primary container, never individual rows or controls. */
+.enter > .home-hero, .repo-workspace > .repo-detail-hero {animation:enter-soft 360ms cubic-bezier(.23,1,.32,1) both}
+.repo-detail-panel {animation:enter-soft 190ms cubic-bezier(.23,1,.32,1) both}
+.app-select-menu {animation:select-in 150ms cubic-bezier(.23,1,.32,1) both;transform-origin:top center}
+.i-check path {stroke-dasharray:24;stroke-dashoffset:24;animation:draw 260ms var(--ease-out) forwards}
+
+/* Only entrance motion in the welcome screen: no indefinite pulse or loading dot. */
+.welcome-emblem {animation:welcome-mark-in 650ms cubic-bezier(.15,.9,.25,1) both}
+.welcome-brand {animation:welcome-text-in 500ms cubic-bezier(.23,1,.32,1) 190ms both}
+
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-delay:0ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important}
+  .tab-pill,.drawer,.drawer-inner,.sheet,.agent-card-wrap,.chev,.tab svg{transition-duration:.01ms!important}
+  .pulse.ok::after{display:none}
+  .btn:active,.ib:active,.tab:active svg,.cable-chip:active{transform:none}
+  .enter > .home-hero,.repo-workspace > .repo-detail-hero,.repo-detail-panel,.app-select-menu,.welcome-emblem,.welcome-brand{animation:none}
+}
+
+/* v3.5.1: the approved M icon becomes a three-panel ribbon. The exact PNG takes
+   over once folded; the layered copies are clipped from the same image. */
+.logo-ribbon{position:relative;display:inline-grid;place-items:center;flex:none;isolation:isolate;overflow:hidden;border-radius:26%;vertical-align:middle;transform-style:preserve-3d}
+.logo-ribbon-settled{width:100%;height:100%;object-fit:cover;display:block;transition:transform .38s cubic-bezier(.18,.8,.2,1)}
+.ribbon-folds{position:absolute;inset:0;pointer-events:none;perspective:280px;transform-style:preserve-3d}
+.ribbon-fold{position:absolute;inset:0;background-size:100% 100%;background-repeat:no-repeat;transform-style:preserve-3d;backface-visibility:hidden}
+.ribbon-fold-left{clip-path:polygon(0 0,40% 0,40% 100%,0 100%);transform-origin:36% 53%}
+.ribbon-fold-middle{clip-path:polygon(34% 0,69% 0,69% 100%,34% 100%);transform-origin:50% 50%}
+.ribbon-fold-right{clip-path:polygon(63% 0,100% 0,100% 100%,63% 100%);transform-origin:66% 54%}
+@keyframes ribbon-fold-left{0%{opacity:.15;transform:rotateY(-78deg) translateX(-28%) skewY(10deg)}48%{opacity:1;transform:rotateY(19deg) translateX(1%) skewY(-3deg)}79%{opacity:1;transform:rotateY(-5deg)}100%{opacity:0;transform:none}}
+@keyframes ribbon-fold-middle{0%{opacity:.14;transform:rotateX(52deg) scaleX(.72)}46%{opacity:1;transform:rotateX(-15deg) scaleX(1.02)}78%{opacity:1;transform:rotateX(3deg)}100%{opacity:0;transform:none}}
+@keyframes ribbon-fold-right{0%{opacity:.12;transform:rotateY(78deg) translateX(28%) skewY(-10deg)}48%{opacity:1;transform:rotateY(-19deg) translateX(-1%) skewY(3deg)}79%{opacity:1;transform:rotateY(5deg)}100%{opacity:0;transform:none}}
+@keyframes ribbon-mark-reveal{0%,78%{opacity:0}94%,100%{opacity:1}}
+.logo-ribbon-animated .logo-ribbon-settled{animation:ribbon-mark-reveal 1.18s ease both}
+.logo-ribbon-animated .ribbon-fold-left{animation:ribbon-fold-left 1.18s cubic-bezier(.2,.86,.24,1) both}
+.logo-ribbon-animated .ribbon-fold-middle{animation:ribbon-fold-middle 1.18s cubic-bezier(.2,.86,.24,1) both}
+.logo-ribbon-animated .ribbon-fold-right{animation:ribbon-fold-right 1.18s cubic-bezier(.2,.86,.24,1) both}
+/* A deliberate, infrequent fold on the home header only; no motion on other tabs. */
+@keyframes ribbon-cycle-left{0%,1%{opacity:.1;transform:rotateY(-68deg) translateX(-20%)}5%{opacity:1;transform:rotateY(15deg)}9%{opacity:1;transform:none}11%,100%{opacity:0;transform:none}}
+@keyframes ribbon-cycle-middle{0%,1%{opacity:.1;transform:rotateX(38deg) scale(.85)}5%{opacity:1;transform:rotateX(-9deg)}9%{opacity:1;transform:none}11%,100%{opacity:0;transform:none}}
+@keyframes ribbon-cycle-right{0%,1%{opacity:.1;transform:rotateY(68deg) translateX(20%)}5%{opacity:1;transform:rotateY(-15deg)}9%{opacity:1;transform:none}11%,100%{opacity:0;transform:none}}
+@keyframes ribbon-cycle-mark{0%,8%{opacity:0}11%,100%{opacity:1}}
+.topbar .logo-ribbon-animated .logo-ribbon-settled{animation:ribbon-cycle-mark 9s linear infinite}
+.topbar .logo-ribbon-animated .ribbon-fold-left{animation:ribbon-cycle-left 9s cubic-bezier(.2,.86,.24,1) infinite}
+.topbar .logo-ribbon-animated .ribbon-fold-middle{animation:ribbon-cycle-middle 9s cubic-bezier(.2,.86,.24,1) infinite}
+.topbar .logo-ribbon-animated .ribbon-fold-right{animation:ribbon-cycle-right 9s cubic-bezier(.2,.86,.24,1) infinite}
+/* Not animated when reduced motion is requested. */
+@media(prefers-reduced-motion:reduce){
+  .logo-ribbon-animated .ribbon-folds{display:none}
+  .logo-ribbon-animated .logo-ribbon-settled,.topbar .logo-ribbon-animated .logo-ribbon-settled{opacity:1!important;animation:none!important}
+}

@@ -1,0 +1,73 @@
+/* Release 3.6: six matching accents, premium utility surfaces and safe mobile install UI. */
+:root[data-accent="purple"]{--cobalt:#7762d5;--cobalt-soft:#ece8ff;--ambient-violet:rgba(128,97,239,.11)}
+:root[data-accent="orange"]{--cobalt:#c56810;--cobalt-soft:#fff0dc;--ambient-violet:rgba(247,141,24,.11)}
+:root[data-accent="coral"]{--cobalt:#d54768;--cobalt-soft:#ffe7ee;--ambient-violet:rgba(240,89,124,.10)}
+:root[data-accent="mint"]{--cobalt:#098c75;--cobalt-soft:#dcf8ef;--ambient-violet:rgba(44,210,173,.11)}
+:root[data-accent="energy-green"]{--cobalt:#548900;--cobalt-soft:#e8f6d3;--ambient-violet:rgba(164,228,57,.10)}
+:root[data-accent="aqua-blue"]{--cobalt:#107cbb;--cobalt-soft:#e0f3ff;--ambient-violet:rgba(31,167,241,.11)}
+:root[data-accent="purple"][data-theme="dark"]{--cobalt:#b6a8ff;--cobalt-soft:#2a244b}
+:root[data-accent="orange"][data-theme="dark"]{--cobalt:#ffb45d;--cobalt-soft:#402c1b}
+:root[data-accent="coral"][data-theme="dark"]{--cobalt:#ff91a3;--cobalt-soft:#422335}
+:root[data-accent="mint"][data-theme="dark"]{--cobalt:#66f2c9;--cobalt-soft:#163c35}
+:root[data-accent="energy-green"][data-theme="dark"]{--cobalt:#b6fa58;--cobalt-soft:#2a3918}
+:root[data-accent="aqua-blue"][data-theme="dark"]{--cobalt:#6fddff;--cobalt-soft:#163549}
+@media(prefers-color-scheme:dark){
+  :root[data-accent="purple"]:not([data-theme="light"]){--cobalt:#b6a8ff;--cobalt-soft:#2a244b}
+  :root[data-accent="orange"]:not([data-theme="light"]){--cobalt:#ffb45d;--cobalt-soft:#402c1b}
+  :root[data-accent="coral"]:not([data-theme="light"]){--cobalt:#ff91a3;--cobalt-soft:#422335}
+  :root[data-accent="mint"]:not([data-theme="light"]){--cobalt:#66f2c9;--cobalt-soft:#163c35}
+  :root[data-accent="energy-green"]:not([data-theme="light"]){--cobalt:#b6fa58;--cobalt-soft:#2a3918}
+  :root[data-accent="aqua-blue"]:not([data-theme="light"]){--cobalt:#6fddff;--cobalt-soft:#163549}
+}
+.appearance-stack{display:grid;gap:12px}
+.settings-setting-title{font:750 13px/1.4 var(--display);color:var(--ink);letter-spacing:-.015em}
+.appearance-stack>p{margin:0;line-height:1.5}
+.accent-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin-block:4px}
+.accent-option{display:grid;place-items:center;gap:6px;position:relative;min-height:104px;min-width:0;padding:10px 5px 8px;background:var(--paper2);border:1px solid var(--line);border-radius:15px;color:var(--ink2);cursor:pointer;font:650 10px/1.25 var(--sans);text-align:center;transition:border-color .16s ease,background .16s ease,transform .16s ease}
+.accent-option img{width:49px;height:49px;object-fit:cover;border-radius:13px;box-shadow:0 6px 12px -8px rgba(0,0,0,.7)}
+.accent-option span:nth-child(2){white-space:normal;min-height:13px}
+.accent-option.selected{border:2px solid var(--cobalt);background:var(--cobalt-soft);color:var(--ink);padding:9px 4px 7px}
+.accent-check{position:absolute;top:5px;right:6px;display:grid;place-items:center;width:17px;height:17px;color:var(--cobalt);font-size:12px}
+.accent-option:hover{transform:translateY(-1px);border-color:var(--cobalt)}
+.install-picker-overlay{position:fixed;inset:0;z-index:10000;background:rgba(3,7,19,.72);display:grid;place-items:end center;padding:14px max(12px,env(safe-area-inset-right)) calc(14px + env(safe-area-inset-bottom))}
+.install-picker-dialog{background:var(--card);color:var(--ink);width:min(100%,480px);padding:19px;border:1px solid var(--line);border-radius:24px;box-shadow:0 16px 50px rgba(0,0,0,.4);max-height:min(790px,93dvh);overflow:auto}
+.install-picker-dialog header{display:flex;gap:12px;justify-content:space-between;align-items:flex-start}
+.install-picker-dialog h2{font:790 22px/1.2 var(--display);letter-spacing:-.04em;margin:4px 0 0}
+.install-picker-dialog>p{color:var(--muted);font-size:12px;line-height:1.6;margin:10px 0 12px}
+.install-picker-dialog .accent-option{min-height:102px}
+.install-picker-dialog .install-picker-note{border-top:1px solid var(--line);padding-top:10px;color:var(--ink2);min-height:42px}
+.install-picker-actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.icon-close{display:grid;place-items:center;min-width:42px;min-height:42px;border-radius:13px;border:1px solid var(--line);background:var(--paper2);color:var(--ink);cursor:pointer}
+/* Change the viewer's title size, not the layout, for long names/descriptions. */
+.topbar-page{min-width:0;overflow:hidden}.topbar-page h1,.topbar-page span{text-overflow:ellipsis;overflow:hidden;white-space:nowrap}
+/* Dedicated repositories & subpages: clear hierarchy with quiet toolbars. */
+.repo-screen .repo-detail-header,.repo-screen .repo-detail-tabs{border-color:var(--line)}
+.repo-info-card{border:1px solid var(--line);box-shadow:0 11px 30px -27px rgba(0,0,0,.7)}
+.repo-info-card h3,.set-sec h3{letter-spacing:-.025em}
+.repo-detail-tabs{position:sticky;top:0;z-index:3;background:var(--card)}
+.repo-list-scroll{scrollbar-width:thin;scrollbar-color:var(--line) transparent}
+.repo-file-row{min-width:0;overflow-wrap:anywhere}
+.repo-file-action,.repo-quick-sync,.repo-card-open{transition:background .16s ease,border-color .16s ease}
+.repo-file-action:hover,.repo-quick-sync:hover{background:var(--cobalt-soft);border-color:var(--cobalt)}
+/* Shimmering skeletons preserve the information architecture while loading. */
+.screen-skeleton{display:grid;gap:12px;width:100%;padding:4px 0;contain:layout}
+.skeleton-surface{background:var(--card);border:1px solid var(--line);border-radius:19px;min-height:90px;padding:16px;display:grid;gap:13px}
+.skeleton-surface.large{min-height:170px}.skeleton-surface.medium{min-height:120px}
+.skeleton-line{display:block;height:13px;width:75%;border-radius:8px;background:linear-gradient(100deg,var(--paper2) 8%,color-mix(in srgb,var(--cobalt) 18%,var(--paper2)) 45%,var(--paper2) 83%);background-size:250% 100%;animation:loading-sheen 1.55s ease-in-out infinite}
+.skeleton-line.short{width:42%}.skeleton-line.tiny{width:27%;height:9px}.skeleton-line.title{width:55%;height:20px}
+.skeleton-surface .skeleton-line:nth-child(2){animation-delay:-.2s}.skeleton-surface .skeleton-line:nth-child(3){animation-delay:-.45s}
+.welcome-screen{background:var(--paper)}
+:where(button,a,summary,[role="radio"],[role="option"]):focus-visible{outline:3px solid var(--cobalt)!important;outline-offset:3px!important}
+@media(prefers-reduced-motion:reduce){.skeleton-line{animation:none}.accent-option{transition:none}.accent-option:hover{transform:none}}
+@media(max-width:350px){.accent-grid{gap:5px}.accent-option{padding-inline:2px}.accent-option img{height:39px;width:39px}.install-picker-dialog{padding:12px}}
+
+/* The timeline range follows the KPI cards, directly before the activity plot. */
+.monitor-period-row{display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:0}
+.monitor-period-row>span{font-size:12px;font-weight:710;color:var(--ink2)}
+.monitor-period-row .monitor-period{max-width:100%;overflow-x:auto;scrollbar-width:none}
+.monitor-period-row .monitor-period::-webkit-scrollbar{display:none}
+.monitor-metric-action{cursor:pointer;text-align:left;color:var(--ink);font:inherit;width:100%;transition:border-color .2s ease,transform .2s ease}
+.monitor-metric-action:focus-visible{outline:2px solid var(--cobalt);outline-offset:3px}
+.monitor-metric-action:hover{border-color:var(--cobalt)}
+.monitor-metric-action .monitor-metric-label{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%}
+@media(max-width:370px){.monitor-period-row{align-items:flex-start;flex-wrap:wrap}.monitor-period-row .monitor-period{width:100%;justify-content:space-between}}

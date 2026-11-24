@@ -1,0 +1,2985 @@
+{
+  "description": "Sanitized folder snapshot, NOT a release artifact or guarantee of secret-free files",
+  "source_folder_name": "MemoryRelay",
+  "captured_at_utc": "2026-11-24T01:41:04.560909+00:00",
+  "git": true,
+  "branch": "main",
+  "head": "3cd84984d5f30ec7e8c582936fd56fb31192773e",
+  "working_tree_dirty": false,
+  "included_count": 590,
+  "included": [
+    {
+      "path": "-H",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "-d",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": ".dev.vars.example",
+      "size": 318,
+      "sha256": "f03787e74be3d73cb559dc8be63635a1234f8366a39ac12961cf94c2dc8f3e1c"
+    },
+    {
+      "path": ".gitignore",
+      "size": 89,
+      "sha256": "db1286e788eb15cd7d3868d6430771f5886ad4809132773c5db427fc59331017"
+    },
+    {
+      "path": "AUDIT-2026-11-11.md",
+      "size": 10710,
+      "sha256": "458bb6058a09b5ab0d3ee1ca6661b630366b0fe9fcb316783006de3bd9745bfe"
+    },
+    {
+      "path": "AUDIT-2026-11-23-V3.3.0.md",
+      "size": 6665,
+      "sha256": "8643608375dc092ff22e1f138efb01cb950d937f01aafd830b89f0e15bec4f9b"
+    },
+    {
+      "path": "AUDIT-ANTHROPIC-UPSTREAM.md",
+      "size": 4890,
+      "sha256": "cebb7f5420707cafb9bffa8beb1270ec0167fc792ae9756ad5d26a4d03569ba9"
+    },
+    {
+      "path": "AUDIT-MEM-POLISH-2026-11-02.md",
+      "size": 5810,
+      "sha256": "f0cb01c95863fab86b560931c31f53a6c542ca759beee332cd49c430ee1729df"
+    },
+    {
+      "path": "AUDIT-MEM-SECOND-PASS-2026-11-02.md",
+      "size": 5840,
+      "sha256": "5657732f453ee9ce1a08c6ffacd5384d747b76243920cf3df4d32b80f6f40e53"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "size": 6976,
+      "sha256": "6a5c21430d60c3b77c1d309be5bfb88f05ffc24a23aa91339d033865214c5a74"
+    },
+    {
+      "path": "CHG-MEM-ALL-SCREENS-REDESIGN-2026-11-02.md",
+      "size": 3750,
+      "sha256": "dd12f9c08685183753fcd568c0c99bd34d8a959cb4dc23b2f2daa11a402efbf4"
+    },
+    {
+      "path": "CHG-MEM-CHARTJS-2026-11-02.md",
+      "size": 2181,
+      "sha256": "0e69398dc1296ac5137712da8988d55c8b029771af0182474abb8a61e63bb583"
+    },
+    {
+      "path": "CHG-MEM-GITHUB-TOKEN-SAVED-MODELS-2026-11-03.md",
+      "size": 2264,
+      "sha256": "5bcac2c8db8ef9f04062057b22ecb7133868faffb6298a3fc7922e23e50285f0"
+    },
+    {
+      "path": "CHG-MEM-NO-ACCENT-2026-11-02.md",
+      "size": 1097,
+      "sha256": "d55fcbb03b9619e45365f7377ece1d131a2d1b88e569d3fe7871fa306547fcc2"
+    },
+    {
+      "path": "CHG-MEM-POLISH-2026-11-02.md",
+      "size": 771,
+      "sha256": "9ccd6ad24823811e9858137578db46c902c3cd8fd7bdfb6a2581a773a017a3a0"
+    },
+    {
+      "path": "CHG-MEM-PONYTAIL-MONITORING-2026-11-02.md",
+      "size": 5128,
+      "sha256": "37f5ad2539378f3f478a92e237a9f003f51bf696655b8a91308667769c73600d"
+    },
+    {
+      "path": "CHG-MEM-PY-ONLY-2026-11-03.md",
+      "size": 380,
+      "sha256": "91c525116c5efe1c3bad92a66dee297f38f58f193196596b6548b7f6a3f7a595"
+    },
+    {
+      "path": "CHG-MEM-TERMUX-PREVIEW-2026-11-02.md",
+      "size": 1471,
+      "sha256": "2610212ae38b0af66d1ce5cae30815cfed206d973256f955bffcf8030663d456"
+    },
+    {
+      "path": "NOTICE-ANTHROPIC-SKILLS.md",
+      "size": 944,
+      "sha256": "8cf571e9b99789cfe49c3f09695a32316f2ea45b6f249f290c2958547313fc99"
+    },
+    {
+      "path": "PACKAGE_STATUS.md",
+      "size": 1540,
+      "sha256": "b429da17af8b9a4901b7db07ef888c093e4d664376e358cacc98b28b1a9d2560"
+    },
+    {
+      "path": "README.md",
+      "size": 27338,
+      "sha256": "91fbc291bcd3fb36f69d85344d18e2cad358052eba17b544456435fd724ec85d"
+    },
+    {
+      "path": "RESUME.md",
+      "size": 5346,
+      "sha256": "14709a4c78a616ff6fade0135722fa60b33717e3739a568bdf56c3d8daf25ed3"
+    },
+    {
+      "path": "docs/BRAND-AND-MOTION-v3.4.7.md",
+      "size": 2482,
+      "sha256": "691fecaf9ef69699511409cad86a4d7965db5dded127043029f7ac26c58b693d"
+    },
+    {
+      "path": "docs/CODE-CLEANER-2026-11-23.md",
+      "size": 9378,
+      "sha256": "f25bb23982f359e278683912bb4e1ce0365218a830f0ab693b3dbff720b30874"
+    },
+    {
+      "path": "docs/DESIGN-SYSTEM.md",
+      "size": 2650,
+      "sha256": "c567f79c6e97d76fc7e146a39abf5b329ddbf943ed8091a71ba1dd58a102352f"
+    },
+    {
+      "path": "docs/QA-2026-11-23-3.4.7.md",
+      "size": 2344,
+      "sha256": "446de4e034929fb1343b74a15d2e1e53c1fa4dcd2d403583a7ffde7dfe5963da"
+    },
+    {
+      "path": "docs/QA-2026-11-23-3.5.0.md",
+      "size": 2656,
+      "sha256": "7c4dc59b42c1dcb2fd4eec978bcb5206fd991c68dca4bbd78155f4b8870c82a6"
+    },
+    {
+      "path": "docs/QA-2026-11-23.md",
+      "size": 2708,
+      "sha256": "5c450ad2ffcdb4dec436a52ec0649d332d3ebebc8d793724f7ceb265263adeac"
+    },
+    {
+      "path": "docs/RELEASE-INVENTORY-v3.5.0.md",
+      "size": 1981,
+      "sha256": "b9d0662947aaeacb56e265c0d884d32dd725f6cdde3c443d33f2b1bf4ec52f7a"
+    },
+    {
+      "path": "docs/releases/3.3.1.md",
+      "size": 352,
+      "sha256": "ac223befc27bbfbfc7c88be607ae4bcb7ff107964058c175670d7b25047a5047"
+    },
+    {
+      "path": "docs/releases/3.3.2.md",
+      "size": 379,
+      "sha256": "f5759741e9d528d6fa230e736ac11c7b32cca996902411ce299fa6b6eb886efe"
+    },
+    {
+      "path": "docs/releases/3.3.3.md",
+      "size": 483,
+      "sha256": "56e3aa36a65a6e82dc4c54e8ef873fc98bc38d24c1280f752f66075851d7e3e4"
+    },
+    {
+      "path": "docs/releases/3.3.4.md",
+      "size": 591,
+      "sha256": "2f370714e70c8706773628e95d362f7dc2275e8f488be1a66db01b9f23484268"
+    },
+    {
+      "path": "docs/releases/3.3.5.md",
+      "size": 335,
+      "sha256": "da045bf48a81b4cc1131e8f1974fb26e717ff144e5f770762a0614abc4243acb"
+    },
+    {
+      "path": "docs/releases/3.3.6.md",
+      "size": 951,
+      "sha256": "aec70c472f5b1579d0bb961612fe9c815135fda147e43cd2b699ff76706ea61b"
+    },
+    {
+      "path": "docs/releases/3.3.7.md",
+      "size": 850,
+      "sha256": "5e2a7e123cbe840023175e16921b478c99687baea6df2c46ee5ec48021de8075"
+    },
+    {
+      "path": "docs/releases/3.3.8.md",
+      "size": 489,
+      "sha256": "cec129a8b3e8fdf291c2c0ed413cd65efd7055e6322ae07bb2d5f58d893345fd"
+    },
+    {
+      "path": "docs/releases/3.4.0.md",
+      "size": 638,
+      "sha256": "420c2e781dc27c0866fc978762df85839172bbe6a2bd638cce073147cbc52614"
+    },
+    {
+      "path": "docs/releases/3.4.1.md",
+      "size": 673,
+      "sha256": "1764d03e1fa98a2272e5c61beb41bdd35c50cd60f46bf8034f6695793845fa0f"
+    },
+    {
+      "path": "docs/releases/3.4.2.md",
+      "size": 687,
+      "sha256": "b3c67e19225145afddd603326647fdf26a83da286c8fa7b71ce0814fcebe9dad"
+    },
+    {
+      "path": "docs/releases/3.4.3.md",
+      "size": 667,
+      "sha256": "dd93756acbaa7a605fefc0df2abc41032167c61b1e3d80dd38d95ef3027f4115"
+    },
+    {
+      "path": "docs/releases/3.4.4.md",
+      "size": 566,
+      "sha256": "7efb6202496c1a4df8109a5588c1fcea4cca7624b255201d96c4d00abf2b24f1"
+    },
+    {
+      "path": "docs/releases/3.4.5.md",
+      "size": 676,
+      "sha256": "6bdb0f3469bccaa6c1ad3510ed5f0dac6b13eea0c834a174ae82b0810a236744"
+    },
+    {
+      "path": "docs/releases/3.4.6.md",
+      "size": 697,
+      "sha256": "b788eb027191ee0409a2339824f08f149e37e00451e91fe5b7782db2afb5a7fd"
+    },
+    {
+      "path": "docs/releases/3.4.7.md",
+      "size": 777,
+      "sha256": "4080880513c69a944198383eb2c5886f6d53c4cff80adf6941fc30ec8634714f"
+    },
+    {
+      "path": "docs/releases/3.5.0.md",
+      "size": 8100,
+      "sha256": "f1f88ae97064a92baee769306e7e3369436c32a802b189d5bfa797fd390cbaa7"
+    },
+    {
+      "path": "docs/visual/home-390.png",
+      "size": 126575,
+      "sha256": "4bdd5f358513a1ac6a132a7a4aba0d81060fbe57303b9610cdc1d384e3d5c400"
+    },
+    {
+      "path": "docs/visual/home-430.png",
+      "size": 150692,
+      "sha256": "027e5ae7f4175c162524c4281a04e76d41a8d16a76e3389b911badaf9c58d8fc"
+    },
+    {
+      "path": "docs/visual/home-chart-390.png",
+      "size": 100147,
+      "sha256": "f5d9e98fe19e0b138dce5032852dcf8562b0c4cd7d0e4bd755ce779f30087093"
+    },
+    {
+      "path": "docs/visual/home-menu-390.png",
+      "size": 73130,
+      "sha256": "18a970c40eb34932009b2678a198cc42a166af3b4ddc75f919bdf6c6c149bacf"
+    },
+    {
+      "path": "docs/visual/memory-390.png",
+      "size": 79763,
+      "sha256": "33ebb4724ddf29e60e5fbadbe78e6a811504563ff56cbd13183c8569d5dc8b41"
+    },
+    {
+      "path": "docs/visual/memory-430.png",
+      "size": 93487,
+      "sha256": "b91ceba2a6a4409d4ce5064a549aba23bb067c6bf259bb38e669735a480bd20f"
+    },
+    {
+      "path": "docs/visual/memory-expanded-390.png",
+      "size": 67033,
+      "sha256": "7078b79d1c1f5e7c699c69407ac8975b9f4a4635fe6f85a316cdb937bec6ad64"
+    },
+    {
+      "path": "docs/visual/memory-expanded-430.png",
+      "size": 82267,
+      "sha256": "32c997514a236af8f2a537991a1b30390a9ac696a09499d93b77111c76952b87"
+    },
+    {
+      "path": "docs/visual/memory-index-390.png",
+      "size": 82622,
+      "sha256": "c35783efb350a15fb4294ace5bbeb59bad8bcfa8f6a880de6f782f98a1b4c9d2"
+    },
+    {
+      "path": "docs/visual/memory-index-430.png",
+      "size": 90695,
+      "sha256": "d6cc5c68fd8bfeab9212e353e955006fd74693639606ff5739214fc6226c75ce"
+    },
+    {
+      "path": "docs/visual/memory-index-fixture.html",
+      "size": 5746,
+      "sha256": "3a1fbef325c6b015235f66995255d8b0ee173856d870d5201aaa7de0eea85905"
+    },
+    {
+      "path": "docs/visual/preview.html",
+      "size": 11910,
+      "sha256": "2a920266e5bdfcbd33a3f51c948025ca888dd1f724328674b01284cd869f5495"
+    },
+    {
+      "path": "docs/visual/repoDetail-390.png",
+      "size": 88531,
+      "sha256": "951ba06027da479bae2b1349f6b5761461941f0815f90eb28e6347546a82278f"
+    },
+    {
+      "path": "docs/visual/repoDetail-430.png",
+      "size": 97087,
+      "sha256": "32a4a13e27105ee20c0a5b0e468ba216d341fc6a1db822c3ee734074089ff94e"
+    },
+    {
+      "path": "docs/visual/repos-390.png",
+      "size": 129647,
+      "sha256": "b82324a7a6e9cb497b53ef134a2a3691d199a45fa2fda625d5d4528ddc9735b2"
+    },
+    {
+      "path": "docs/visual/repos-430.png",
+      "size": 155208,
+      "sha256": "ea611a2728a81124789b617db31cced2af8cee479dfde5e00a08e3458d469de1"
+    },
+    {
+      "path": "docs/visual/v3.5.1/overview.html",
+      "size": 5875,
+      "sha256": "659b6a9a3e660a5b89fe22d3fe281875be61e5397436f57807a61479fd2ec237"
+    },
+    {
+      "path": "docs/visual/v3.5.1/repositories.html",
+      "size": 5373,
+      "sha256": "1f3d28460c74444d9f4158f528d51bdac09ff05039d9ac7fcdfcd489d3fac7a8"
+    },
+    {
+      "path": "docs/visual/v3.5.1/settings.html",
+      "size": 3606,
+      "sha256": "366f250587ab20d88bcd3477261ba56530c722faf345b96eee69ff1478ce4948"
+    },
+    {
+      "path": "docs/visual/v3.5.1/welcome.html",
+      "size": 2046,
+      "sha256": "488634ee07b8ed06b27c9741011e2148c3a8d2d3f9aa8a4fad2ec02dc2d9782f"
+    },
+    {
+      "path": "docs/visual/welcome-390.png",
+      "size": 155150,
+      "sha256": "8acdc520ec082c4deaa2d2dad5942cbe1969652a5d4f05f702bedabda079174f"
+    },
+    {
+      "path": "docs/visual/welcome-430.png",
+      "size": 181411,
+      "sha256": "8ee97f5e5c5e67427e307406de45911c552666d5fbb99a099f14cdb4abf032c5"
+    },
+    {
+      "path": "docs/visual/welcome.html",
+      "size": 1090,
+      "sha256": "71fbd866d2b8c806b1e99e97c4858c3c6bfedace4c76bd40d2d9dfc285de8b3f"
+    },
+    {
+      "path": "index.html",
+      "size": 984,
+      "sha256": "6dd54123948ea1d6df39fc6851df9f2a516aebdaf630d1ba7ddf700c056fe0d2"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/.dev.vars.example",
+      "size": 318,
+      "sha256": "f03787e74be3d73cb559dc8be63635a1234f8366a39ac12961cf94c2dc8f3e1c"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/.gitignore",
+      "size": 89,
+      "sha256": "db1286e788eb15cd7d3868d6430771f5886ad4809132773c5db427fc59331017"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/AUDIT-2026-11-11.md",
+      "size": 10710,
+      "sha256": "458bb6058a09b5ab0d3ee1ca6661b630366b0fe9fcb316783006de3bd9745bfe"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/AUDIT-2026-11-23-V3.3.0.md",
+      "size": 6665,
+      "sha256": "8643608375dc092ff22e1f138efb01cb950d937f01aafd830b89f0e15bec4f9b"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/AUDIT-ANTHROPIC-UPSTREAM.md",
+      "size": 4890,
+      "sha256": "cebb7f5420707cafb9bffa8beb1270ec0167fc792ae9756ad5d26a4d03569ba9"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/AUDIT-MEM-POLISH-2026-11-02.md",
+      "size": 5810,
+      "sha256": "f0cb01c95863fab86b560931c31f53a6c542ca759beee332cd49c430ee1729df"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/AUDIT-MEM-SECOND-PASS-2026-11-02.md",
+      "size": 5840,
+      "sha256": "5657732f453ee9ce1a08c6ffacd5384d747b76243920cf3df4d32b80f6f40e53"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/CHANGELOG.md",
+      "size": 6976,
+      "sha256": "6a5c21430d60c3b77c1d309be5bfb88f05ffc24a23aa91339d033865214c5a74"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/CHG-MEM-ALL-SCREENS-REDESIGN-2026-11-02.md",
+      "size": 3750,
+      "sha256": "dd12f9c08685183753fcd568c0c99bd34d8a959cb4dc23b2f2daa11a402efbf4"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/CHG-MEM-CHARTJS-2026-11-02.md",
+      "size": 2181,
+      "sha256": "0e69398dc1296ac5137712da8988d55c8b029771af0182474abb8a61e63bb583"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/CHG-MEM-GITHUB-TOKEN-SAVED-MODELS-2026-11-03.md",
+      "size": 2264,
+      "sha256": "5bcac2c8db8ef9f04062057b22ecb7133868faffb6298a3fc7922e23e50285f0"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/CHG-MEM-NO-ACCENT-2026-11-02.md",
+      "size": 1097,
+      "sha256": "d55fcbb03b9619e45365f7377ece1d131a2d1b88e569d3fe7871fa306547fcc2"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/CHG-MEM-POLISH-2026-11-02.md",
+      "size": 771,
+      "sha256": "9ccd6ad24823811e9858137578db46c902c3cd8fd7bdfb6a2581a773a017a3a0"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/CHG-MEM-PONYTAIL-MONITORING-2026-11-02.md",
+      "size": 5128,
+      "sha256": "37f5ad2539378f3f478a92e237a9f003f51bf696655b8a91308667769c73600d"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/CHG-MEM-PY-ONLY-2026-11-03.md",
+      "size": 380,
+      "sha256": "91c525116c5efe1c3bad92a66dee297f38f58f193196596b6548b7f6a3f7a595"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/CHG-MEM-TERMUX-PREVIEW-2026-11-02.md",
+      "size": 1471,
+      "sha256": "2610212ae38b0af66d1ce5cae30815cfed206d973256f955bffcf8030663d456"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/NOTICE-ANTHROPIC-SKILLS.md",
+      "size": 944,
+      "sha256": "8cf571e9b99789cfe49c3f09695a32316f2ea45b6f249f290c2958547313fc99"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/PACKAGE_STATUS.md",
+      "size": 1540,
+      "sha256": "b429da17af8b9a4901b7db07ef888c093e4d664376e358cacc98b28b1a9d2560"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/README.md",
+      "size": 27338,
+      "sha256": "91fbc291bcd3fb36f69d85344d18e2cad358052eba17b544456435fd724ec85d"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/RESUME.md",
+      "size": 5346,
+      "sha256": "14709a4c78a616ff6fade0135722fa60b33717e3739a568bdf56c3d8daf25ed3"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/docs/BRAND-AND-MOTION-v3.4.7.md",
+      "size": 2482,
+      "sha256": "691fecaf9ef69699511409cad86a4d7965db5dded127043029f7ac26c58b693d"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/docs/CODE-CLEANER-2026-11-23.md",
+      "size": 9378,
+      "sha256": "f25bb23982f359e278683912bb4e1ce0365218a830f0ab693b3dbff720b30874"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/docs/DESIGN-SYSTEM.md",
+      "size": 2650,
+      "sha256": "c567f79c6e97d76fc7e146a39abf5b329ddbf943ed8091a71ba1dd58a102352f"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/docs/QA-2026-11-23-3.4.7.md",
+      "size": 2344,
+      "sha256": "446de4e034929fb1343b74a15d2e1e53c1fa4dcd2d403583a7ffde7dfe5963da"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/docs/QA-2026-11-23-3.5.0.md",
+      "size": 2656,
+      "sha256": "7c4dc59b42c1dcb2fd4eec978bcb5206fd991c68dca4bbd78155f4b8870c82a6"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/docs/QA-2026-11-23.md",
+      "size": 2708,
+      "sha256": "5c450ad2ffcdb4dec436a52ec0649d332d3ebebc8d793724f7ceb265263adeac"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/docs/RELEASE-INVENTORY-v3.5.0.md",
+      "size": 1981,
+      "sha256": "b9d0662947aaeacb56e265c0d884d32dd725f6cdde3c443d33f2b1bf4ec52f7a"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/docs/releases/3.3.1.md",
+      "size": 352,
+      "sha256": "ac223befc27bbfbfc7c88be607ae4bcb7ff107964058c175670d7b25047a5047"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/docs/releases/3.3.2.md",
+      "size": 379,
+      "sha256": "f5759741e9d528d6fa230e736ac11c7b32cca996902411ce299fa6b6eb886efe"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/docs/releases/3.3.3.md",
+      "size": 483,
+      "sha256": "56e3aa36a65a6e82dc4c54e8ef873fc98bc38d24c1280f752f66075851d7e3e4"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/docs/releases/3.3.4.md",
+      "size": 591,
+      "sha256": "2f370714e70c8706773628e95d362f7dc2275e8f488be1a66db01b9f23484268"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/docs/releases/3.3.5.md",
+      "size": 335,
+      "sha256": "da045bf48a81b4cc1131e8f1974fb26e717ff144e5f770762a0614abc4243acb"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/docs/releases/3.3.6.md",
+      "size": 951,
+      "sha256": "aec70c472f5b1579d0bb961612fe9c815135fda147e43cd2b699ff76706ea61b"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/docs/releases/3.3.7.md",
+      "size": 850,
+      "sha256": "5e2a7e123cbe840023175e16921b478c99687baea6df2c46ee5ec48021de8075"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/docs/releases/3.3.8.md",
+      "size": 489,
+      "sha256": "cec129a8b3e8fdf291c2c0ed413cd65efd7055e6322ae07bb2d5f58d893345fd"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/docs/releases/3.4.0.md",
+      "size": 638,
+      "sha256": "420c2e781dc27c0866fc978762df85839172bbe6a2bd638cce073147cbc52614"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/docs/releases/3.4.1.md",
+      "size": 673,
+      "sha256": "1764d03e1fa98a2272e5c61beb41bdd35c50cd60f46bf8034f6695793845fa0f"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/docs/releases/3.4.2.md",
+      "size": 687,
+      "sha256": "b3c67e19225145afddd603326647fdf26a83da286c8fa7b71ce0814fcebe9dad"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/docs/releases/3.4.3.md",
+      "size": 667,
+      "sha256": "dd93756acbaa7a605fefc0df2abc41032167c61b1e3d80dd38d95ef3027f4115"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/docs/releases/3.4.4.md",
+      "size": 566,
+      "sha256": "7efb6202496c1a4df8109a5588c1fcea4cca7624b255201d96c4d00abf2b24f1"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/docs/releases/3.4.5.md",
+      "size": 676,
+      "sha256": "6bdb0f3469bccaa6c1ad3510ed5f0dac6b13eea0c834a174ae82b0810a236744"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/docs/releases/3.4.6.md",
+      "size": 697,
+      "sha256": "b788eb027191ee0409a2339824f08f149e37e00451e91fe5b7782db2afb5a7fd"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/docs/releases/3.4.7.md",
+      "size": 777,
+      "sha256": "4080880513c69a944198383eb2c5886f6d53c4cff80adf6941fc30ec8634714f"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/docs/releases/3.5.0.md",
+      "size": 8100,
+      "sha256": "f1f88ae97064a92baee769306e7e3369436c32a802b189d5bfa797fd390cbaa7"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/docs/visual/home-390.png",
+      "size": 126575,
+      "sha256": "4bdd5f358513a1ac6a132a7a4aba0d81060fbe57303b9610cdc1d384e3d5c400"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/docs/visual/home-430.png",
+      "size": 150692,
+      "sha256": "027e5ae7f4175c162524c4281a04e76d41a8d16a76e3389b911badaf9c58d8fc"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/docs/visual/home-chart-390.png",
+      "size": 100147,
+      "sha256": "f5d9e98fe19e0b138dce5032852dcf8562b0c4cd7d0e4bd755ce779f30087093"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/docs/visual/home-menu-390.png",
+      "size": 73130,
+      "sha256": "18a970c40eb34932009b2678a198cc42a166af3b4ddc75f919bdf6c6c149bacf"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/docs/visual/memory-390.png",
+      "size": 79763,
+      "sha256": "33ebb4724ddf29e60e5fbadbe78e6a811504563ff56cbd13183c8569d5dc8b41"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/docs/visual/memory-430.png",
+      "size": 93487,
+      "sha256": "b91ceba2a6a4409d4ce5064a549aba23bb067c6bf259bb38e669735a480bd20f"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/docs/visual/memory-expanded-390.png",
+      "size": 67033,
+      "sha256": "7078b79d1c1f5e7c699c69407ac8975b9f4a4635fe6f85a316cdb937bec6ad64"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/docs/visual/memory-expanded-430.png",
+      "size": 82267,
+      "sha256": "32c997514a236af8f2a537991a1b30390a9ac696a09499d93b77111c76952b87"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/docs/visual/memory-index-390.png",
+      "size": 82622,
+      "sha256": "c35783efb350a15fb4294ace5bbeb59bad8bcfa8f6a880de6f782f98a1b4c9d2"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/docs/visual/memory-index-430.png",
+      "size": 90695,
+      "sha256": "d6cc5c68fd8bfeab9212e353e955006fd74693639606ff5739214fc6226c75ce"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/docs/visual/memory-index-fixture.html",
+      "size": 5746,
+      "sha256": "3a1fbef325c6b015235f66995255d8b0ee173856d870d5201aaa7de0eea85905"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/docs/visual/preview.html",
+      "size": 11910,
+      "sha256": "2a920266e5bdfcbd33a3f51c948025ca888dd1f724328674b01284cd869f5495"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/docs/visual/repoDetail-390.png",
+      "size": 88531,
+      "sha256": "951ba06027da479bae2b1349f6b5761461941f0815f90eb28e6347546a82278f"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/docs/visual/repoDetail-430.png",
+      "size": 97087,
+      "sha256": "32a4a13e27105ee20c0a5b0e468ba216d341fc6a1db822c3ee734074089ff94e"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/docs/visual/repos-390.png",
+      "size": 129647,
+      "sha256": "b82324a7a6e9cb497b53ef134a2a3691d199a45fa2fda625d5d4528ddc9735b2"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/docs/visual/repos-430.png",
+      "size": 155208,
+      "sha256": "ea611a2728a81124789b617db31cced2af8cee479dfde5e00a08e3458d469de1"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/docs/visual/v3.5.1/overview.html",
+      "size": 5875,
+      "sha256": "659b6a9a3e660a5b89fe22d3fe281875be61e5397436f57807a61479fd2ec237"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/docs/visual/v3.5.1/repositories.html",
+      "size": 5373,
+      "sha256": "1f3d28460c74444d9f4158f528d51bdac09ff05039d9ac7fcdfcd489d3fac7a8"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/docs/visual/v3.5.1/settings.html",
+      "size": 3606,
+      "sha256": "366f250587ab20d88bcd3477261ba56530c722faf345b96eee69ff1478ce4948"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/docs/visual/v3.5.1/welcome.html",
+      "size": 2046,
+      "sha256": "488634ee07b8ed06b27c9741011e2148c3a8d2d3f9aa8a4fad2ec02dc2d9782f"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/docs/visual/welcome-390.png",
+      "size": 155150,
+      "sha256": "8acdc520ec082c4deaa2d2dad5942cbe1969652a5d4f05f702bedabda079174f"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/docs/visual/welcome-430.png",
+      "size": 181411,
+      "sha256": "8ee97f5e5c5e67427e307406de45911c552666d5fbb99a099f14cdb4abf032c5"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/docs/visual/welcome.html",
+      "size": 1090,
+      "sha256": "71fbd866d2b8c806b1e99e97c4858c3c6bfedace4c76bd40d2d9dfc285de8b3f"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/index.html",
+      "size": 984,
+      "sha256": "6dd54123948ea1d6df39fc6851df9f2a516aebdaf630d1ba7ddf700c056fe0d2"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/package-lock.json",
+      "size": 111356,
+      "sha256": "9e9175e363a4bdf90313c7a297fb3dd8683c826e0232179c5d7d0a88c09e6d74"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/package.json",
+      "size": 1269,
+      "sha256": "5ccea2c21f51bbe29d8559d114efdd2e8432de854ff6f52089868d3d34e8a3df"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/icons/apple-touch-icon.png",
+      "size": 29978,
+      "sha256": "9f6ea3c47451f442fda1ea09e6ba1d5ed1896315a4dcf016bfaadd7baed14fc1"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/icons/aqua-blue-192.png",
+      "size": 42411,
+      "sha256": "f2fc2b740ce4b0e5bd50bb5699c5d5d2c4e2aceabeb852cdac78050fdb022277"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/icons/aqua-blue-32.png",
+      "size": 2229,
+      "sha256": "1f7ad28ff16cbaa9dd945decffdbce45c14f4e7ce36f6e05557e38ef44d5ef62"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/icons/aqua-blue-48.png",
+      "size": 4261,
+      "sha256": "8a7bd702468cb047f1148a9afe26901d38b6413e07cd413af4ea8019255e784b"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/icons/aqua-blue-512.png",
+      "size": 233238,
+      "sha256": "8bca93e4c9db77d2b4f67625653aef05be3b5d96be9edc39b1e6c2c3df1996ff"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/icons/aqua-blue-apple.png",
+      "size": 37948,
+      "sha256": "9bb85ece8392fbdb9201cb0774a300b8745796e14456e8a00b9b76b31f9be9e5"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/icons/aqua-blue-maskable-192.png",
+      "size": 27741,
+      "sha256": "47d13df397c9a16e7f02c4a203b3027e13787d966471af8f03a57269e0ed92aa"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/icons/aqua-blue-maskable-512.png",
+      "size": 154056,
+      "sha256": "9fa0dd0af20ba890bad528c84947ec328bb7015a52d0f9df466408d92249c4d8"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/icons/coral-192.png",
+      "size": 43830,
+      "sha256": "1855640279f28f6bd384e1493f0f1e58a06fe81ebb579e163cbf3c8d4bc062e8"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/icons/coral-32.png",
+      "size": 2300,
+      "sha256": "6519863f4632caa7a286ed6a1aafea56fe90ef002d1a051a42eeca35d9b7cbc2"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/icons/coral-48.png",
+      "size": 4390,
+      "sha256": "340c961626facb09f9ccc88567f1d07541f7e040adf2b7e3c0c1c437a085460d"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/icons/coral-512.png",
+      "size": 243443,
+      "sha256": "8b366c584173cbb41f3941a0b6be15590583ce99ff1be98e15ea1e2957af3443"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/icons/coral-apple.png",
+      "size": 39190,
+      "sha256": "51f8a72553bd3480e498823fcea44e44bdee6bbcc4bb69fee4a815e51025f88a"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/icons/coral-maskable-192.png",
+      "size": 28391,
+      "sha256": "271fea38b1b7a7f921d07920cf9f6707b9df1b5c95dfa1bc241f1b4d70355a96"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/icons/coral-maskable-512.png",
+      "size": 161080,
+      "sha256": "0c82d2df0fef7bf62535043a1923241f69cdc605731ff36a0f1a94b4e80a5d5a"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/icons/energy-green-192.png",
+      "size": 42789,
+      "sha256": "8c16b4139a8ffa95139ebf858cb270fa183c94e8a0543809e7ea1d04f1b20cd7"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/icons/energy-green-32.png",
+      "size": 2240,
+      "sha256": "2f06fc7c2b9aa55d9b08f3a38f61aad979e5ebea3c13fd0639a130e4a7251652"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/icons/energy-green-48.png",
+      "size": 4245,
+      "sha256": "2607e5c93918c9bedc344f8a587cf7a5106466632ca609f614e9afa642091c6e"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/icons/energy-green-512.png",
+      "size": 236735,
+      "sha256": "c35217a6281cf43e380e39c26daacfb675fabcc68b3c8fb07c3978d7a79a0897"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/icons/energy-green-apple.png",
+      "size": 38228,
+      "sha256": "ba69bdc7fabab605123aa9f9e00aa9999af597302e80ee2ec889e62fab3fde29"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/icons/energy-green-maskable-192.png",
+      "size": 27831,
+      "sha256": "a2bd75281b26f74c23e701eeee678a979b33f57fa50fdfe7c2392eae1fb93480"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/icons/energy-green-maskable-512.png",
+      "size": 156900,
+      "sha256": "6d4699ebc6c682d614cbad1044853b3d5d6dbcbcf007c4236b15814c3b1e5032"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/icons/favicon-32.png",
+      "size": 2168,
+      "sha256": "e4b626203ea773e9b419af83a539b2527b9cbeddf78bcb88a2cb7c672405007e"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/icons/favicon-48.png",
+      "size": 4034,
+      "sha256": "e0e21c135320a0edbeeb1d82eed19d9387013ec2a4319d06f988eaa1825bbdc9"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/icons/icon-192.png",
+      "size": 34413,
+      "sha256": "332a2b49e755ac686983c2981f8221df5e5ed0a44a327f06ca581a26e56c4eb3"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/icons/icon-512.png",
+      "size": 218162,
+      "sha256": "c2bca2a01b889c409c1f298794acb6857ccc4ed1cb8361dbb352d00378c4a686"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/icons/icon.svg",
+      "size": 1069,
+      "sha256": "fa5d90e62c948b413b818581fb4cc528022862364d92e342d4df24c5bdef48ae"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/icons/maskable-192.png",
+      "size": 24087,
+      "sha256": "00e5e9ad71e0c11016bc12ea722ab62016a197f8e3f67925c913d02105530299"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/icons/maskable-512.png",
+      "size": 138720,
+      "sha256": "a101856f9b95f9fd7ce9d437c355ed8f935af884cc5e2c6508683e3abf622499"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/icons/mint-192.png",
+      "size": 42991,
+      "sha256": "4e9bb916cae1130043eaa05ef007bfcbdf6b6bc9c6cc6c83422dbb95dae45dcc"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/icons/mint-32.png",
+      "size": 2328,
+      "sha256": "270113cdbc8b74affcd4dc9b4a5c6f5e0e048ce257adfb8f0f090eb8a38a9590"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/icons/mint-48.png",
+      "size": 4363,
+      "sha256": "5b70e23a25bdc0756b086a9f7cd3e17a30e1ae920d69d410883543318873bc70"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/icons/mint-512.png",
+      "size": 235872,
+      "sha256": "4de27c363c436823abce9373ac3931e01cc5a5db442517b6a362799d63035ce8"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/icons/mint-apple.png",
+      "size": 38334,
+      "sha256": "0e595a20ca41b23489fa75ff69d48128d888190b6985a83fe7efc7d473fbbd22"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/icons/mint-maskable-192.png",
+      "size": 28095,
+      "sha256": "08ad9be52d42d290dd76e227b7961d9d77c304311fe61dad9b1be783db89d4b3"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/icons/mint-maskable-512.png",
+      "size": 155975,
+      "sha256": "cf883610234303b47790172e2336218934591c42c0b601667cd87e98027270d5"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/icons/orange-192.png",
+      "size": 37320,
+      "sha256": "390c083ee2d5d52b2d86922d65ff02c362fd1ff40300097f6272b6f576aaeb8c"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/icons/orange-32.png",
+      "size": 2154,
+      "sha256": "02c3c40053d1d6dbe9c9a6a7fa60bccceb2423798b454fc22d34da630b15db94"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/icons/orange-48.png",
+      "size": 4104,
+      "sha256": "79f4500b89f260bf763f3d8522ad6fa1bc30ce2d24c73fe7984985366b3cb5d3"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/icons/orange-512.png",
+      "size": 236229,
+      "sha256": "1616f9c0ae8d6d71ea041e3a3925a89f21f1069fb978844429590be380a756f4"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/icons/orange-apple.png",
+      "size": 33445,
+      "sha256": "0aa08e75e2a91e3d5b7a51ef3532df1eecdfc04bd61f2885be4861c5038d19e2"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/icons/orange-maskable-192.png",
+      "size": 24975,
+      "sha256": "aa88abe0de2492c56dbd262a75b4d7e073953fd3699fc399bcc7539b0c135d49"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/icons/orange-maskable-512.png",
+      "size": 146193,
+      "sha256": "766bbaad92f882cba61115fa35202ae3d95c8370b4cd20f6e3b1cdb42ade7531"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/icons/purple-192.png",
+      "size": 36621,
+      "sha256": "0d526535aa525aad554121606563c65f3591bd8a8a041dc4d298e16e5802d580"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/icons/purple-32.png",
+      "size": 2189,
+      "sha256": "eb439b961b8120a01579abb0ac34801137bcac10e2df1cf23576e7f9c324c6ad"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/icons/purple-48.png",
+      "size": 4084,
+      "sha256": "1fddb7a2a67100cd7627262e97015314bed7df38d40b06fb86154a0e5ee362b4"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/icons/purple-512.png",
+      "size": 221483,
+      "sha256": "1241774f10cbd7ea7f5cef41358e89aa42c941cf3ce6931bbf3e75bc613fb2b0"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/icons/purple-apple.png",
+      "size": 33058,
+      "sha256": "152e7fd2901aaceacc7efec2bc11a18bd856417af11110afe53a416f76a01387"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/icons/purple-maskable-192.png",
+      "size": 24387,
+      "sha256": "ee98750cf211034767c8222acb8a02562694f9dc82c9b0ec1cf29cacd93ef276"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/icons/purple-maskable-512.png",
+      "size": 146130,
+      "sha256": "be7a169c95f7cc8c0607438e45d20f19d8845fb8e33d3ba111c20a51610dd382"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/manifest-aqua-blue.webmanifest",
+      "size": 991,
+      "sha256": "415a36adac7bc07a5e4ca052a57027d421744edf342c19772ce56aa164e4e560"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/manifest-coral.webmanifest",
+      "size": 975,
+      "sha256": "8fd5c8aa441fa458d2824808dea1a713f731a472f888a89fe4e122d7668e284c"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/manifest-energy-green.webmanifest",
+      "size": 1003,
+      "sha256": "070a397fd64854dc6c391dcd4c348850558b80c8a4b54344669f0a76d254f7b1"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/manifest-mint.webmanifest",
+      "size": 971,
+      "sha256": "a59d76f6f30ab4baba51891adacd80abcc28393e5f8abf8d6442c1663090c52b"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/manifest-orange.webmanifest",
+      "size": 979,
+      "sha256": "937e3e3accfed60a81c8b37e9461dfc317f34fb3feb82bb0306081e866b798e0"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/manifest-purple.webmanifest",
+      "size": 979,
+      "sha256": "f378603b3d2c7c130fcabbf9306b8499fb128b41b9a811da6ff3dddac164855b"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/manifest.webmanifest",
+      "size": 979,
+      "sha256": "f378603b3d2c7c130fcabbf9306b8499fb128b41b9a811da6ff3dddac164855b"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/sw.js",
+      "size": 1412,
+      "sha256": "132ff086a89e26506cf7fa1fef0ab891277bfd4a8c193e674ed242d8e2f75a31"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/public/theme-init.js",
+      "size": 822,
+      "sha256": "f6515bd64ac615911470da4baa18cf34c28ddca2d0cd9b892bfcda309ad67840"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/scripts/canvas_poster.py",
+      "size": 1122,
+      "sha256": "dc473e0ab3b2258b3d3666356ec623e5140ea614b53a17787bda73a9c0bff462"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/scripts/sync-anthropic.mjs",
+      "size": 4688,
+      "sha256": "93808e11d46f32eb90355633d90600a014a0c6a0f7085fa86a758cdb7ffa9320"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/scripts/webapp_smoke.py",
+      "size": 1437,
+      "sha256": "1d0b3fe254d9125d058d347f80b3524a3511df9ed3df4eb4646ba17c6818e0a7"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/server.js",
+      "size": 1472,
+      "sha256": "b247e63de6e15d7aeaf3dec89c63afbf6440bf2e1fbc9aa589b06e84a0d8882a"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/shared/brands.js",
+      "size": 3626,
+      "sha256": "105bf9b74eed63d95e590fccce9449265d7c62a3b5de5d0771169af1eace1632"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/shared/memoryBudget.js",
+      "size": 977,
+      "sha256": "11739da05d3d622b68d56111645e25f6f9d464119806ebbf27a9b0b8de2435de"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/shared/skillTokens.js",
+      "size": 265,
+      "sha256": "c3b9cfe8cb43b7ade147ec460586f2521e76887fcfcc33054fe8668e15812327"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/App.jsx",
+      "size": 1134,
+      "sha256": "5a3c1056d03d1ac76a8292c4967ef03ef17406d2ef132238f798775d98ccb54b"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/api/client.js",
+      "size": 1359,
+      "sha256": "366c1a3b9db7555f6759ba7667007a6ad55851e6e9db82a98166e5ccbaf8b183"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/api/endpoints.js",
+      "size": 5859,
+      "sha256": "fd1dc2f5d2c8e05ac3f68bc0aa8bc0b57f3a72a7f95f334c876f8d5ac41240d1"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/components/AccentPicker.jsx",
+      "size": 864,
+      "sha256": "39d36002027d073ad859cf6e3082c4244e6b4c77e5de6d77f5b18878bbde6cfe"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/components/AccessPicker.jsx",
+      "size": 1167,
+      "sha256": "2ef6fd7a3e3554e4b3e6ca20bf46711537a373ef06ccfcefd1e000dca4351ee7"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/components/ActionRow.jsx",
+      "size": 1463,
+      "sha256": "1fce904888e55b3dcde53c39ea92aa3c6933ae3fba2313aad4a368b143c858c4"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/components/AppSelect.jsx",
+      "size": 5163,
+      "sha256": "0817fd5a9fedf467a1a05181c5b31e75bd188be230c7da0c266d20203de332d1"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/components/Badge.jsx",
+      "size": 163,
+      "sha256": "b05350e37a97654c4609f840a916e639b6d1d0608faac05f473bda3f957e18f2"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/components/Brand.jsx",
+      "size": 1108,
+      "sha256": "1feb61eaa9fa8f8eacbabb17c21f369a621da4d19c970dbd52e33673855a2bb0"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/components/Button.jsx",
+      "size": 581,
+      "sha256": "613d987a39b49699945602b16b1b17498eeb61d04fee051dbf987841dff843e0"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/components/Collapse.jsx",
+      "size": 432,
+      "sha256": "0ec7d012201234e26e0e9c8849f42e760691960936a8097e7e289b49c3374c77"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/components/Icon.jsx",
+      "size": 3172,
+      "sha256": "f6b9c0dce57c738e8b6ca8a91a2ecd7bb24e2301a25182f1bbd0f030186deb11"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/components/IconButton.jsx",
+      "size": 533,
+      "sha256": "73225bba2d745aa1f7a740f02e705affdb375ecfbcac775fd015b55e59901075"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/components/InstallChooser.jsx",
+      "size": 3298,
+      "sha256": "16fcf76b9ab99f23db4be25660e92b4030f3e2adcf24ea5c54541b11ff1324aa"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/components/Logo.jsx",
+      "size": 1110,
+      "sha256": "e4d10ce78563d0579635ee5b80fa58aaaf0bf3d4be542ba231bfe151fbaaef06"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/components/Notice.jsx",
+      "size": 252,
+      "sha256": "b5c1c7ea9f0370d85954501ad1dc58cf4922d09e572d4b81979487bd216c9ee5"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/components/PageHead.jsx",
+      "size": 393,
+      "sha256": "b34f84973f72472df80352b4e0014b4547bf788c683a63e6ee3a5755ba079a66"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/components/ScreenSkeleton.jsx",
+      "size": 614,
+      "sha256": "c84f4a081aebe15349d872df7b9fe00378d9376671cf05cf6f302dbe6f253175"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/components/SearchBar.jsx",
+      "size": 517,
+      "sha256": "f3986d7af3d6fdd897bce05bd6ec7ce5d1af364f56172a7e3720a7086177bdda"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/components/Segmented.jsx",
+      "size": 456,
+      "sha256": "b5b091bf6b8553d939d3f5403081ba9b5db739174cec2409a2da19089dafcae4"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/components/Sheet.jsx",
+      "size": 2620,
+      "sha256": "9b81e0357a28210e1f82e385d75c3b348c1b73b6806adcd07c09d27daeb5beda"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/components/Switch.jsx",
+      "size": 408,
+      "sha256": "dbb3961e77aea7e4cbab501980ed9eaea64bccb9042de8f20c4c95c173185ef0"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/components/WelcomeSplash.jsx",
+      "size": 846,
+      "sha256": "f9c0e99a851e3296c52e510f08fabeb140fce9fdcc1bd29dbd18ff810f91b9c0"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/hooks/useAccent.js",
+      "size": 2160,
+      "sha256": "a24034fb05ffc901ea54c6efb5929a40b21214973bf3d3adeffee6aa04a370f1"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/hooks/useAuth.js",
+      "size": 1264,
+      "sha256": "50b5e6bdb645709f2209fd9e0ff054efe25f179fb3c7c8b0afc1850a175df3f0"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/hooks/useCountUp.js",
+      "size": 993,
+      "sha256": "42dbe4fa8763b3c1364733fe110896fdd6ce516894a4d50703236a5c6ff1afe0"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/hooks/useGemini.js",
+      "size": 1330,
+      "sha256": "6243a8cd808e7dcbb7fdf685c9385fe815643d62ee7fb952cb09597c32099719"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/hooks/useHashRoute.js",
+      "size": 1025,
+      "sha256": "53704650251641e753c66e1e6c5b6aef2d2221647e232684f8779928585adaef"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/hooks/useInstallPrompt.js",
+      "size": 1144,
+      "sha256": "2c973b50da8a101d9702e0c6cf409cbef0bbe9726e29aa7fbbf03fd1db6dffb7"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/hooks/useMemories.js",
+      "size": 3710,
+      "sha256": "55a6a21d8bc0abef211e495a5e829959affde2644e63ea9f9f7183cf9ba9c6e5"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/hooks/useOverview.js",
+      "size": 1163,
+      "sha256": "73936d2fd1e4140482ac7dade787cd7ad87d4468f061ff09dfee8c077aebdaf8"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/hooks/usePersistent.js",
+      "size": 357,
+      "sha256": "03ba63543f3ba502e7183ffc244728c7895d0f2c35d81580642728a950332f6a"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/hooks/usePolling.js",
+      "size": 578,
+      "sha256": "2fb53e229bbe687ec4d0621408cbb0a54757da0b147a477dcddad89f7e880665"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/hooks/useServices.js",
+      "size": 2705,
+      "sha256": "efb743325a800225d3a6f0da1ee6080f76f448dd07460ea5987d56a95ca1e8e5"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/hooks/useSheetDrag.js",
+      "size": 1885,
+      "sha256": "2625c32c03e5c91f6331cb9ba2479416f1b52d47875757d02c399ca856901315"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/hooks/useSkills.js",
+      "size": 2037,
+      "sha256": "201a8e7e10a4cdcd20f9d58464a9d0715a1e3016dc4d9064e3a94686d1d9d9a9"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/hooks/useSwipeDeck.js",
+      "size": 3411,
+      "sha256": "529cd61e78086eb6d66841cf67b22739759d7b46a6a04a71b69a9cc80aa99575"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/hooks/useSwipePager.js",
+      "size": 3143,
+      "sha256": "09493ec8309a2189b3432468e9d531ab2c53bb0965805a4924c2270009e13787"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/hooks/useTheme.js",
+      "size": 1216,
+      "sha256": "d81308887c7e94ec1d730ffa46d5dc9874c7efb34fcaacaded0a6478ed9e9120"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/lib/cable.js",
+      "size": 846,
+      "sha256": "10f6627653cec775de1b73730c60f88cad52eb53d8ee7479cf3a4ea2579b0a45"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/lib/clipboard.js",
+      "size": 888,
+      "sha256": "35db4478958e598206a2fc0c6c0b5fbe5ff7dea117063ae3db17889e221b83dd"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/lib/format.js",
+      "size": 467,
+      "sha256": "94c3d42c574125aef459ae8f03d6993ffc47b967a519bc92dfe6d2e13c6e79f3"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/lib/gesture.js",
+      "size": 1053,
+      "sha256": "9e49e57f0dec51319c7ba2c2f00f58632c48911e42ab10387fa5cb9df585c873"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/lib/inert.js",
+      "size": 254,
+      "sha256": "05c52b6c7ff04f1051047c9d93d0d656bf858b035dba3342950a375d70b58d5a"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/lib/memoryMarkdown.js",
+      "size": 2846,
+      "sha256": "c17d0edc71a2f34080e2893683dd43811c5684f1ce2389208323e9fbaa7dd8a5"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/lib/storage.js",
+      "size": 374,
+      "sha256": "1db6d558448d5fc3a05cfcd7be8e5b622061a446d534f274c76a98f7f568db89"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/main.jsx",
+      "size": 652,
+      "sha256": "9d47bfb3255c6db3cc47abcaa9d7516e7e68ef5597873132826822e342e5b699"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/modules/agents/AgentCard.jsx",
+      "size": 3718,
+      "sha256": "b84a43489fb47d9af2beabc43aee141d25f0b3754c2b1f2d7d51ebf117c21655"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/modules/agents/AgentsScreen.jsx",
+      "size": 7460,
+      "sha256": "0eff501910cc52a15a2ca43b762a0ab5dcd09e9e0a713af048fd8b47c1d3943b"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/modules/home/ActivityChart.jsx",
+      "size": 3643,
+      "sha256": "f80b6fa6695b777555a2627ce0bd2cfdc4399a63d5cd5c4bb4dc89e6dff396e8"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/modules/home/ErrorsScreen.jsx",
+      "size": 3492,
+      "sha256": "e18f55d721bb24e5386dda26c5896aa9eff3b026a4775728986b34483b1ff8d1"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/modules/home/HomeScreen.jsx",
+      "size": 4053,
+      "sha256": "830367d414d18e0e20c51c24619029a2f046a8f10e91fdcc3c1b7b3c646a237a"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/modules/home/MetricDropdown.jsx",
+      "size": 2997,
+      "sha256": "9134fa96b389d8bf4db9c2d8313ce6430b34ca64b430b52abe913cf719bdc751"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/modules/home/MonitorPanel.jsx",
+      "size": 11692,
+      "sha256": "fdadb3a18d6fc023232e66f1e6cc17590cabaf4fe99074dc01f782a69ad03b33"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/modules/home/metricColors.js",
+      "size": 1059,
+      "sha256": "67c1df6361bf1bd1b9a06bf837257894b4edc958a8b4592898aaabeb1a5288db"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/modules/index.js",
+      "size": 1864,
+      "sha256": "c668cd7d64c466be0a3e95ec1c61f4b40f6114ac416923ef46f5adacd72dc9f9"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/modules/keys/CompatPanel.jsx",
+      "size": 8715,
+      "sha256": "0f786ec24379c9cdb76dd8dd9683e84a1b8c720455e9a4a4a6b3c7c1c033fbf1"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/modules/keys/DelegationPanel.jsx",
+      "size": 10373,
+      "sha256": "39abc962ea26e980c3602e21dc15741df7e5683d3261f478a947cdf0862573b3"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/modules/keys/GeminiPanel.jsx",
+      "size": 6392,
+      "sha256": "d643c0bad48ec981d967f5620ece16e90536fb5a53dea270c2a582660dda2139"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/modules/keys/KeyRow.jsx",
+      "size": 1287,
+      "sha256": "e3f0196fe7906784296b7d555bd4a9278b804aa665c300f7ea43eca219e0579b"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/modules/keys/KeysScreen.jsx",
+      "size": 1384,
+      "sha256": "8ecde9a5441b12f6a3b826db4becd2cf24a617b407c0a498cac7c10edeb4440c"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/modules/keys/providers.jsx",
+      "size": 1317,
+      "sha256": "7d608f29edf54b1c92f0ea886b656abd6cb554dcd633536d9a744b3287b5b759"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/modules/memory/Housekeeping.jsx",
+      "size": 2297,
+      "sha256": "11d093743798001e68b043838aeec638605190b8a97c7ad652b482af5fd0ab20"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/modules/memory/MemoryCard.jsx",
+      "size": 3190,
+      "sha256": "a285d9928d34f17b82ff3c01455c21c372e35a34688c2ce699515858d78eb597"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/modules/memory/MemoryEditor.jsx",
+      "size": 8997,
+      "sha256": "e89ba806e1a4759a2f4001f7a6c3a6dcba2e51e5f5886c432d4e2aedf34423a1"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/modules/memory/MemoryLabels.jsx",
+      "size": 1071,
+      "sha256": "ed0904d4a95b692adb979ae3bff44f0f819a305e5ea46f31a3b91e9f4b019fcc"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/modules/memory/MemoryMarkdown.jsx",
+      "size": 2088,
+      "sha256": "99c00240623b375cd5c55fa482b3a2d0dd5fa26d9d0579d8d1dceeb486f84fbe"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/modules/memory/MemoryScreen.jsx",
+      "size": 4204,
+      "sha256": "46a0b9f195328908c0a04ec345ef4ebbc76fc75fccc69ad71df8a28146d98711"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/modules/skills/GithubSources.jsx",
+      "size": 26787,
+      "sha256": "ccdef5391a3b0e5c1f0b00db4842d65a413e791d3481cace5967bc33a9d5b238"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/modules/skills/ScriptBank.jsx",
+      "size": 3172,
+      "sha256": "ca1f80ec45c44c55bce023247bfdd4e6b89014f9ca5d915b67b88a03b09b7948"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/modules/skills/SkillSelector.jsx",
+      "size": 10069,
+      "sha256": "6e7cfa92d1ad20ac39cac76342b8dd02ac38176c83a83bd352a224061d7ecf24"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/modules/skills/SkillStudio.jsx",
+      "size": 6137,
+      "sha256": "0b78124a03725c5a69fe46a3ec8a061d42b5ce340040b60f30b6fa04f1e6e91b"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/modules/skills/SkillsScreen.jsx",
+      "size": 1446,
+      "sha256": "6d1ed1afbf6f5c67162e2c74f54320ed0c9d6cfaac4f2081799fbe9e5439b15e"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/settings/About.jsx",
+      "size": 630,
+      "sha256": "bc7038fe4700c095d3707316348871231d3418aaadef77412c31c4278fe1a3ce"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/settings/Account.jsx",
+      "size": 516,
+      "sha256": "466e9d22b5a277677eb2403fed14c34f86fc75997cc815eb35929af31560c5fc"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/settings/Appearance.jsx",
+      "size": 1128,
+      "sha256": "5f55a7971e7f6494d5c5df12edf8acf91b19ba5f7a37c4844b5b10f915fdf49d"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/settings/Backup.jsx",
+      "size": 2515,
+      "sha256": "9118176db32778554b2798e997ee82250b85e3d149bbbd3443b8a98036cb1550"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/settings/Gestures.jsx",
+      "size": 571,
+      "sha256": "73cfc62b2135cd867431a0b03e09a5598cccdd8609bab27a610bc1022c17819a"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/settings/Install.jsx",
+      "size": 688,
+      "sha256": "32bbcffa6345f0d0cfbe9eefb81deaf9bae59fdcf92e4a79f11446abfc57cd6d"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/settings/MemoryContext.jsx",
+      "size": 2274,
+      "sha256": "497ca1b9a0b1f6ac43f4779d1482bce629c706bb12c5ca2e37278f47cc4d5e80"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/settings/Section.jsx",
+      "size": 217,
+      "sha256": "67445e0457faca07c4a50dd6e4a696bdef0502da9a1bfa403490dfee04f79816"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/settings/SettingsSheet.jsx",
+      "size": 1435,
+      "sha256": "a83cda7b919ef3954f43bb62c120b352272c7a6dfc40c8c656e347e1d2ed5838"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/shell/AppContext.js",
+      "size": 230,
+      "sha256": "b98aefbb97659a065026451c873d8629986aa049748ae3dfe27751ec08c6b59e"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/shell/AppShell.jsx",
+      "size": 3008,
+      "sha256": "4f28e224b9b577d5acf8904e08c78ca0289b2f74bc1af900a087a9c1748859ac"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/shell/AuthGate.jsx",
+      "size": 2868,
+      "sha256": "be831abd9ac7c4285b2772efbdbaf5a93ea2cf95ed21c9475440f87ad0d286c9"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/shell/Pager.jsx",
+      "size": 815,
+      "sha256": "5e2f3fedf83dfa37007566f1407eec26ddef38c8745603515e36ac896fe75990"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/shell/PwaRefresh.jsx",
+      "size": 991,
+      "sha256": "7cb3c2a0ce1df79c74853fb40df8fa6af3e4a30eac766a6f5c3324d060eadd6a"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/shell/TabBar.jsx",
+      "size": 918,
+      "sha256": "28c293ef9a307aa53dc0d17862c75e6d55a7799daef87ec69586d6b187995b11"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/shell/TopBar.jsx",
+      "size": 1011,
+      "sha256": "3d429fb473e12b824dfada6a338ca37c90ccec6b66ac7269538a7299e956c153"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/styles/accent-and-polish.css",
+      "size": 7582,
+      "sha256": "40f00d3de17c9fdd0d780a98d903cd4913b3dba1df164afd24427e913757b9b6"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/styles/base.css",
+      "size": 4838,
+      "sha256": "efd8bc2d5e508f8a87e18094f86637c7ca8140d1c9fefe085a9e87fd41fc26b8"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/styles/motion.css",
+      "size": 5875,
+      "sha256": "2469b9cc51650fbd622ae753e6f3805d68c10c2f61f28a5c89942caea711cef8"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/styles/redesign.css",
+      "size": 47853,
+      "sha256": "e793578dac0983fe970ffb3e0420aac51a51ce1f3b1a0a6ac3412aa9f1d2350d"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/styles/screens.css",
+      "size": 11197,
+      "sha256": "539574aeda4a7fe705708737ca52148ab759a7c8453b18d4b88468ced14a1d96"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/styles/shell.css",
+      "size": 4832,
+      "sha256": "986e931d5608bf3ebb11053345bbc8a7b82cb13271835ae5b2d3bf675fc5b17a"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/styles/system.css",
+      "size": 11068,
+      "sha256": "c71f6a5c684366b7bfbad64aeb861ea492de9a428638ac43d06d0d69e3b087e2"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/styles/tokens.css",
+      "size": 3471,
+      "sha256": "7f20e4870671b284a92b8b252ea8b3e1693d5f6cfccb83acdbdbbfda57bbbef9"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/src/styles/workspace.css",
+      "size": 17894,
+      "sha256": "9e7432e7d393cebd6ce066ca8dae1044392410c339a628bf643ba6f82568686e"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/test/anthropic-adaptations.test.js",
+      "size": 2076,
+      "sha256": "f5963a20f6e508b628c4833c2172982cf3f00cf45aec82955321c89c953631d1"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/test/brand-motion.test.js",
+      "size": 2543,
+      "sha256": "bc1c44c0797461c46ab2d3579b2f0c318bae715d6ee1ecd369ce3162433b578d"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/test/delegate.test.js",
+      "size": 22348,
+      "sha256": "b864a6c9709a9972c637da65b3a0ca4bfee6c4257499a7314c5257cb1abd0206"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/test/gesture.test.js",
+      "size": 948,
+      "sha256": "432db1f9873d1f12c59da7a495e26b0ccd43cc6f3307859a5ca77ae5fb244beb"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/test/github-repo-sync.test.js",
+      "size": 47780,
+      "sha256": "eb3194fe9902e77581525da8617d680be11041ace5703b4f110dc63608398d9d"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/test/hardening.test.js",
+      "size": 35063,
+      "sha256": "18323bfd733bca54d57019c1514b927d7de415f62d18dc2338a697015d0d77a0"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/test/helpers/d1.js",
+      "size": 735,
+      "sha256": "810113d57060ad28ade9ac32a88a6e162dd9d306dfc06d4e737cb9b5d9ecdaac"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/test/legacy-mcp-compat-v3.6.0.test.js",
+      "size": 2121,
+      "sha256": "ba7a5b55017ea78cbcce85e903e24636b583e762dc664af4b1e2b6597094996d"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/test/memory-context.test.js",
+      "size": 7422,
+      "sha256": "fed453fb231246a1339b4aba99694dc4e65609fcc45193e2ba7aa05bb242b7a5"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/test/memory-index-v3.5.0.test.js",
+      "size": 11321,
+      "sha256": "1b0a7757b0452411c0974c25ca3c781ce9288532e1540c62e1956b6a65eab104"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/test/memory-markdown.test.js",
+      "size": 1965,
+      "sha256": "e67ed703239ee21e855e53b3721f105846d754a83034bc22e10839160bae464c"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/test/monitor-placement.test.js",
+      "size": 1286,
+      "sha256": "1d22e97a8f8585e03a333b4634aeeefcafd9c8faeccafa6a6aad62bc247ec059"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/test/monitoring.test.js",
+      "size": 3700,
+      "sha256": "eb9ba060883ab5b90d653542b2cb7ed77c264d76cf0f2ee3cecae921b20f28fa"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/test/perf-audit.test.js",
+      "size": 3340,
+      "sha256": "c9934fc75626c87594a0ac99bee9c0e0d9379ba1cdcb7d81e52766fc7b52ab15"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/test/premium-ui.test.js",
+      "size": 2714,
+      "sha256": "6b3ca29e6629601d36812ad96c39d40f8e59d8cbf1e2928896b4cee79df347ca"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/test/premium-v3.5.1.test.js",
+      "size": 6901,
+      "sha256": "80ed22f23679f69962ef5ba46b5d338fe3d95515edbccb9b10ace601cc652afc"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/test/security-audit.test.js",
+      "size": 7832,
+      "sha256": "66638b6fc506913c3ba005fa6f674063212ffb6f5c264d721ab6fca046c5460e"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/test/skill-cleanup.test.js",
+      "size": 2874,
+      "sha256": "9e4824c85a90ba269bd6ac06c2007b80471c79f93d8ba587a0c0d29b13f8721a"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/test/skill-e2e.test.js",
+      "size": 10346,
+      "sha256": "9a693987b1e74efd251bd7daf471ede4a5af73f8aae881e1bab33d613737dfee"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/test/skills.test.js",
+      "size": 17006,
+      "sha256": "ed9dd385efd873b562504ae7ad07d1039dc1827bdf1a61dca1feb8381b047964"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/test/sync-official-generator.test.js",
+      "size": 3144,
+      "sha256": "f11a90becedccba80cdfd1faf07128eae044899e8a3f3dbbbd777df846175a51"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/test/upstream-import.test.js",
+      "size": 1918,
+      "sha256": "7ba08cda440d2c1c19453f592d6a0f2852ae1f327595e6ad1a2d831678dc06a3"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/test/worker.test.js",
+      "size": 8181,
+      "sha256": "3f6d27d74d2ec276ed2d8fca9f9c109795795d438022a0194e64e4507df45574"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/test/workspace-ui.test.js",
+      "size": 3361,
+      "sha256": "e5198f30f6f15e49ce3e546a7ecc9f323b7564f6caa9e0abab30def2ed34c325"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/tsconfig.json",
+      "size": 213,
+      "sha256": "e0574c44d2a400ba3185a7544677a80b6aca7e9de27dbc8d9f6c041eaa6e87df"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/vite.config.js",
+      "size": 1104,
+      "sha256": "81cd30bb0243856befecc968755509953fa6a1aeba3e657c61d4ed350611cba2"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/worker/aifetch.js",
+      "size": 2991,
+      "sha256": "93da768120c5cddd790db7a0794e5b406b4b8adb67a12a0458a9a9632f97ce8c"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/worker/anthropicSkills.js",
+      "size": 14793,
+      "sha256": "a16644d3f97c8a296a7ee2549d1c4fc88472edffccf2d56446d08ff533c48c2d"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/worker/anthropicUpstream.generated.js",
+      "size": 170,
+      "sha256": "ee558ad7eb3872c9f24cbb7b91c58fe32acbfc5e535310c5323ee6dfa309eb05"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/worker/api.js",
+      "size": 14495,
+      "sha256": "22b31f7182edf46a2dc1dda5851df2dacf0b6b616a3b63c7a75decd898b1ab17"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/worker/auth.js",
+      "size": 9412,
+      "sha256": "a7f0be53b8a76bd3cabf8f28b41c4dc1bf3fa71d8b6139a88d2b1ef64c161773"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/worker/builtins.js",
+      "size": 4452,
+      "sha256": "e883e62f3deccffc7a17b2bd233ca66e6a395f6f6cce4b0c5108fe7557200b70"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/worker/compat.js",
+      "size": 9588,
+      "sha256": "18d5923c0b95650c52ae4eeeb66436a6a9555c98501113ec8505880d78d79995"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/worker/constants.js",
+      "size": 14535,
+      "sha256": "87cca0a9b226fa978be2266875f0cec7c61cfa3ebe444bec569cde2fbfc782c9"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/worker/db.js",
+      "size": 14012,
+      "sha256": "47447087a99ddba50c4b5ab1e9d2190a2526c2c494c8f44cdcefc32bbf48c4e6"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/worker/delegate.js",
+      "size": 22040,
+      "sha256": "3179875ea27be9f25a10f9755fa60d34b5d641794940476f8e8c1e9cd9f55f78"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/worker/delegateguide.js",
+      "size": 5813,
+      "sha256": "7f4d62707ac4484270f401704752d8e02fbba15263c78c32d3825c5738284652"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/worker/diagnostics.js",
+      "size": 4413,
+      "sha256": "46316512728eef2aa4e7dd515e4df16cc2edf2818b8a573f0cff72646502a579"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/worker/gemini.js",
+      "size": 9322,
+      "sha256": "f7726dca2c7c2afb061730559cb3b164136ce957d7a1020f187d85c866df149b"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/worker/githubSkills.js",
+      "size": 45263,
+      "sha256": "18c445bff6d010489b910391b32d8d354f8904335aac7dcde3878392923a03e5"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/worker/housekeep.js",
+      "size": 7455,
+      "sha256": "4694304eb246a4f0232891c843fbe70b0405e12db587a2fae16892cd22c8eccf"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/worker/index.js",
+      "size": 6771,
+      "sha256": "2567449827f230d77ab7dc5263cbdf3c6e390a3f8d912b6f0f615a32de2e6f56"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/worker/limits.js",
+      "size": 709,
+      "sha256": "7d0f16a8bb0a5ed7e5413efc01d1e90296e14bf866bb6f89f0a988d7a3d21cf2"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/worker/llm.js",
+      "size": 1360,
+      "sha256": "98060805677de85e133a311242ba53944f29b5189ab8dfe468570975714a9c54"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/worker/mcp.js",
+      "size": 18088,
+      "sha256": "ee91b84558cc3b0ceec75832db33e2618a059031dbdc14e30fe8e2a2c42edc86"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/worker/memories.js",
+      "size": 13423,
+      "sha256": "b5a60679d14219edd827f72c659a3f3077f3ee1d386ef07e967f707912432c23"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/worker/memoryFormat.js",
+      "size": 1216,
+      "sha256": "eb744b6492619eb59e8f036d09f44b5b012d30bf23e7a3766708d871bf0229c9"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/worker/memoryIndex.js",
+      "size": 5745,
+      "sha256": "efb71ba75943369ccb0ba88d720297dd5664e4508201dd8a4cb24463b62fd8f3"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/worker/memorySettings.js",
+      "size": 969,
+      "sha256": "2e371317dcb76a5d31cb414151a82cd0c56dd8a02a3122509f05fc8f6f27d9e6"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/worker/metering.js",
+      "size": 2399,
+      "sha256": "303ba09483e3312b3daa337dae5d911a13870dcbf6275d13f1c2f6ee02e21873"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/worker/monitor.js",
+      "size": 3991,
+      "sha256": "d22c31520cb1f5a7a7bc5b6680872adfb20ef7f1f39c9264b5c739d2b4a5ea8c"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/worker/oauth.js",
+      "size": 28677,
+      "sha256": "66def6d6d04f8fb0f5ef99c80b8bd9fee0cd88d05b812cf7971c2d27756fe079"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/worker/openrouter.js",
+      "size": 1214,
+      "sha256": "cbc3259ca422911e3bfae03bb6657f45ccd9fca5d76a5b129f6776b13cedd1c3"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/worker/providers.js",
+      "size": 2770,
+      "sha256": "889a050d2c0581e69aebf2a71eff9dfb29369531e6c86f8f1316e4aacc4e006e"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/worker/secrets.js",
+      "size": 3899,
+      "sha256": "c7a7fc4620af5429fd17edcf03257445f7de6f77337a5ed0860b0035c882f021"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/worker/services.js",
+      "size": 4763,
+      "sha256": "296f2453f6dacbd15a4cf2ae6338dddf8742a988e30512e652371900388f6b65"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/worker/skills.js",
+      "size": 26746,
+      "sha256": "43b08f35b0d3852a94ffbb267211c35dc9172267910597aeb3e4ece47763e341"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/worker/skillstudio.js",
+      "size": 6066,
+      "sha256": "c1cf72899b1d2043563f518409fe3d3c931e83b0426689cab9ef6b9dad813124"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/worker/util.js",
+      "size": 4947,
+      "sha256": "8dc194f38cab70953f9e49323b2b9cf3b24563fcfa30ee2a10cdbfca6a12db3d"
+    },
+    {
+      "path": "memoryrelay-v3.6.0-work/wrangler.toml",
+      "size": 726,
+      "sha256": "7f809dc0ebebaccd38c0ca568f8ac270c247264fd651a6a4afef2e17931c5ab9"
+    },
+    {
+      "path": "package-lock.json",
+      "size": 111356,
+      "sha256": "9e9175e363a4bdf90313c7a297fb3dd8683c826e0232179c5d7d0a88c09e6d74"
+    },
+    {
+      "path": "package.json",
+      "size": 1269,
+      "sha256": "5ccea2c21f51bbe29d8559d114efdd2e8432de854ff6f52089868d3d34e8a3df"
+    },
+    {
+      "path": "public/icons/apple-touch-icon.png",
+      "size": 29978,
+      "sha256": "9f6ea3c47451f442fda1ea09e6ba1d5ed1896315a4dcf016bfaadd7baed14fc1"
+    },
+    {
+      "path": "public/icons/aqua-blue-192.png",
+      "size": 42411,
+      "sha256": "f2fc2b740ce4b0e5bd50bb5699c5d5d2c4e2aceabeb852cdac78050fdb022277"
+    },
+    {
+      "path": "public/icons/aqua-blue-32.png",
+      "size": 2229,
+      "sha256": "1f7ad28ff16cbaa9dd945decffdbce45c14f4e7ce36f6e05557e38ef44d5ef62"
+    },
+    {
+      "path": "public/icons/aqua-blue-48.png",
+      "size": 4261,
+      "sha256": "8a7bd702468cb047f1148a9afe26901d38b6413e07cd413af4ea8019255e784b"
+    },
+    {
+      "path": "public/icons/aqua-blue-512.png",
+      "size": 233238,
+      "sha256": "8bca93e4c9db77d2b4f67625653aef05be3b5d96be9edc39b1e6c2c3df1996ff"
+    },
+    {
+      "path": "public/icons/aqua-blue-apple.png",
+      "size": 37948,
+      "sha256": "9bb85ece8392fbdb9201cb0774a300b8745796e14456e8a00b9b76b31f9be9e5"
+    },
+    {
+      "path": "public/icons/aqua-blue-maskable-192.png",
+      "size": 27741,
+      "sha256": "47d13df397c9a16e7f02c4a203b3027e13787d966471af8f03a57269e0ed92aa"
+    },
+    {
+      "path": "public/icons/aqua-blue-maskable-512.png",
+      "size": 154056,
+      "sha256": "9fa0dd0af20ba890bad528c84947ec328bb7015a52d0f9df466408d92249c4d8"
+    },
+    {
+      "path": "public/icons/coral-192.png",
+      "size": 43830,
+      "sha256": "1855640279f28f6bd384e1493f0f1e58a06fe81ebb579e163cbf3c8d4bc062e8"
+    },
+    {
+      "path": "public/icons/coral-32.png",
+      "size": 2300,
+      "sha256": "6519863f4632caa7a286ed6a1aafea56fe90ef002d1a051a42eeca35d9b7cbc2"
+    },
+    {
+      "path": "public/icons/coral-48.png",
+      "size": 4390,
+      "sha256": "340c961626facb09f9ccc88567f1d07541f7e040adf2b7e3c0c1c437a085460d"
+    },
+    {
+      "path": "public/icons/coral-512.png",
+      "size": 243443,
+      "sha256": "8b366c584173cbb41f3941a0b6be15590583ce99ff1be98e15ea1e2957af3443"
+    },
+    {
+      "path": "public/icons/coral-apple.png",
+      "size": 39190,
+      "sha256": "51f8a72553bd3480e498823fcea44e44bdee6bbcc4bb69fee4a815e51025f88a"
+    },
+    {
+      "path": "public/icons/coral-maskable-192.png",
+      "size": 28391,
+      "sha256": "271fea38b1b7a7f921d07920cf9f6707b9df1b5c95dfa1bc241f1b4d70355a96"
+    },
+    {
+      "path": "public/icons/coral-maskable-512.png",
+      "size": 161080,
+      "sha256": "0c82d2df0fef7bf62535043a1923241f69cdc605731ff36a0f1a94b4e80a5d5a"
+    },
+    {
+      "path": "public/icons/energy-green-192.png",
+      "size": 42789,
+      "sha256": "8c16b4139a8ffa95139ebf858cb270fa183c94e8a0543809e7ea1d04f1b20cd7"
+    },
+    {
+      "path": "public/icons/energy-green-32.png",
+      "size": 2240,
+      "sha256": "2f06fc7c2b9aa55d9b08f3a38f61aad979e5ebea3c13fd0639a130e4a7251652"
+    },
+    {
+      "path": "public/icons/energy-green-48.png",
+      "size": 4245,
+      "sha256": "2607e5c93918c9bedc344f8a587cf7a5106466632ca609f614e9afa642091c6e"
+    },
+    {
+      "path": "public/icons/energy-green-512.png",
+      "size": 236735,
+      "sha256": "c35217a6281cf43e380e39c26daacfb675fabcc68b3c8fb07c3978d7a79a0897"
+    },
+    {
+      "path": "public/icons/energy-green-apple.png",
+      "size": 38228,
+      "sha256": "ba69bdc7fabab605123aa9f9e00aa9999af597302e80ee2ec889e62fab3fde29"
+    },
+    {
+      "path": "public/icons/energy-green-maskable-192.png",
+      "size": 27831,
+      "sha256": "a2bd75281b26f74c23e701eeee678a979b33f57fa50fdfe7c2392eae1fb93480"
+    },
+    {
+      "path": "public/icons/energy-green-maskable-512.png",
+      "size": 156900,
+      "sha256": "6d4699ebc6c682d614cbad1044853b3d5d6dbcbcf007c4236b15814c3b1e5032"
+    },
+    {
+      "path": "public/icons/favicon-32.png",
+      "size": 2168,
+      "sha256": "e4b626203ea773e9b419af83a539b2527b9cbeddf78bcb88a2cb7c672405007e"
+    },
+    {
+      "path": "public/icons/favicon-48.png",
+      "size": 4034,
+      "sha256": "e0e21c135320a0edbeeb1d82eed19d9387013ec2a4319d06f988eaa1825bbdc9"
+    },
+    {
+      "path": "public/icons/icon-192.png",
+      "size": 34413,
+      "sha256": "332a2b49e755ac686983c2981f8221df5e5ed0a44a327f06ca581a26e56c4eb3"
+    },
+    {
+      "path": "public/icons/icon-512.png",
+      "size": 218162,
+      "sha256": "c2bca2a01b889c409c1f298794acb6857ccc4ed1cb8361dbb352d00378c4a686"
+    },
+    {
+      "path": "public/icons/icon.svg",
+      "size": 1069,
+      "sha256": "fa5d90e62c948b413b818581fb4cc528022862364d92e342d4df24c5bdef48ae"
+    },
+    {
+      "path": "public/icons/maskable-192.png",
+      "size": 24087,
+      "sha256": "00e5e9ad71e0c11016bc12ea722ab62016a197f8e3f67925c913d02105530299"
+    },
+    {
+      "path": "public/icons/maskable-512.png",
+      "size": 138720,
+      "sha256": "a101856f9b95f9fd7ce9d437c355ed8f935af884cc5e2c6508683e3abf622499"
+    },
+    {
+      "path": "public/icons/mint-192.png",
+      "size": 42991,
+      "sha256": "4e9bb916cae1130043eaa05ef007bfcbdf6b6bc9c6cc6c83422dbb95dae45dcc"
+    },
+    {
+      "path": "public/icons/mint-32.png",
+      "size": 2328,
+      "sha256": "270113cdbc8b74affcd4dc9b4a5c6f5e0e048ce257adfb8f0f090eb8a38a9590"
+    },
+    {
+      "path": "public/icons/mint-48.png",
+      "size": 4363,
+      "sha256": "5b70e23a25bdc0756b086a9f7cd3e17a30e1ae920d69d410883543318873bc70"
+    },
+    {
+      "path": "public/icons/mint-512.png",
+      "size": 235872,
+      "sha256": "4de27c363c436823abce9373ac3931e01cc5a5db442517b6a362799d63035ce8"
+    },
+    {
+      "path": "public/icons/mint-apple.png",
+      "size": 38334,
+      "sha256": "0e595a20ca41b23489fa75ff69d48128d888190b6985a83fe7efc7d473fbbd22"
+    },
+    {
+      "path": "public/icons/mint-maskable-192.png",
+      "size": 28095,
+      "sha256": "08ad9be52d42d290dd76e227b7961d9d77c304311fe61dad9b1be783db89d4b3"
+    },
+    {
+      "path": "public/icons/mint-maskable-512.png",
+      "size": 155975,
+      "sha256": "cf883610234303b47790172e2336218934591c42c0b601667cd87e98027270d5"
+    },
+    {
+      "path": "public/icons/orange-192.png",
+      "size": 37320,
+      "sha256": "390c083ee2d5d52b2d86922d65ff02c362fd1ff40300097f6272b6f576aaeb8c"
+    },
+    {
+      "path": "public/icons/orange-32.png",
+      "size": 2154,
+      "sha256": "02c3c40053d1d6dbe9c9a6a7fa60bccceb2423798b454fc22d34da630b15db94"
+    },
+    {
+      "path": "public/icons/orange-48.png",
+      "size": 4104,
+      "sha256": "79f4500b89f260bf763f3d8522ad6fa1bc30ce2d24c73fe7984985366b3cb5d3"
+    },
+    {
+      "path": "public/icons/orange-512.png",
+      "size": 236229,
+      "sha256": "1616f9c0ae8d6d71ea041e3a3925a89f21f1069fb978844429590be380a756f4"
+    },
+    {
+      "path": "public/icons/orange-apple.png",
+      "size": 33445,
+      "sha256": "0aa08e75e2a91e3d5b7a51ef3532df1eecdfc04bd61f2885be4861c5038d19e2"
+    },
+    {
+      "path": "public/icons/orange-maskable-192.png",
+      "size": 24975,
+      "sha256": "aa88abe0de2492c56dbd262a75b4d7e073953fd3699fc399bcc7539b0c135d49"
+    },
+    {
+      "path": "public/icons/orange-maskable-512.png",
+      "size": 146193,
+      "sha256": "766bbaad92f882cba61115fa35202ae3d95c8370b4cd20f6e3b1cdb42ade7531"
+    },
+    {
+      "path": "public/icons/purple-192.png",
+      "size": 36621,
+      "sha256": "0d526535aa525aad554121606563c65f3591bd8a8a041dc4d298e16e5802d580"
+    },
+    {
+      "path": "public/icons/purple-32.png",
+      "size": 2189,
+      "sha256": "eb439b961b8120a01579abb0ac34801137bcac10e2df1cf23576e7f9c324c6ad"
+    },
+    {
+      "path": "public/icons/purple-48.png",
+      "size": 4084,
+      "sha256": "1fddb7a2a67100cd7627262e97015314bed7df38d40b06fb86154a0e5ee362b4"
+    },
+    {
+      "path": "public/icons/purple-512.png",
+      "size": 221483,
+      "sha256": "1241774f10cbd7ea7f5cef41358e89aa42c941cf3ce6931bbf3e75bc613fb2b0"
+    },
+    {
+      "path": "public/icons/purple-apple.png",
+      "size": 33058,
+      "sha256": "152e7fd2901aaceacc7efec2bc11a18bd856417af11110afe53a416f76a01387"
+    },
+    {
+      "path": "public/icons/purple-maskable-192.png",
+      "size": 24387,
+      "sha256": "ee98750cf211034767c8222acb8a02562694f9dc82c9b0ec1cf29cacd93ef276"
+    },
+    {
+      "path": "public/icons/purple-maskable-512.png",
+      "size": 146130,
+      "sha256": "be7a169c95f7cc8c0607438e45d20f19d8845fb8e33d3ba111c20a51610dd382"
+    },
+    {
+      "path": "public/manifest-aqua-blue.webmanifest",
+      "size": 991,
+      "sha256": "415a36adac7bc07a5e4ca052a57027d421744edf342c19772ce56aa164e4e560"
+    },
+    {
+      "path": "public/manifest-coral.webmanifest",
+      "size": 975,
+      "sha256": "8fd5c8aa441fa458d2824808dea1a713f731a472f888a89fe4e122d7668e284c"
+    },
+    {
+      "path": "public/manifest-energy-green.webmanifest",
+      "size": 1003,
+      "sha256": "070a397fd64854dc6c391dcd4c348850558b80c8a4b54344669f0a76d254f7b1"
+    },
+    {
+      "path": "public/manifest-mint.webmanifest",
+      "size": 971,
+      "sha256": "a59d76f6f30ab4baba51891adacd80abcc28393e5f8abf8d6442c1663090c52b"
+    },
+    {
+      "path": "public/manifest-orange.webmanifest",
+      "size": 979,
+      "sha256": "937e3e3accfed60a81c8b37e9461dfc317f34fb3feb82bb0306081e866b798e0"
+    },
+    {
+      "path": "public/manifest-purple.webmanifest",
+      "size": 979,
+      "sha256": "f378603b3d2c7c130fcabbf9306b8499fb128b41b9a811da6ff3dddac164855b"
+    },
+    {
+      "path": "public/manifest.webmanifest",
+      "size": 979,
+      "sha256": "f378603b3d2c7c130fcabbf9306b8499fb128b41b9a811da6ff3dddac164855b"
+    },
+    {
+      "path": "public/sw.js",
+      "size": 1412,
+      "sha256": "132ff086a89e26506cf7fa1fef0ab891277bfd4a8c193e674ed242d8e2f75a31"
+    },
+    {
+      "path": "public/theme-init.js",
+      "size": 822,
+      "sha256": "f6515bd64ac615911470da4baa18cf34c28ddca2d0cd9b892bfcda309ad67840"
+    },
+    {
+      "path": "scripts/canvas_poster.py",
+      "size": 1122,
+      "sha256": "dc473e0ab3b2258b3d3666356ec623e5140ea614b53a17787bda73a9c0bff462"
+    },
+    {
+      "path": "scripts/sync-anthropic.mjs",
+      "size": 4688,
+      "sha256": "93808e11d46f32eb90355633d90600a014a0c6a0f7085fa86a758cdb7ffa9320"
+    },
+    {
+      "path": "scripts/webapp_smoke.py",
+      "size": 1437,
+      "sha256": "1d0b3fe254d9125d058d347f80b3524a3511df9ed3df4eb4646ba17c6818e0a7"
+    },
+    {
+      "path": "server.js",
+      "size": 1472,
+      "sha256": "b247e63de6e15d7aeaf3dec89c63afbf6440bf2e1fbc9aa589b06e84a0d8882a"
+    },
+    {
+      "path": "shared/brands.js",
+      "size": 3626,
+      "sha256": "105bf9b74eed63d95e590fccce9449265d7c62a3b5de5d0771169af1eace1632"
+    },
+    {
+      "path": "shared/memoryBudget.js",
+      "size": 977,
+      "sha256": "11739da05d3d622b68d56111645e25f6f9d464119806ebbf27a9b0b8de2435de"
+    },
+    {
+      "path": "shared/skillTokens.js",
+      "size": 265,
+      "sha256": "c3b9cfe8cb43b7ade147ec460586f2521e76887fcfcc33054fe8668e15812327"
+    },
+    {
+      "path": "src/App.jsx",
+      "size": 1134,
+      "sha256": "5a3c1056d03d1ac76a8292c4967ef03ef17406d2ef132238f798775d98ccb54b"
+    },
+    {
+      "path": "src/api/client.js",
+      "size": 1359,
+      "sha256": "366c1a3b9db7555f6759ba7667007a6ad55851e6e9db82a98166e5ccbaf8b183"
+    },
+    {
+      "path": "src/api/endpoints.js",
+      "size": 5859,
+      "sha256": "fd1dc2f5d2c8e05ac3f68bc0aa8bc0b57f3a72a7f95f334c876f8d5ac41240d1"
+    },
+    {
+      "path": "src/components/AccentPicker.jsx",
+      "size": 864,
+      "sha256": "39d36002027d073ad859cf6e3082c4244e6b4c77e5de6d77f5b18878bbde6cfe"
+    },
+    {
+      "path": "src/components/AccessPicker.jsx",
+      "size": 1167,
+      "sha256": "2ef6fd7a3e3554e4b3e6ca20bf46711537a373ef06ccfcefd1e000dca4351ee7"
+    },
+    {
+      "path": "src/components/ActionRow.jsx",
+      "size": 1463,
+      "sha256": "1fce904888e55b3dcde53c39ea92aa3c6933ae3fba2313aad4a368b143c858c4"
+    },
+    {
+      "path": "src/components/AppSelect.jsx",
+      "size": 5163,
+      "sha256": "0817fd5a9fedf467a1a05181c5b31e75bd188be230c7da0c266d20203de332d1"
+    },
+    {
+      "path": "src/components/Badge.jsx",
+      "size": 163,
+      "sha256": "b05350e37a97654c4609f840a916e639b6d1d0608faac05f473bda3f957e18f2"
+    },
+    {
+      "path": "src/components/Brand.jsx",
+      "size": 1108,
+      "sha256": "1feb61eaa9fa8f8eacbabb17c21f369a621da4d19c970dbd52e33673855a2bb0"
+    },
+    {
+      "path": "src/components/Button.jsx",
+      "size": 581,
+      "sha256": "613d987a39b49699945602b16b1b17498eeb61d04fee051dbf987841dff843e0"
+    },
+    {
+      "path": "src/components/Collapse.jsx",
+      "size": 432,
+      "sha256": "0ec7d012201234e26e0e9c8849f42e760691960936a8097e7e289b49c3374c77"
+    },
+    {
+      "path": "src/components/Icon.jsx",
+      "size": 3172,
+      "sha256": "f6b9c0dce57c738e8b6ca8a91a2ecd7bb24e2301a25182f1bbd0f030186deb11"
+    },
+    {
+      "path": "src/components/IconButton.jsx",
+      "size": 533,
+      "sha256": "73225bba2d745aa1f7a740f02e705affdb375ecfbcac775fd015b55e59901075"
+    },
+    {
+      "path": "src/components/InstallChooser.jsx",
+      "size": 3298,
+      "sha256": "16fcf76b9ab99f23db4be25660e92b4030f3e2adcf24ea5c54541b11ff1324aa"
+    },
+    {
+      "path": "src/components/Logo.jsx",
+      "size": 1110,
+      "sha256": "e4d10ce78563d0579635ee5b80fa58aaaf0bf3d4be542ba231bfe151fbaaef06"
+    },
+    {
+      "path": "src/components/Notice.jsx",
+      "size": 252,
+      "sha256": "b5c1c7ea9f0370d85954501ad1dc58cf4922d09e572d4b81979487bd216c9ee5"
+    },
+    {
+      "path": "src/components/PageHead.jsx",
+      "size": 393,
+      "sha256": "b34f84973f72472df80352b4e0014b4547bf788c683a63e6ee3a5755ba079a66"
+    },
+    {
+      "path": "src/components/ScreenSkeleton.jsx",
+      "size": 614,
+      "sha256": "c84f4a081aebe15349d872df7b9fe00378d9376671cf05cf6f302dbe6f253175"
+    },
+    {
+      "path": "src/components/SearchBar.jsx",
+      "size": 517,
+      "sha256": "f3986d7af3d6fdd897bce05bd6ec7ce5d1af364f56172a7e3720a7086177bdda"
+    },
+    {
+      "path": "src/components/Segmented.jsx",
+      "size": 456,
+      "sha256": "b5b091bf6b8553d939d3f5403081ba9b5db739174cec2409a2da19089dafcae4"
+    },
+    {
+      "path": "src/components/Sheet.jsx",
+      "size": 2620,
+      "sha256": "9b81e0357a28210e1f82e385d75c3b348c1b73b6806adcd07c09d27daeb5beda"
+    },
+    {
+      "path": "src/components/Switch.jsx",
+      "size": 408,
+      "sha256": "dbb3961e77aea7e4cbab501980ed9eaea64bccb9042de8f20c4c95c173185ef0"
+    },
+    {
+      "path": "src/components/WelcomeSplash.jsx",
+      "size": 846,
+      "sha256": "f9c0e99a851e3296c52e510f08fabeb140fce9fdcc1bd29dbd18ff810f91b9c0"
+    },
+    {
+      "path": "src/hooks/useAccent.js",
+      "size": 2160,
+      "sha256": "a24034fb05ffc901ea54c6efb5929a40b21214973bf3d3adeffee6aa04a370f1"
+    },
+    {
+      "path": "src/hooks/useAuth.js",
+      "size": 1264,
+      "sha256": "50b5e6bdb645709f2209fd9e0ff054efe25f179fb3c7c8b0afc1850a175df3f0"
+    },
+    {
+      "path": "src/hooks/useCountUp.js",
+      "size": 993,
+      "sha256": "42dbe4fa8763b3c1364733fe110896fdd6ce516894a4d50703236a5c6ff1afe0"
+    },
+    {
+      "path": "src/hooks/useGemini.js",
+      "size": 1330,
+      "sha256": "6243a8cd808e7dcbb7fdf685c9385fe815643d62ee7fb952cb09597c32099719"
+    },
+    {
+      "path": "src/hooks/useHashRoute.js",
+      "size": 1025,
+      "sha256": "53704650251641e753c66e1e6c5b6aef2d2221647e232684f8779928585adaef"
+    },
+    {
+      "path": "src/hooks/useInstallPrompt.js",
+      "size": 1144,
+      "sha256": "2c973b50da8a101d9702e0c6cf409cbef0bbe9726e29aa7fbbf03fd1db6dffb7"
+    },
+    {
+      "path": "src/hooks/useMemories.js",
+      "size": 3710,
+      "sha256": "55a6a21d8bc0abef211e495a5e829959affde2644e63ea9f9f7183cf9ba9c6e5"
+    },
+    {
+      "path": "src/hooks/useOverview.js",
+      "size": 1163,
+      "sha256": "73936d2fd1e4140482ac7dade787cd7ad87d4468f061ff09dfee8c077aebdaf8"
+    },
+    {
+      "path": "src/hooks/usePersistent.js",
+      "size": 357,
+      "sha256": "03ba63543f3ba502e7183ffc244728c7895d0f2c35d81580642728a950332f6a"
+    },
+    {
+      "path": "src/hooks/usePolling.js",
+      "size": 578,
+      "sha256": "2fb53e229bbe687ec4d0621408cbb0a54757da0b147a477dcddad89f7e880665"
+    },
+    {
+      "path": "src/hooks/useServices.js",
+      "size": 2705,
+      "sha256": "efb743325a800225d3a6f0da1ee6080f76f448dd07460ea5987d56a95ca1e8e5"
+    },
+    {
+      "path": "src/hooks/useSheetDrag.js",
+      "size": 1885,
+      "sha256": "2625c32c03e5c91f6331cb9ba2479416f1b52d47875757d02c399ca856901315"
+    },
+    {
+      "path": "src/hooks/useSkills.js",
+      "size": 2037,
+      "sha256": "201a8e7e10a4cdcd20f9d58464a9d0715a1e3016dc4d9064e3a94686d1d9d9a9"
+    },
+    {
+      "path": "src/hooks/useSwipeDeck.js",
+      "size": 3411,
+      "sha256": "529cd61e78086eb6d66841cf67b22739759d7b46a6a04a71b69a9cc80aa99575"
+    },
+    {
+      "path": "src/hooks/useSwipePager.js",
+      "size": 3143,
+      "sha256": "09493ec8309a2189b3432468e9d531ab2c53bb0965805a4924c2270009e13787"
+    },
+    {
+      "path": "src/hooks/useTheme.js",
+      "size": 1216,
+      "sha256": "d81308887c7e94ec1d730ffa46d5dc9874c7efb34fcaacaded0a6478ed9e9120"
+    },
+    {
+      "path": "src/lib/cable.js",
+      "size": 846,
+      "sha256": "10f6627653cec775de1b73730c60f88cad52eb53d8ee7479cf3a4ea2579b0a45"
+    },
+    {
+      "path": "src/lib/clipboard.js",
+      "size": 888,
+      "sha256": "35db4478958e598206a2fc0c6c0b5fbe5ff7dea117063ae3db17889e221b83dd"
+    },
+    {
+      "path": "src/lib/format.js",
+      "size": 467,
+      "sha256": "94c3d42c574125aef459ae8f03d6993ffc47b967a519bc92dfe6d2e13c6e79f3"
+    },
+    {
+      "path": "src/lib/gesture.js",
+      "size": 1053,
+      "sha256": "9e49e57f0dec51319c7ba2c2f00f58632c48911e42ab10387fa5cb9df585c873"
+    },
+    {
+      "path": "src/lib/inert.js",
+      "size": 254,
+      "sha256": "05c52b6c7ff04f1051047c9d93d0d656bf858b035dba3342950a375d70b58d5a"
+    },
+    {
+      "path": "src/lib/memoryMarkdown.js",
+      "size": 2846,
+      "sha256": "c17d0edc71a2f34080e2893683dd43811c5684f1ce2389208323e9fbaa7dd8a5"
+    },
+    {
+      "path": "src/lib/storage.js",
+      "size": 374,
+      "sha256": "1db6d558448d5fc3a05cfcd7be8e5b622061a446d534f274c76a98f7f568db89"
+    },
+    {
+      "path": "src/main.jsx",
+      "size": 652,
+      "sha256": "9d47bfb3255c6db3cc47abcaa9d7516e7e68ef5597873132826822e342e5b699"
+    },
+    {
+      "path": "src/modules/agents/AgentCard.jsx",
+      "size": 3718,
+      "sha256": "b84a43489fb47d9af2beabc43aee141d25f0b3754c2b1f2d7d51ebf117c21655"
+    },
+    {
+      "path": "src/modules/agents/AgentsScreen.jsx",
+      "size": 7460,
+      "sha256": "0eff501910cc52a15a2ca43b762a0ab5dcd09e9e0a713af048fd8b47c1d3943b"
+    },
+    {
+      "path": "src/modules/home/ActivityChart.jsx",
+      "size": 3643,
+      "sha256": "f80b6fa6695b777555a2627ce0bd2cfdc4399a63d5cd5c4bb4dc89e6dff396e8"
+    },
+    {
+      "path": "src/modules/home/ErrorsScreen.jsx",
+      "size": 3492,
+      "sha256": "e18f55d721bb24e5386dda26c5896aa9eff3b026a4775728986b34483b1ff8d1"
+    },
+    {
+      "path": "src/modules/home/HomeScreen.jsx",
+      "size": 4053,
+      "sha256": "830367d414d18e0e20c51c24619029a2f046a8f10e91fdcc3c1b7b3c646a237a"
+    },
+    {
+      "path": "src/modules/home/MetricDropdown.jsx",
+      "size": 2997,
+      "sha256": "9134fa96b389d8bf4db9c2d8313ce6430b34ca64b430b52abe913cf719bdc751"
+    },
+    {
+      "path": "src/modules/home/MonitorPanel.jsx",
+      "size": 11692,
+      "sha256": "fdadb3a18d6fc023232e66f1e6cc17590cabaf4fe99074dc01f782a69ad03b33"
+    },
+    {
+      "path": "src/modules/home/metricColors.js",
+      "size": 1059,
+      "sha256": "67c1df6361bf1bd1b9a06bf837257894b4edc958a8b4592898aaabeb1a5288db"
+    },
+    {
+      "path": "src/modules/index.js",
+      "size": 1864,
+      "sha256": "c668cd7d64c466be0a3e95ec1c61f4b40f6114ac416923ef46f5adacd72dc9f9"
+    },
+    {
+      "path": "src/modules/keys/CompatPanel.jsx",
+      "size": 8715,
+      "sha256": "0f786ec24379c9cdb76dd8dd9683e84a1b8c720455e9a4a4a6b3c7c1c033fbf1"
+    },
+    {
+      "path": "src/modules/keys/DelegationPanel.jsx",
+      "size": 10373,
+      "sha256": "39abc962ea26e980c3602e21dc15741df7e5683d3261f478a947cdf0862573b3"
+    },
+    {
+      "path": "src/modules/keys/GeminiPanel.jsx",
+      "size": 6392,
+      "sha256": "d643c0bad48ec981d967f5620ece16e90536fb5a53dea270c2a582660dda2139"
+    },
+    {
+      "path": "src/modules/keys/KeyRow.jsx",
+      "size": 1287,
+      "sha256": "e3f0196fe7906784296b7d555bd4a9278b804aa665c300f7ea43eca219e0579b"
+    },
+    {
+      "path": "src/modules/keys/KeysScreen.jsx",
+      "size": 1384,
+      "sha256": "8ecde9a5441b12f6a3b826db4becd2cf24a617b407c0a498cac7c10edeb4440c"
+    },
+    {
+      "path": "src/modules/keys/providers.jsx",
+      "size": 1317,
+      "sha256": "7d608f29edf54b1c92f0ea886b656abd6cb554dcd633536d9a744b3287b5b759"
+    },
+    {
+      "path": "src/modules/memory/Housekeeping.jsx",
+      "size": 2297,
+      "sha256": "11d093743798001e68b043838aeec638605190b8a97c7ad652b482af5fd0ab20"
+    },
+    {
+      "path": "src/modules/memory/MemoryCard.jsx",
+      "size": 3190,
+      "sha256": "a285d9928d34f17b82ff3c01455c21c372e35a34688c2ce699515858d78eb597"
+    },
+    {
+      "path": "src/modules/memory/MemoryEditor.jsx",
+      "size": 8997,
+      "sha256": "e89ba806e1a4759a2f4001f7a6c3a6dcba2e51e5f5886c432d4e2aedf34423a1"
+    },
+    {
+      "path": "src/modules/memory/MemoryLabels.jsx",
+      "size": 1071,
+      "sha256": "ed0904d4a95b692adb979ae3bff44f0f819a305e5ea46f31a3b91e9f4b019fcc"
+    },
+    {
+      "path": "src/modules/memory/MemoryMarkdown.jsx",
+      "size": 2088,
+      "sha256": "99c00240623b375cd5c55fa482b3a2d0dd5fa26d9d0579d8d1dceeb486f84fbe"
+    },
+    {
+      "path": "src/modules/memory/MemoryScreen.jsx",
+      "size": 4204,
+      "sha256": "46a0b9f195328908c0a04ec345ef4ebbc76fc75fccc69ad71df8a28146d98711"
+    },
+    {
+      "path": "src/modules/skills/GithubSources.jsx",
+      "size": 26787,
+      "sha256": "ccdef5391a3b0e5c1f0b00db4842d65a413e791d3481cace5967bc33a9d5b238"
+    },
+    {
+      "path": "src/modules/skills/ScriptBank.jsx",
+      "size": 3172,
+      "sha256": "ca1f80ec45c44c55bce023247bfdd4e6b89014f9ca5d915b67b88a03b09b7948"
+    },
+    {
+      "path": "src/modules/skills/SkillSelector.jsx",
+      "size": 10069,
+      "sha256": "6e7cfa92d1ad20ac39cac76342b8dd02ac38176c83a83bd352a224061d7ecf24"
+    },
+    {
+      "path": "src/modules/skills/SkillStudio.jsx",
+      "size": 6137,
+      "sha256": "0b78124a03725c5a69fe46a3ec8a061d42b5ce340040b60f30b6fa04f1e6e91b"
+    },
+    {
+      "path": "src/modules/skills/SkillsScreen.jsx",
+      "size": 1446,
+      "sha256": "6d1ed1afbf6f5c67162e2c74f54320ed0c9d6cfaac4f2081799fbe9e5439b15e"
+    },
+    {
+      "path": "src/settings/About.jsx",
+      "size": 630,
+      "sha256": "bc7038fe4700c095d3707316348871231d3418aaadef77412c31c4278fe1a3ce"
+    },
+    {
+      "path": "src/settings/Account.jsx",
+      "size": 516,
+      "sha256": "466e9d22b5a277677eb2403fed14c34f86fc75997cc815eb35929af31560c5fc"
+    },
+    {
+      "path": "src/settings/Appearance.jsx",
+      "size": 1128,
+      "sha256": "5f55a7971e7f6494d5c5df12edf8acf91b19ba5f7a37c4844b5b10f915fdf49d"
+    },
+    {
+      "path": "src/settings/Backup.jsx",
+      "size": 2515,
+      "sha256": "9118176db32778554b2798e997ee82250b85e3d149bbbd3443b8a98036cb1550"
+    },
+    {
+      "path": "src/settings/Gestures.jsx",
+      "size": 571,
+      "sha256": "73cfc62b2135cd867431a0b03e09a5598cccdd8609bab27a610bc1022c17819a"
+    },
+    {
+      "path": "src/settings/Install.jsx",
+      "size": 688,
+      "sha256": "32bbcffa6345f0d0cfbe9eefb81deaf9bae59fdcf92e4a79f11446abfc57cd6d"
+    },
+    {
+      "path": "src/settings/MemoryContext.jsx",
+      "size": 2274,
+      "sha256": "497ca1b9a0b1f6ac43f4779d1482bce629c706bb12c5ca2e37278f47cc4d5e80"
+    },
+    {
+      "path": "src/settings/Section.jsx",
+      "size": 217,
+      "sha256": "67445e0457faca07c4a50dd6e4a696bdef0502da9a1bfa403490dfee04f79816"
+    },
+    {
+      "path": "src/settings/SettingsSheet.jsx",
+      "size": 1435,
+      "sha256": "a83cda7b919ef3954f43bb62c120b352272c7a6dfc40c8c656e347e1d2ed5838"
+    },
+    {
+      "path": "src/shell/AppContext.js",
+      "size": 230,
+      "sha256": "b98aefbb97659a065026451c873d8629986aa049748ae3dfe27751ec08c6b59e"
+    },
+    {
+      "path": "src/shell/AppShell.jsx",
+      "size": 3008,
+      "sha256": "4f28e224b9b577d5acf8904e08c78ca0289b2f74bc1af900a087a9c1748859ac"
+    },
+    {
+      "path": "src/shell/AuthGate.jsx",
+      "size": 2868,
+      "sha256": "be831abd9ac7c4285b2772efbdbaf5a93ea2cf95ed21c9475440f87ad0d286c9"
+    },
+    {
+      "path": "src/shell/Pager.jsx",
+      "size": 815,
+      "sha256": "5e2f3fedf83dfa37007566f1407eec26ddef38c8745603515e36ac896fe75990"
+    },
+    {
+      "path": "src/shell/PwaRefresh.jsx",
+      "size": 991,
+      "sha256": "7cb3c2a0ce1df79c74853fb40df8fa6af3e4a30eac766a6f5c3324d060eadd6a"
+    },
+    {
+      "path": "src/shell/TabBar.jsx",
+      "size": 918,
+      "sha256": "28c293ef9a307aa53dc0d17862c75e6d55a7799daef87ec69586d6b187995b11"
+    },
+    {
+      "path": "src/shell/TopBar.jsx",
+      "size": 1011,
+      "sha256": "3d429fb473e12b824dfada6a338ca37c90ccec6b66ac7269538a7299e956c153"
+    },
+    {
+      "path": "src/styles/accent-and-polish.css",
+      "size": 7582,
+      "sha256": "40f00d3de17c9fdd0d780a98d903cd4913b3dba1df164afd24427e913757b9b6"
+    },
+    {
+      "path": "src/styles/base.css",
+      "size": 4838,
+      "sha256": "efd8bc2d5e508f8a87e18094f86637c7ca8140d1c9fefe085a9e87fd41fc26b8"
+    },
+    {
+      "path": "src/styles/motion.css",
+      "size": 5875,
+      "sha256": "2469b9cc51650fbd622ae753e6f3805d68c10c2f61f28a5c89942caea711cef8"
+    },
+    {
+      "path": "src/styles/redesign.css",
+      "size": 47853,
+      "sha256": "e793578dac0983fe970ffb3e0420aac51a51ce1f3b1a0a6ac3412aa9f1d2350d"
+    },
+    {
+      "path": "src/styles/screens.css",
+      "size": 11197,
+      "sha256": "539574aeda4a7fe705708737ca52148ab759a7c8453b18d4b88468ced14a1d96"
+    },
+    {
+      "path": "src/styles/shell.css",
+      "size": 4832,
+      "sha256": "986e931d5608bf3ebb11053345bbc8a7b82cb13271835ae5b2d3bf675fc5b17a"
+    },
+    {
+      "path": "src/styles/system.css",
+      "size": 11068,
+      "sha256": "c71f6a5c684366b7bfbad64aeb861ea492de9a428638ac43d06d0d69e3b087e2"
+    },
+    {
+      "path": "src/styles/tokens.css",
+      "size": 3471,
+      "sha256": "7f20e4870671b284a92b8b252ea8b3e1693d5f6cfccb83acdbdbbfda57bbbef9"
+    },
+    {
+      "path": "src/styles/workspace.css",
+      "size": 17894,
+      "sha256": "9e7432e7d393cebd6ce066ca8dae1044392410c339a628bf643ba6f82568686e"
+    },
+    {
+      "path": "test/anthropic-adaptations.test.js",
+      "size": 2076,
+      "sha256": "f5963a20f6e508b628c4833c2172982cf3f00cf45aec82955321c89c953631d1"
+    },
+    {
+      "path": "test/brand-motion.test.js",
+      "size": 2543,
+      "sha256": "bc1c44c0797461c46ab2d3579b2f0c318bae715d6ee1ecd369ce3162433b578d"
+    },
+    {
+      "path": "test/delegate.test.js",
+      "size": 22348,
+      "sha256": "b864a6c9709a9972c637da65b3a0ca4bfee6c4257499a7314c5257cb1abd0206"
+    },
+    {
+      "path": "test/gesture.test.js",
+      "size": 948,
+      "sha256": "432db1f9873d1f12c59da7a495e26b0ccd43cc6f3307859a5ca77ae5fb244beb"
+    },
+    {
+      "path": "test/github-repo-sync.test.js",
+      "size": 47780,
+      "sha256": "eb3194fe9902e77581525da8617d680be11041ace5703b4f110dc63608398d9d"
+    },
+    {
+      "path": "test/hardening.test.js",
+      "size": 35063,
+      "sha256": "18323bfd733bca54d57019c1514b927d7de415f62d18dc2338a697015d0d77a0"
+    },
+    {
+      "path": "test/helpers/d1.js",
+      "size": 735,
+      "sha256": "810113d57060ad28ade9ac32a88a6e162dd9d306dfc06d4e737cb9b5d9ecdaac"
+    },
+    {
+      "path": "test/legacy-mcp-compat-v3.6.0.test.js",
+      "size": 2121,
+      "sha256": "ba7a5b55017ea78cbcce85e903e24636b583e762dc664af4b1e2b6597094996d"
+    },
+    {
+      "path": "test/memory-context.test.js",
+      "size": 7422,
+      "sha256": "fed453fb231246a1339b4aba99694dc4e65609fcc45193e2ba7aa05bb242b7a5"
+    },
+    {
+      "path": "test/memory-index-v3.5.0.test.js",
+      "size": 11321,
+      "sha256": "1b0a7757b0452411c0974c25ca3c781ce9288532e1540c62e1956b6a65eab104"
+    },
+    {
+      "path": "test/memory-markdown.test.js",
+      "size": 1965,
+      "sha256": "e67ed703239ee21e855e53b3721f105846d754a83034bc22e10839160bae464c"
+    },
+    {
+      "path": "test/monitor-placement.test.js",
+      "size": 1286,
+      "sha256": "1d22e97a8f8585e03a333b4634aeeefcafd9c8faeccafa6a6aad62bc247ec059"
+    },
+    {
+      "path": "test/monitoring.test.js",
+      "size": 3700,
+      "sha256": "eb9ba060883ab5b90d653542b2cb7ed77c264d76cf0f2ee3cecae921b20f28fa"
+    },
+    {
+      "path": "test/perf-audit.test.js",
+      "size": 3340,
+      "sha256": "c9934fc75626c87594a0ac99bee9c0e0d9379ba1cdcb7d81e52766fc7b52ab15"
+    },
+    {
+      "path": "test/premium-ui.test.js",
+      "size": 2714,
+      "sha256": "6b3ca29e6629601d36812ad96c39d40f8e59d8cbf1e2928896b4cee79df347ca"
+    },
+    {
+      "path": "test/premium-v3.5.1.test.js",
+      "size": 6901,
+      "sha256": "80ed22f23679f69962ef5ba46b5d338fe3d95515edbccb9b10ace601cc652afc"
+    },
+    {
+      "path": "test/security-audit.test.js",
+      "size": 7832,
+      "sha256": "66638b6fc506913c3ba005fa6f674063212ffb6f5c264d721ab6fca046c5460e"
+    },
+    {
+      "path": "test/skill-cleanup.test.js",
+      "size": 2874,
+      "sha256": "9e4824c85a90ba269bd6ac06c2007b80471c79f93d8ba587a0c0d29b13f8721a"
+    },
+    {
+      "path": "test/skill-e2e.test.js",
+      "size": 10346,
+      "sha256": "9a693987b1e74efd251bd7daf471ede4a5af73f8aae881e1bab33d613737dfee"
+    },
+    {
+      "path": "test/skills.test.js",
+      "size": 17006,
+      "sha256": "ed9dd385efd873b562504ae7ad07d1039dc1827bdf1a61dca1feb8381b047964"
+    },
+    {
+      "path": "test/sync-official-generator.test.js",
+      "size": 3144,
+      "sha256": "f11a90becedccba80cdfd1faf07128eae044899e8a3f3dbbbd777df846175a51"
+    },
+    {
+      "path": "test/upstream-import.test.js",
+      "size": 1918,
+      "sha256": "7ba08cda440d2c1c19453f592d6a0f2852ae1f327595e6ad1a2d831678dc06a3"
+    },
+    {
+      "path": "test/worker.test.js",
+      "size": 8181,
+      "sha256": "3f6d27d74d2ec276ed2d8fca9f9c109795795d438022a0194e64e4507df45574"
+    },
+    {
+      "path": "test/workspace-ui.test.js",
+      "size": 3361,
+      "sha256": "e5198f30f6f15e49ce3e546a7ecc9f323b7564f6caa9e0abab30def2ed34c325"
+    },
+    {
+      "path": "tsconfig.json",
+      "size": 213,
+      "sha256": "e0574c44d2a400ba3185a7544677a80b6aca7e9de27dbc8d9f6c041eaa6e87df"
+    },
+    {
+      "path": "vite.config.js",
+      "size": 1104,
+      "sha256": "81cd30bb0243856befecc968755509953fa6a1aeba3e657c61d4ed350611cba2"
+    },
+    {
+      "path": "worker/aifetch.js",
+      "size": 2991,
+      "sha256": "93da768120c5cddd790db7a0794e5b406b4b8adb67a12a0458a9a9632f97ce8c"
+    },
+    {
+      "path": "worker/anthropicSkills.js",
+      "size": 14793,
+      "sha256": "a16644d3f97c8a296a7ee2549d1c4fc88472edffccf2d56446d08ff533c48c2d"
+    },
+    {
+      "path": "worker/anthropicUpstream.generated.js",
+      "size": 170,
+      "sha256": "ee558ad7eb3872c9f24cbb7b91c58fe32acbfc5e535310c5323ee6dfa309eb05"
+    },
+    {
+      "path": "worker/api.js",
+      "size": 14495,
+      "sha256": "22b31f7182edf46a2dc1dda5851df2dacf0b6b616a3b63c7a75decd898b1ab17"
+    },
+    {
+      "path": "worker/auth.js",
+      "size": 9412,
+      "sha256": "a7f0be53b8a76bd3cabf8f28b41c4dc1bf3fa71d8b6139a88d2b1ef64c161773"
+    },
+    {
+      "path": "worker/builtins.js",
+      "size": 4452,
+      "sha256": "e883e62f3deccffc7a17b2bd233ca66e6a395f6f6cce4b0c5108fe7557200b70"
+    },
+    {
+      "path": "worker/compat.js",
+      "size": 9588,
+      "sha256": "18d5923c0b95650c52ae4eeeb66436a6a9555c98501113ec8505880d78d79995"
+    },
+    {
+      "path": "worker/constants.js",
+      "size": 14535,
+      "sha256": "87cca0a9b226fa978be2266875f0cec7c61cfa3ebe444bec569cde2fbfc782c9"
+    },
+    {
+      "path": "worker/db.js",
+      "size": 14012,
+      "sha256": "47447087a99ddba50c4b5ab1e9d2190a2526c2c494c8f44cdcefc32bbf48c4e6"
+    },
+    {
+      "path": "worker/delegate.js",
+      "size": 22040,
+      "sha256": "3179875ea27be9f25a10f9755fa60d34b5d641794940476f8e8c1e9cd9f55f78"
+    },
+    {
+      "path": "worker/delegateguide.js",
+      "size": 5813,
+      "sha256": "7f4d62707ac4484270f401704752d8e02fbba15263c78c32d3825c5738284652"
+    },
+    {
+      "path": "worker/diagnostics.js",
+      "size": 4413,
+      "sha256": "46316512728eef2aa4e7dd515e4df16cc2edf2818b8a573f0cff72646502a579"
+    },
+    {
+      "path": "worker/gemini.js",
+      "size": 9322,
+      "sha256": "f7726dca2c7c2afb061730559cb3b164136ce957d7a1020f187d85c866df149b"
+    },
+    {
+      "path": "worker/githubSkills.js",
+      "size": 45263,
+      "sha256": "18c445bff6d010489b910391b32d8d354f8904335aac7dcde3878392923a03e5"
+    },
+    {
+      "path": "worker/housekeep.js",
+      "size": 7455,
+      "sha256": "4694304eb246a4f0232891c843fbe70b0405e12db587a2fae16892cd22c8eccf"
+    },
+    {
+      "path": "worker/index.js",
+      "size": 6771,
+      "sha256": "2567449827f230d77ab7dc5263cbdf3c6e390a3f8d912b6f0f615a32de2e6f56"
+    },
+    {
+      "path": "worker/limits.js",
+      "size": 709,
+      "sha256": "7d0f16a8bb0a5ed7e5413efc01d1e90296e14bf866bb6f89f0a988d7a3d21cf2"
+    },
+    {
+      "path": "worker/llm.js",
+      "size": 1360,
+      "sha256": "98060805677de85e133a311242ba53944f29b5189ab8dfe468570975714a9c54"
+    },
+    {
+      "path": "worker/mcp.js",
+      "size": 18088,
+      "sha256": "ee91b84558cc3b0ceec75832db33e2618a059031dbdc14e30fe8e2a2c42edc86"
+    },
+    {
+      "path": "worker/memories.js",
+      "size": 13423,
+      "sha256": "b5a60679d14219edd827f72c659a3f3077f3ee1d386ef07e967f707912432c23"
+    },
+    {
+      "path": "worker/memoryFormat.js",
+      "size": 1216,
+      "sha256": "eb744b6492619eb59e8f036d09f44b5b012d30bf23e7a3766708d871bf0229c9"
+    },
+    {
+      "path": "worker/memoryIndex.js",
+      "size": 5745,
+      "sha256": "efb71ba75943369ccb0ba88d720297dd5664e4508201dd8a4cb24463b62fd8f3"
+    },
+    {
+      "path": "worker/memorySettings.js",
+      "size": 969,
+      "sha256": "2e371317dcb76a5d31cb414151a82cd0c56dd8a02a3122509f05fc8f6f27d9e6"
+    },
+    {
+      "path": "worker/metering.js",
+      "size": 2399,
+      "sha256": "303ba09483e3312b3daa337dae5d911a13870dcbf6275d13f1c2f6ee02e21873"
+    },
+    {
+      "path": "worker/monitor.js",
+      "size": 3991,
+      "sha256": "d22c31520cb1f5a7a7bc5b6680872adfb20ef7f1f39c9264b5c739d2b4a5ea8c"
+    },
+    {
+      "path": "worker/oauth.js",
+      "size": 28677,
+      "sha256": "66def6d6d04f8fb0f5ef99c80b8bd9fee0cd88d05b812cf7971c2d27756fe079"
+    },
+    {
+      "path": "worker/openrouter.js",
+      "size": 1214,
+      "sha256": "cbc3259ca422911e3bfae03bb6657f45ccd9fca5d76a5b129f6776b13cedd1c3"
+    },
+    {
+      "path": "worker/providers.js",
+      "size": 2770,
+      "sha256": "889a050d2c0581e69aebf2a71eff9dfb29369531e6c86f8f1316e4aacc4e006e"
+    },
+    {
+      "path": "worker/secrets.js",
+      "size": 3899,
+      "sha256": "c7a7fc4620af5429fd17edcf03257445f7de6f77337a5ed0860b0035c882f021"
+    },
+    {
+      "path": "worker/services.js",
+      "size": 4763,
+      "sha256": "296f2453f6dacbd15a4cf2ae6338dddf8742a988e30512e652371900388f6b65"
+    },
+    {
+      "path": "worker/skills.js",
+      "size": 26746,
+      "sha256": "43b08f35b0d3852a94ffbb267211c35dc9172267910597aeb3e4ece47763e341"
+    },
+    {
+      "path": "worker/skillstudio.js",
+      "size": 6066,
+      "sha256": "c1cf72899b1d2043563f518409fe3d3c931e83b0426689cab9ef6b9dad813124"
+    },
+    {
+      "path": "worker/util.js",
+      "size": 4947,
+      "sha256": "8dc194f38cab70953f9e49323b2b9cf3b24563fcfa30ee2a10cdbfca6a12db3d"
+    },
+    {
+      "path": "wrangler.toml",
+      "size": 726,
+      "sha256": "7f809dc0ebebaccd38c0ca568f8ac270c247264fd651a6a4afef2e17931c5ab9"
+    }
+  ],
+  "omitted_count": 5,
+  "omitted": [
+    {
+      "path": ".expo/README.md",
+      "reason": "generated/private directory"
+    },
+    {
+      "path": ".expo/devices.json",
+      "reason": "generated/private directory"
+    },
+    {
+      "path": "MemoryRelay.zip",
+      "reason": "archive/build/log/key file"
+    },
+    {
+      "path": "test/audit.test.js",
+      "reason": "potential hardcoded credential"
+    },
+    {
+      "path": "test/saved-model-catalog.test.js",
+      "reason": "potential hardcoded credential"
+    }
+  ]
+}
