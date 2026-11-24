@@ -5,13 +5,13 @@ export const SESSION_DAYS = 14;
 export const PBKDF2_ITER = 100000;
 export const MAX_CALLS = 8; // Workers subrequest budget per request
 export const RETRYABLE = new Set([0, 500, 502, 503, 504]); // 0 = could not reach Gemini at all
-export const BUILD = "2026-11-23.3-memory-library-index";
+export const BUILD = "2026-11-23.4-premium-accessible-interface";
 export const MAX_MEMORIES = 5000;        // library cap, stops a looping agent from filling the database
 export const MAX_TAGS = 5;
 export const MAX_ARG_CHARS = 100000;     // largest single string an agent may send
 export const MCP_PER_MINUTE = 300;       // requests per connection
 export const PROTOCOLS = ["2025-06-18", "2025-03-26", "2024-11-05"];
-export const SERVER_VERSION = "3.5.0";
+export const SERVER_VERSION = "3.5.1";
 export const ACCESS = ["read", "write", "full"];   // what a connection may do
 export const ACCESS_RANK = { read: 1, write: 2, full: 3 };
 export const ACCESS_LABEL = { read: "Read only", write: "Read and write", full: "Full access" };
@@ -42,7 +42,7 @@ export const TOOLS = [
       }, additionalProperties: false },
     }, required: ["text"] } },
   { name: "search", annotations: T("Search full memory library", { readOnlyHint: true, idempotentHint: true }),
-    description: "Search the ENTIRE memory library across Markdown, description, context tags and typed labels. Returns short index entries (ID, description, metadata, tags), NOT full text. Page with offset=next_offset until null; max 100 per page. Call get_memory(memory_id) to read selected full Markdown, fenced snippets and commands. Filter by app, platform, feature, version, language or stack.",
+    description: "Search the ENTIRE memory library across Markdown, description, context tags and typed labels. Returns short index entries (ID, description, metadata, tags), NOT full text. Page with offset=next_offset until null; max 100 per page. Call get_memory(memory_id) to read selected full Markdown, fenced snippets and commands. Filter by app, platform, feature, version, language or stack. Compatibility for old connector registrations: query=@page:100_keywords retrieves an offset page; query=@read:memoryid retrieves the entire selected memory, until get_memory becomes available after reconnecting.",
     inputSchema: { type: "object", properties: {
       query: { type: "string", description: "Keywords; all words must match. Empty query lists every memory." },
       limit: { type: "integer", description: "Index results per page, 1–100 (default 20)." },
@@ -104,7 +104,7 @@ export const TOOLS = [
       acceptance: { type: "string" }, context: { type: "string" }, verify: { type: "boolean" },
       provider: { type: "string", enum: ["gemini", "openrouter", "nvidia", "openai"] }, model: { type: "string" }, max_output_tokens: { type: "integer" } }, required: ["task"] } },
   { name: "select_skills", annotations: T("Pick skills for a request", { readOnlyHint: true, openWorldHint: true }),
-    description: "Call FIRST, before any task. Send the user's request word for word and the files you plan to edit. Returns only the skill instructions to follow (or none).",
+    description: "Call FIRST, before any task. Send the user's request word for word and the files you plan to edit. Returns up to 10 relevant skills (owner-adjustable in Settings) with instructions to follow, or none.",
     inputSchema: { type: "object", properties: { request: { type: "string" }, files: { type: "array", items: { type: "string" } }, functions: { type: "array", items: { type: "string" } } }, required: ["request"] } },
   { name: "get_skill", annotations: T("Get one skill by name", { readOnlyHint: true, idempotentHint: true }),
     description: "Fetch one skill by its exact name (for example when the user says \"use ponytail-audit\"). Returns its instructions, or says why it cannot (unknown name with similar names, or switched off by the owner).",

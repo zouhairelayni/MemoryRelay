@@ -12,7 +12,7 @@ export default function App() {
   useEffect(() => {
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     // Keep the brand visible briefly once on startup, not between tabs or on refresh.
-    const id = window.setTimeout(() => setWelcomeComplete(true), reduced ? 0 : 850);
+    const id = window.setTimeout(() => setWelcomeComplete(true), reduced ? 0 : 1250);
     return () => window.clearTimeout(id);
   }, []);
   if (auth.phase === "loading" || !welcomeComplete) return <WelcomeSplash loading={auth.phase === "loading"} />;

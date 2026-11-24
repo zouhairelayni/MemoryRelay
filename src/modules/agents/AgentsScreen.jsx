@@ -1,6 +1,8 @@
+import ScreenSkeleton from "../../components/ScreenSkeleton.jsx";
 import { useCallback, useEffect, useState } from "react";
 import { useApp } from "../../shell/AppContext.js";
 import { useServices } from "../../hooks/useServices.js";
+import { monitoring } from "../../api/endpoints.js";
 import { usePolling } from "../../hooks/usePolling.js";
 import { useSwipeDeck } from "../../hooks/useSwipeDeck.js";
 import { copyText } from "../../lib/clipboard.js";
@@ -20,12 +22,19 @@ export default function AgentsScreen({ active }) {
   const svc = useServices({ onChange: refreshAll });
   const { items, focusId } = svc;
 
+  const [jobData, setJobData] = useState(null);
+  usePolling(() => monitoring.get("30").then(setJobData).catch(() => {}), 15000, active);
+  const jobs = jobData?.jobs || [];
+  const activeJobs = jobs.filter(j => j.state === "running");
+  const recentJobs = jobs.filter(j => j.state !== "running").slice(0, 8);
   const [idx, setIdx] = useState(0);
   const [open, setOpen] = useState({});
   const [name, setName] = useState("");
   const [access, setAccess] = useState("write");
   const [copied, setCopied] = useState(false);
   const oauthUrl = window.location.origin + "/mcp";
+  const live = useApp().status.live;
+  const lastCall = useApp().counts.last_call;
 
   usePolling(() => svc.load(), 20000, active);
 
@@ -45,7 +54,13 @@ export default function AgentsScreen({ active }) {
 
   return (
     <div className="screen agents-screen">
-      <PageHead icon="agents" title="Connections" sub="One connection per agent, each with its own access." />
+      <PageHead icon="agents" title="Connections" sub="One connection per agent." />
+      <section className="connection-health card" aria-live="polite" aria-label="Connection health">
+        <div className="connection-health-mark"><Icon name={live === false ? "x" : "check"} size={22}/></div>
+        <div className="grow"><b>{live === null ? "Checking connection" : live ? "Service responding" : "Connection needs attention"}</b>
+          <span className="muted small">{svc.loaded ? `${items.filter(a => !a.revoked).length} active agents` : "Loading connections"}{lastCall ? ` · Last request ${lastCall}` : ""}</span></div>
+        <IconButton icon="refresh" label="Check connection now" onClick={test}/>
+      </section>
 
       <div className="card">
         <SearchBar id="svc-name" icon="agents" placeholder="New connection, for example Claude Work" value={name}
@@ -74,11 +89,18 @@ export default function AgentsScreen({ active }) {
             onCopy={() => svc.copyAddress(cur.url)} onRevoke={() => svc.revoke(cur.id)} onDelete={() => svc.remove(cur.id)}
             onRename={(n)=>svc.rename(cur.id,n)} onAccess={(a) => svc.setAccess(cur.id, a)} onSignOut={() => svc.signOut(cur.id)} />
         ) : (
-          <p className="empty">{svc.loaded ? "No connections yet. Add one above." : "Loading..."}</p>
+          svc.loaded ? <p className="empty">No connections yet. Add one above.</p> :
+          <ScreenSkeleton label="Loading connected agents"/>
         )}
       </div>
 
       {items.length > 1 ? <p className="agent-hint" id="conn-hint">Swipe the card or tap a name to switch</p> : null}
+
+      <section className="card monitor-agent-jobs" aria-label="Subagent tasks" aria-live="polite">
+        <div className="monitor-chart-title"><div><h3>Subagent tasks</h3><p className="muted small">Delegated work and its progress</p></div><span className="muted small">{activeJobs.length} running</span></div>
+        {activeJobs.length ? activeJobs.map(j => <article className="job-row" key={j.id}><b>{j.agent || "Subagent"} · Running</b><p>{j.task_summary || "Task summary unavailable"}</p><small className="muted">{j.provider || "Provider unavailable"} · {j.model || "Model unavailable"} · {j.kind || "Task"}</small></article>) : <p className="muted small">No subagent tasks running.</p>}
+        {recentJobs.length ? <details className="monitor-details"><summary>Recent completed tasks ({recentJobs.length})</summary>{recentJobs.map(j => <article className="job-row" key={j.id}><b>{j.agent || "Subagent"} · {j.state || "Finished"}</b><p>{j.task_summary || "Task summary was not recorded"}</p><small className="muted">{j.provider || "Provider"} · {j.model || "Model"} · {j.kind || "Task"}</small></article>)}</details> : null}
+      </section>
 
       <div className="card">
         <div className="chead">

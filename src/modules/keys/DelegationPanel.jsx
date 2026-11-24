@@ -1,3 +1,4 @@
+import ScreenSkeleton from "../../components/ScreenSkeleton.jsx";
 import { useCallback, useEffect, useState } from "react";
 import { delegation } from "../../api/endpoints.js";
 import Badge from "../../components/Badge.jsx";
@@ -42,7 +43,7 @@ export default function DelegationPanel({ active }) {
     catch (e) { setRun({ busy: false, text: e.message, bad: true }); }
   };
 
-  if (!d) return <div className="card"><p className="muted small" style={{ margin: 0 }}>Loading sub-agents...</p></div>;
+  if (!d) return <ScreenSkeleton type="cards" count={2} label="Loading AI providers"/>;
 
   const others = d.providers.filter((p) => !d.order.includes(p.id));
   const rows = [...d.order.map((id) => d.providers.find((p) => p.id === id)).filter(Boolean), ...others];

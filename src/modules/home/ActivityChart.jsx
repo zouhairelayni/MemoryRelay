@@ -20,7 +20,7 @@ export default function ActivityChart({type='line',labels=[],values=[],label,uni
     const rgb=/^#([0-9a-f]{6})$/i.exec(accent);
     const channels=rgb?[1,3,5].map(i=>parseInt(rgb[1].slice(i-1,i+1),16)):[170,165,255];
     const rgba=(opacity)=>`rgba(${channels.join(',')},${opacity})`;
-    gradient.addColorStop(0,rgba(.34));gradient.addColorStop(.55,rgba(.11));gradient.addColorStop(1,rgba(0));
+    gradient.addColorStop(0,rgba(.49));gradient.addColorStop(.55,rgba(.25));gradient.addColorStop(1,rgba(.045));
     const bar=accent;
     const isBar=type==='bar';
     const chart=new Chart(canvas.current,{
@@ -28,7 +28,7 @@ export default function ActivityChart({type='line',labels=[],values=[],label,uni
       data:{labels,datasets:[{
         label,data:values.map(x=>Number(x)||0),
         borderColor:accent,backgroundColor:isBar?bar:gradient,
-        borderWidth:isBar?0:2.5,pointRadius:isBar?0:values.length>45?0:1.6,
+        borderWidth:isBar?0:3,pointRadius:isBar?0:values.length>45?0:1.6,
         pointHoverRadius:5,pointHoverBackgroundColor:accent,pointHoverBorderWidth:2,pointHoverBorderColor:css(colors,"--card","#152232"),tension:0.36,fill:isBar?false:"origin",
         borderRadius:isBar?6:0,maxBarThickness:16,
       }]},

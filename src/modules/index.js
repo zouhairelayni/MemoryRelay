@@ -13,6 +13,7 @@ import MemoryScreen from "./memory/MemoryScreen.jsx";
 import SkillsScreen from "./skills/SkillsScreen.jsx";
 import AgentsScreen from "./agents/AgentsScreen.jsx";
 import KeysScreen from "./keys/KeysScreen.jsx";
+import ErrorsScreen from "./home/ErrorsScreen.jsx";
 
 export const MODULES = [
   { id: "home", title: "Live", icon: "live", blurb: "What is happening now and what needs you", Screen: HomeScreen, tab: true },
@@ -20,7 +21,9 @@ export const MODULES = [
   { id: "skills", title: "Skills", icon: "skills", blurb: "Choose which skills your agents can use", Screen: SkillsScreen, tab: true },
   { id: "agents", title: "Agents", icon: "agents", blurb: "Connect agents and set what each may do", Screen: AgentsScreen, tab: true },
   { id: "keys", title: "Models", icon: "models", blurb: "AI keys, routing and sub-agents", Screen: KeysScreen, tab: true },
+  { id: "errors", title: "Errors", icon: "alert", blurb: "Recorded diagnostic failures", Screen: ErrorsScreen, tab: false },
 ];
 
 export const TABS = MODULES.filter((m) => m.tab);
 export const TAB_IDS = TABS.map((m) => m.id);
+export const ROUTE_IDS = MODULES.map((m) => m.id);

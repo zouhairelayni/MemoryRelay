@@ -1,20 +1,10 @@
 import { useInstallPrompt } from "../hooks/useInstallPrompt.js";
-import Button from "../components/Button.jsx";
+import InstallChooser from "../components/InstallChooser.jsx";
 import Section from "./Section.jsx";
-
-export default function Install() {
-  const { canInstall, installed, brave, install } = useInstallPrompt();
-  return (
-    <Section title="App">
-      {installed ? <p className="small ok" style={{ margin: 0 }}>Installed. You are using the app.</p> : null}
-      {!installed && canInstall ? <Button icon="phone" onClick={install}>Install app</Button> : null}
-      {!installed && !canInstall ? (
-        <p className="muted small" style={{ margin: 0 }}>
-          {brave
-            ? "Brave on Android can only add a shortcut. For a real app that survives uninstalling the browser, open this page in Chrome and choose Install app."
-            : "Your browser has not offered to install this app yet. Use the browser menu and choose Install app or Add to Home screen."}
-        </p>
-      ) : null}
-    </Section>
-  );
+export default function Install(){
+  const {installed,brave}=useInstallPrompt();
+  return <Section title="Install the app"><div className="appearance-stack">
+    {installed ? <p className="small ok">MemoryRelay is installed.</p> : <InstallChooser variant="section"/>}
+    {!installed ? <p className="muted small">{brave ? "Use Chrome or another install-capable browser for a PWA launcher icon." : "Pick your accent before installing. Your browser may require installation from its menu."}</p> : null}
+  </div></Section>;
 }

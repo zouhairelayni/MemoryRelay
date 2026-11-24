@@ -27,3 +27,35 @@
   .btn:active,.ib:active,.tab:active svg,.cable-chip:active{transform:none}
   .enter > .home-hero,.repo-workspace > .repo-detail-hero,.repo-detail-panel,.app-select-menu,.welcome-emblem,.welcome-brand{animation:none}
 }
+
+/* v3.5.1: the approved M icon becomes a three-panel ribbon. The exact PNG takes
+   over once folded; the layered copies are clipped from the same image. */
+.logo-ribbon{position:relative;display:inline-grid;place-items:center;flex:none;isolation:isolate;overflow:hidden;border-radius:26%;vertical-align:middle;transform-style:preserve-3d}
+.logo-ribbon-settled{width:100%;height:100%;object-fit:cover;display:block;transition:transform .38s cubic-bezier(.18,.8,.2,1)}
+.ribbon-folds{position:absolute;inset:0;pointer-events:none;perspective:280px;transform-style:preserve-3d}
+.ribbon-fold{position:absolute;inset:0;background-size:100% 100%;background-repeat:no-repeat;transform-style:preserve-3d;backface-visibility:hidden}
+.ribbon-fold-left{clip-path:polygon(0 0,40% 0,40% 100%,0 100%);transform-origin:36% 53%}
+.ribbon-fold-middle{clip-path:polygon(34% 0,69% 0,69% 100%,34% 100%);transform-origin:50% 50%}
+.ribbon-fold-right{clip-path:polygon(63% 0,100% 0,100% 100%,63% 100%);transform-origin:66% 54%}
+@keyframes ribbon-fold-left{0%{opacity:.15;transform:rotateY(-78deg) translateX(-28%) skewY(10deg)}48%{opacity:1;transform:rotateY(19deg) translateX(1%) skewY(-3deg)}79%{opacity:1;transform:rotateY(-5deg)}100%{opacity:0;transform:none}}
+@keyframes ribbon-fold-middle{0%{opacity:.14;transform:rotateX(52deg) scaleX(.72)}46%{opacity:1;transform:rotateX(-15deg) scaleX(1.02)}78%{opacity:1;transform:rotateX(3deg)}100%{opacity:0;transform:none}}
+@keyframes ribbon-fold-right{0%{opacity:.12;transform:rotateY(78deg) translateX(28%) skewY(-10deg)}48%{opacity:1;transform:rotateY(-19deg) translateX(-1%) skewY(3deg)}79%{opacity:1;transform:rotateY(5deg)}100%{opacity:0;transform:none}}
+@keyframes ribbon-mark-reveal{0%,78%{opacity:0}94%,100%{opacity:1}}
+.logo-ribbon-animated .logo-ribbon-settled{animation:ribbon-mark-reveal 1.18s ease both}
+.logo-ribbon-animated .ribbon-fold-left{animation:ribbon-fold-left 1.18s cubic-bezier(.2,.86,.24,1) both}
+.logo-ribbon-animated .ribbon-fold-middle{animation:ribbon-fold-middle 1.18s cubic-bezier(.2,.86,.24,1) both}
+.logo-ribbon-animated .ribbon-fold-right{animation:ribbon-fold-right 1.18s cubic-bezier(.2,.86,.24,1) both}
+/* A deliberate, infrequent fold on the home header only; no motion on other tabs. */
+@keyframes ribbon-cycle-left{0%,1%{opacity:.1;transform:rotateY(-68deg) translateX(-20%)}5%{opacity:1;transform:rotateY(15deg)}9%{opacity:1;transform:none}11%,100%{opacity:0;transform:none}}
+@keyframes ribbon-cycle-middle{0%,1%{opacity:.1;transform:rotateX(38deg) scale(.85)}5%{opacity:1;transform:rotateX(-9deg)}9%{opacity:1;transform:none}11%,100%{opacity:0;transform:none}}
+@keyframes ribbon-cycle-right{0%,1%{opacity:.1;transform:rotateY(68deg) translateX(20%)}5%{opacity:1;transform:rotateY(-15deg)}9%{opacity:1;transform:none}11%,100%{opacity:0;transform:none}}
+@keyframes ribbon-cycle-mark{0%,8%{opacity:0}11%,100%{opacity:1}}
+.topbar .logo-ribbon-animated .logo-ribbon-settled{animation:ribbon-cycle-mark 9s linear infinite}
+.topbar .logo-ribbon-animated .ribbon-fold-left{animation:ribbon-cycle-left 9s cubic-bezier(.2,.86,.24,1) infinite}
+.topbar .logo-ribbon-animated .ribbon-fold-middle{animation:ribbon-cycle-middle 9s cubic-bezier(.2,.86,.24,1) infinite}
+.topbar .logo-ribbon-animated .ribbon-fold-right{animation:ribbon-cycle-right 9s cubic-bezier(.2,.86,.24,1) infinite}
+/* Not animated when reduced motion is requested. */
+@media(prefers-reduced-motion:reduce){
+  .logo-ribbon-animated .ribbon-folds{display:none}
+  .logo-ribbon-animated .logo-ribbon-settled,.topbar .logo-ribbon-animated .logo-ribbon-settled{opacity:1!important;animation:none!important}
+}

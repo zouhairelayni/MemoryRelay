@@ -219,12 +219,12 @@ export async function deleteSkill(env, name) {
 }
 
 async function skillSettings(env) {
-  const max = Math.min(8, Math.max(1, Number(await getConfig(env, "skills_max")) || DEFAULT_MAX));
+  const max = Math.min(10, Math.max(1, Number(await getConfig(env, "skills_max")) || DEFAULT_MAX));
   return { max };
 }
 export async function setSkillMax(env, n) {
   const value = Number(n);
-  if (!Number.isInteger(value) || value < 1 || value > 8) return { error: "choose 1 to 8 skills per request" };
+  if (!Number.isInteger(value) || value < 1 || value > 10) return { error: "choose 1 to 10 skills per request" };
   await setConfig(env, "skills_max", String(value));
   return skillSettings(env);
 }

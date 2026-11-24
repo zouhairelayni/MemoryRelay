@@ -108,6 +108,11 @@ export const provider = (id) => ({
 
 // Sub-agents: switch, hourly limit, routing, usage.
 export const monitoring = { get: (period="30") => get("/api/monitor?days="+encodeURIComponent(period)) };
+export const diagnostics = {
+  list: ({ period = '30', category = '', code = '', offset = 0, limit = 50 } = {}) =>
+    get('/api/errors?' + new URLSearchParams({period,category,code,offset:String(offset),limit:String(limit)})),
+  report: (type,screen) => post('/api/errors/client',{type,screen}),
+};
 
 export const delegation = {
   get: () => get("/api/delegation"),

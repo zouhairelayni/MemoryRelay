@@ -59,6 +59,14 @@ export async function remember(env, a, source = "agent") {
 // The index contains descriptions, IDs, and typed labels, NEVER full Markdown bodies.
 // Cursor by offset until next_offset is null; no first-20 or first-500 truncation.
 export async function search(env, a) {
+  // Compatibility for existing ChatGPT MCP installations whose cached tool schema
+  // only accepts {query, limit} and does not yet expose get_memory or offset.
+  // New clients use list_memories/get_memory/offset directly. This never writes.
+  const q = String(a?.query || "").trim();
+  const page = /^@page:(\d{1,5})(?:\s+([\s\S]*))?$/.exec(q);
+  if (page) return queryMemoryIndex(env, { ...a, query: page[2] || "", offset: Math.min(5000, Number(page[1])) });
+  const read = /^@read:([a-f0-9]{12})$/i.exec(q);
+  if (read) return getMemory(env, { memory_id: read[1].toLowerCase() });
   return queryMemoryIndex(env, a);
 }
 

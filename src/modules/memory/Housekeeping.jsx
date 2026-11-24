@@ -11,7 +11,7 @@ export default function Housekeeping({ onApplied, onUsedGemini }) {
     <div className="card">
       <div className="chead">
         <span className="chip brass"><Icon name="broom" size={19} /></span>
-        <div className="grow"><h3>Clean up</h3><div className="sub">Finds duplicates and suggests one merged text. Rules are never touched.</div></div>
+        <div className="grow"><h3>Clean up</h3><div className="sub">Reviews Markdown, descriptions and verified labels. Rules are protected.</div></div>
         <IconButton id="check" icon="search" label={hk.phase === "checking" ? "Checking" : "Check for duplicates"} variant="solid" size="lg" disabled={busy} onClick={hk.check} />
       </div>
       <div id="hk">
@@ -19,8 +19,10 @@ export default function Housekeeping({ onApplied, onUsedGemini }) {
           <>
             {hk.groups.map((g) => (
               <div className="suggest" key={g.keep}>
-                <b>{g.merged_text || g.keep_text}</b>
-                <small>Merges {g.drop.length + 1} memories into this one</small>
+                <strong>{g.merged_description || "Proposed merged memory"}</strong>
+                <pre className="housekeep-preview">{g.merged_text || g.keep_text}</pre>
+                {g.merged_metadata ? <small>Suggested labels: {Object.entries(g.merged_metadata).filter(([,v])=>Array.isArray(v)?v.length:!!v).map(([k,v])=>`${k}: ${Array.isArray(v)?v.join(", "):v}`).join(" · ")}</small> : null}
+                <small>Would merge {g.drop.length + 1} memories. Review evidence and labels before approving.</small>
               </div>
             ))}
             <div className="row">

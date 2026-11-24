@@ -10,7 +10,7 @@ export default function TabBar({ tabs, activeId, onSelect }) {
         <span className="tab-pill" aria-hidden="true" />
         {tabs.map((t) => (
           <button key={t.id} type="button" className={"tab" + (t.id === activeId ? " on" : "")} data-tab={t.id}
-            aria-current={t.id === activeId ? "page" : undefined} onClick={() => onSelect(t.id)}>
+            aria-current={t.id === activeId ? "page" : undefined} title={t.title} onClick={() => onSelect(t.id)}>
             <Icon name={t.icon} size={22} />
             <span>{t.title}</span>
           </button>

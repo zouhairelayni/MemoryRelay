@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef } from "react";
 import { AppContext } from "./AppContext.js";
-import { TABS, TAB_IDS } from "../modules/index.js";
+import { TABS, TAB_IDS, MODULES, ROUTE_IDS } from "../modules/index.js";
 import { useHashRoute } from "../hooks/useHashRoute.js";
 import { useOverview } from "../hooks/useOverview.js";
 import { usePersistent } from "../hooks/usePersistent.js";
@@ -10,7 +10,7 @@ import Pager from "./Pager.jsx";
 import TabBar from "./TabBar.jsx";
 import TopBar from "./TopBar.jsx";
 
-const ROUTES = [...TAB_IDS, "settings"];
+const ROUTES = [...ROUTE_IDS, "settings"];
 
 export default function AppShell({ email, logout }) {
   const { route, go, back } = useHashRoute(ROUTES, "home");
@@ -21,7 +21,8 @@ export default function AppShell({ email, logout }) {
   // Settings is a layer on top of the last tab, so the tab underneath does not change.
   const lastTab = useRef("home");
   const settingsOpen = route === "settings";
-  if (!settingsOpen) lastTab.current = route;
+  const errorsOpen = route === "errors";
+  if (TAB_IDS.includes(route)) lastTab.current = route;
   const tabId = lastTab.current;
   const index = Math.max(0, TAB_IDS.indexOf(tabId));
 
@@ -45,14 +46,15 @@ export default function AppShell({ email, logout }) {
     go: select, email, logout: doLogout, theme, setTheme, swipeTabs, setSwipeTabs,
   }), [overview.counts, overview.status, overview.loadCounts, overview.test, select, email, doLogout, theme, setTheme, swipeTabs, setSwipeTabs]);
 
-  const panes = TABS.map((m) => ({ id: m.id, title: m.title, node: <m.Screen active={m.id === tabId && !settingsOpen} /> }));
+  const panes = TABS.map((m) => ({ id: m.id, title: m.title, node: <m.Screen active={m.id === tabId && !settingsOpen && !errorsOpen} /> }));
+  const ErrorsScreen = MODULES.find(m=>m.id === "errors")?.Screen;
 
   return (
     <AppContext.Provider value={ctx}>
-      <div className="shell">
-        <TopBar onSettings={openSettings} />
+      <div className="shell" data-active-tab={tabId}>
+        <TopBar onSettings={openSettings} tabId={tabId} />
         <main className="main">
-          <Pager panes={panes} index={index} onChange={go} swipe={swipeTabs && !settingsOpen} />
+          {errorsOpen && ErrorsScreen ? <ErrorsScreen active /> : <Pager panes={panes} index={index} onChange={go} swipe={swipeTabs && !settingsOpen} />}
         </main>
         <TabBar tabs={TABS} activeId={tabId} onSelect={select} />
         <SettingsSheet open={settingsOpen} onClose={closeSettings} />

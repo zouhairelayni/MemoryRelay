@@ -36,7 +36,7 @@ test('authentication and navigation retain their action selectors', () => {
 test('skills selection uses stable selectable values; monitoring offers hour and day plus per-function charts', () => {
   const selector=read('src/modules/skills/SkillSelector.jsx');
   assert.match(selector, /id="sk-max"[^>]*label="Skills per request"/);
-  assert.match(selector, /Array.from\(\{length:8\}/);
+  assert.match(selector, /Array.from\(\{length:10\}/);
   assert.doesNotMatch(selector, /id="sk-max"[^>]*type="number"/);
   const panel=read('src/modules/home/MonitorPanel.jsx');
   for(const period of ['1h','1d','7','30','90']) assert.ok(panel.includes(`"${period}"`));

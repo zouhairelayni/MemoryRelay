@@ -16,6 +16,7 @@ import { COMPAT } from "./providers.js";
 import { delegate, getDelegation, saveDelegation } from "./delegate.js";
 import { BRIEF_FORM, GUIDE } from "./delegateguide.js";
 import { monitor } from "./monitor.js";
+import { listErrors, recordClientError } from "./diagnostics.js";
 import { addSkillRepo, githubTokenStatus, saveGitHubToken, removeGitHubToken, githubBlockedUntil, githubQuota, listRepoFiles, listSkillRepos, previewRepoFile, removeRepoFile, removeSkillRepo, restoreRepoFile, setSkillRepoFilter, setSkillRepoSync, syncSkillRepo } from "./githubSkills.js";
 
 export async function settings(env) {
@@ -42,6 +43,13 @@ export async function api(request, env, url) {
   const p = url.pathname, m = request.method;
 
   if (p === '/api/monitor' && m === 'GET') return json(await monitor(env,url.searchParams.get('days')));
+  if (p === '/api/errors' && m === 'GET') return json(await listErrors(env,Object.fromEntries(url.searchParams)));
+  if (p === '/api/errors/client' && m === 'POST') {
+    const input = await body(request);
+    const windowed = await rateLimit(env,'client-diagnostics',20,60000);
+    if (!windowed.ok) return json({ error: 'diagnostics rate limit exceeded' }, 429);
+    return withStatus(await recordClientError(env,input));
+  }
   if (p === "/api/settings" && m === "GET") return json(await settings(env));
   if (p === "/api/memory-settings" && m === "GET") return json({ max_tokens: await getMemoryLimit(env) });
   if (p === "/api/memory-settings" && m === "PUT") return withStatus(await setMemoryLimit(env, (await body(request)).max_tokens));

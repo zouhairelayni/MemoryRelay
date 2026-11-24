@@ -1,3 +1,4 @@
+import ScreenSkeleton from "../../components/ScreenSkeleton.jsx";
 import { useCallback, useEffect, useState } from "react";
 import { useApp } from "../../shell/AppContext.js";
 import { useMemories } from "../../hooks/useMemories.js";
@@ -66,7 +67,7 @@ export default function MemoryScreen({ active }) {
       <div className="memory-index-count" role="status">{mem.loaded ? `${mem.total} matching ${filter === "all" ? "entries" : filter} · ${mem.items.length} loaded` : "Searching library…"}</div>
       <div id="items" className={"stack" + (list.length || !mem.loaded ? " list" : "")}>
         {mem.error ? <p className="notice small bad">{mem.error}</p> : null}
-        {!mem.loaded && !mem.error ? [0, 1, 2].map((k) => <div className="skel" key={k} />) : null}
+        {!mem.loaded && !mem.error ? <ScreenSkeleton label="Loading memories"/> : null}
         {list.map((m) => (
           <MemoryCard key={m.id} m={m} editing={editing === m.id}
             onEdit={setEditing} onCancel={() => setEditing(null)} onSave={saveEdit} onDelete={(id) => mem.remove(id)} />

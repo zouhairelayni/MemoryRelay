@@ -3,10 +3,23 @@ import {monitoring} from '../../api/endpoints.js';
 import ActivityChart from './ActivityChart.jsx';
 import MetricDropdown from './MetricDropdown.jsx';
 import { colorForMetric } from './metricColors.js';
+import { useApp } from '../../shell/AppContext.js';
+import Icon from '../../components/Icon.jsx';
 
 const fmt=n=>Intl.NumberFormat().format(Number(n)||0);
 const time=ts=>new Date(ts).toLocaleString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
-const elapsed=ms=>{const sec=Math.max(0,Math.floor(ms/1000));return sec>=3600?`${Math.floor(sec/3600)}h ${Math.floor(sec%3600/60)}m`:sec>=60?`${Math.floor(sec/60)}m ${sec%60}s`:`${sec}s`;};
+const humanizeFunction=(category,action)=>{
+  const a=String(action||'').toLowerCase().replace(/[_-]+/g,' ').replace(/\s+/g,' ').trim();
+  const known={'connector test':'Test connection','connector status':'Check connection status','memory list':'Read memories','memory search':'Search memories','memory get':'Read a memory','memory remember':'Save memory','memory update':'Update memory','memory forget':'Delete memory','skill list':'List skills','skill select':'Select skills','skill sync':'Sync skills','github sync':'Sync repository','provider call':'Call AI provider','monitor get':'Load usage analytics'};
+  if(known[a])return known[a];
+  const route=String(action||'').replace(/^(GET|POST|PUT|PATCH|DELETE)\s+/i,'').split(/[?#]/)[0].replace(/:[a-z]+/gi,':id');
+  const routeLabels={'/api/connector/test':'Test agent connection','/api/services':'Manage agent connections','/api/memories':'Manage memories','/api/memory-settings':'Configure memory limits','/api/skills':'Manage skills','/api/skill-repos':'Manage skill repositories','/api/monitor':'Load usage analytics','/api/errors':'View diagnostics','/api/settings':'Load workspace settings','/api/gemini':'Configure Gemini','/api/openrouter':'Configure OpenRouter','/api/openai':'Configure OpenAI','/api/nvidia':'Configure NVIDIA','/api/export':'Export workspace data','/api/import':'Import workspace data','/api/delegation':'Configure sub-agents'};
+  if(routeLabels[route])return routeLabels[route];
+  const clean=a.replace(/\b(api|mcp|http|post|get|put|patch|delete)\b/g,'').trim();
+  const words=clean.split(' ').filter(Boolean).map(w=>w.charAt(0).toUpperCase()+w.slice(1));
+  const categoryLabel=({api:'Dashboard',mcp:'Agent tool',provider:'AI provider',skill:'Skill',client:'App',worker:'Server',system:'System'})[category]||'Operation';
+  return words.length?`${categoryLabel}: ${words.join(' ')}`:categoryLabel;
+};
 const memoryActions=new Set(['remember','update_memory','forget']);
 const measure=(row,id)=>{
   if(id==='mcp')return row.category==='mcp'?Number(row.n):0;
@@ -23,7 +36,7 @@ const METRICS=[
   ['mcp','MCP calls'],['skill','Skills selected'],['delegate','Delegated tasks'],['memory','Memory changes'],
   ['provider','Model API calls'],['api','Dashboard API calls'],['tokens','Estimated tokens'],['errors','Errors'],
 ];
-function RunningElapsed({start}){const [clock,setClock]=useState(Date.now());useEffect(()=>{const id=setInterval(()=>setClock(Date.now()),1000);return()=>clearInterval(id);},[]);return <span>{elapsed(clock-start)} elapsed{clock-start>20*60e3?' · Check for stalled task':''}</span>;}
+
 function Heat({hourly}){
   const counts=new Map(hourly.map(x=>[x.weekday+'-'+x.hour,Number(x.n)]));
   const max=Math.max(1,...counts.values());
@@ -36,6 +49,7 @@ function Heat({hourly}){
   </div></div>;
 }
 export default function MonitorPanel({active}) {
+  const { go } = useApp();
   const [period,setPeriod]=useState('30'),[metric,setMetric]=useState('mcp'),[data,setData]=useState(null),[error,setError]=useState(''),[reload,setReload]=useState(0);
   useEffect(()=>{if(!active)return;let alive=true;setData(null);
     const load=()=>monitoring.get(period).then(d=>{if(alive){setData(d);setError('');}}).catch(e=>{if(alive)setError(e.message)});
@@ -59,29 +73,29 @@ export default function MonitorPanel({active}) {
   const totals=useMemo(()=>METRICS.map(([id,label])=>({id,label,count:(data?.totals||[]).reduce((n,row)=>n+measure(row,id),0)})),[data]);
   const primaryMetrics=useMemo(()=>["mcp","tokens","skill","errors"].map(id=>totals.find(x=>x.id===id)).filter(Boolean),[totals]);
   const supportingMetrics=useMemo(()=>totals.filter(x=>!["mcp","tokens","skill","errors"].includes(x.id)),[totals]);
-  const metricCard=({id,label,count})=><div key={id} className={`monitor-metric metric-${id}`}><span className="monitor-metric-label">{label}</span><b>{fmt(count)}</b><span className="monitor-metric-meta">{data.label} <span aria-hidden="true">↗</span></span></div>;
+  const metricCard=({id,label,count})=>id === 'errors' ? <button key={id} type="button" className={`monitor-metric metric-${id} monitor-metric-action`} title="Open error diagnostics" aria-label={`Open error diagnostics. ${fmt(count)} errors in ${data.label}`} onClick={()=>go('errors')}><span className="monitor-metric-label">{label} <Icon name="chev" size={15}/></span><b>{fmt(count)}</b><span className="monitor-metric-meta">{data.label} · View diagnostics</span></button> : <div key={id} className={`monitor-metric metric-${id}`}><span className="monitor-metric-label">{label}</span><b>{fmt(count)}</b><span className="monitor-metric-meta">{data.label}</span></div>;
   const timeLabels=useMemo(()=>timeline.buckets.map(t=>new Date(t).toLocaleString(undefined,
     period==='1h'||period==='1d'?{hour:'2-digit',minute:'2-digit'}:{month:'short',day:'numeric'})),[timeline.buckets,period]);
-  const functionRows=useMemo(()=>(data?.totals||[]).filter(x=>Number(x.n)>0),[data]);
+  const functionRows=useMemo(()=>(data?.totals||[]).filter(x=>Number(x.n)>0).map(x=>({...x,displayLabel:humanizeFunction(x.category,x.action)})),[data]);
   const topFunctions=useMemo(()=>functionRows.slice(0,8),[functionRows]);
-  const functionNames=useMemo(()=>topFunctions.map(x=>{const name=x.category+' / '+x.action;return name.length>26?name.slice(0,25)+'…':name;}),[topFunctions]);
+  const functionNames=useMemo(()=>topFunctions.map(x=>x.displayLabel),[topFunctions]);
   const functionCounts=useMemo(()=>topFunctions.map(x=>Number(x.n)),[topFunctions]);
   const plotValues=metric==='all'?timeline.totals:metric.startsWith('fn:')?
     timeline.byAction.get(metric.slice(3))||[]:timeline.byMetric[metric]||[];
   const selectedLabel=metric==='all'?'All recorded events':metric.startsWith('fn:')?
-    metric.slice(3).replace(':',' / '):METRICS.find(([id])=>id===metric)?.[1]||'MCP calls';
-  const jobs=data?.jobs||[],activeJobs=jobs.filter(j=>j.state==='running');
+    functionRows.find(x=>`fn:${x.category}:${x.action}`===metric)?.displayLabel||'Function activity':METRICS.find(([id])=>id===metric)?.[1]||'MCP calls';
   return <section className="monitor-root" aria-label="Activity monitoring">
-    <div className="monitor-header"><div><span className="dash-eyebrow">PERFORMANCE</span><h3>Usage at a glance</h3><p className="muted small">All figures reflect recorded activity, not billing totals.</p></div>
-      <div className="monitor-period" role="group" aria-label="Activity period">{[["1h","1h"],["1d","24h"],["7","7d"],["30","30d"],["90","90d"]].map(([value,label])=><button key={value} type="button" className={period===value?"on":""} aria-pressed={period===value} onClick={()=>{setPeriod(value);setMetric("mcp");}}>{label}</button>)}</div></div>
+    <div className="monitor-header"><div><span className="dash-eyebrow">PERFORMANCE</span><h3>Usage at a glance</h3><p className="muted small">All figures reflect recorded activity, not billing totals.</p></div></div>
     {error?<div className="monitor-load-error" role="alert"><strong>Activity data is unavailable</strong><span>{error}</span><button type="button" className="btn sm ghost" onClick={()=>setReload(n=>n+1)}>Try again</button></div>:null}
     {!data?<div className="monitor-loading" aria-label="Loading usage data">
       <div className="monitor-metrics">{[0,1,2,3].map(i=><div className="monitor-metric" key={i}><span className="monitor-shimmer monitor-shimmer-label"/><span className="monitor-shimmer monitor-shimmer-number"/><span className="monitor-shimmer monitor-shimmer-foot"/></div>)}</div>
+      <div className="monitor-period-row"><span>Time range</span><div className="monitor-period" role="group" aria-label="Activity period">{[["1h","1h"],["1d","24h"],["7","7d"],["30","30d"],["90","90d"]].map(([value,label])=><button key={value} type="button" className={period===value?"on":""} aria-pressed={period===value} onClick={()=>setPeriod(value)}>{label}</button>)}</div></div>
       <div className="monitor-shimmer monitor-shimmer-graph"/>
     </div>:<>
       <div className="monitor-metrics">
         {primaryMetrics.map(metricCard)}
       </div>
+      <div className="monitor-period-row"><span>Time range</span><div className="monitor-period" role="group" aria-label="Activity period">{[["1h","1h"],["1d","24h"],["7","7d"],["30","30d"],["90","90d"]].map(([value,label])=><button key={value} type="button" className={period===value?"on":""} aria-pressed={period===value} onClick={()=>setPeriod(value)}>{label}</button>)}</div></div>
       <div className="card monitor-figure monitor-figure-primary">
         <div className="monitor-chart-title"><div><span className="dash-eyebrow">ACTIVITY INSIGHTS</span><h4>Activity trend</h4><p className="muted small">{data.label} · Recorded data, not cumulative totals</p></div>
           <MetricDropdown value={metric} onChange={setMetric} metrics={METRICS} functions={functionRows}/>
@@ -94,21 +108,8 @@ export default function MonitorPanel({active}) {
       <div className="card monitor-figure monitor-functions"><div className="monitor-chart-title"><h4>Most used functions</h4><span className="muted small">Top {topFunctions.length} in {data.label}</span></div>
         {topFunctions.length?<ActivityChart type="bar" color={colorForMetric("functions")} labels={functionNames} values={functionCounts} label="Most used functions"/>:<p className="muted small">No functions recorded for this period.</p>}
         <details className="monitor-details"><summary>All recorded functions ({functionRows.length})</summary>
-          <div className="monitor-function-list">{functionRows.map(x=><div key={`${x.category}:${x.action}`} className="monitor-breakdown"><span>{x.category} / {x.action}</span><b>{fmt(x.n)}</b></div>)}</div>
+          <div className="monitor-function-list">{functionRows.map(x=><div key={`${x.category}:${x.action}`} className="monitor-breakdown"><span>{x.displayLabel}</span><b>{fmt(x.n)}</b></div>)}</div>
         </details>
-      </div>
-      <div className="card monitor-figure monitor-agent-jobs" aria-live="polite"><div className="monitor-chart-title"><h4>Subagent tasks</h4><span className="muted small">{activeJobs.length} running</span></div>
-        {activeJobs.map(j=><div key={j.id} className="job-row"><div className="row" style={{alignItems:'center',gap:8}}><span className="job-dot"/><b>{j.agent}</b><span className="muted small">{j.provider||'Finding a model'} {j.model}</span></div><p>{j.task_summary||'Task summary unavailable'}</p><small className="muted">{j.kind} · Started {time(j.ts)} · <RunningElapsed start={j.ts}/></small></div>)}
-        {!activeJobs.length?<p className="muted small">No subagents currently running.</p>:null}
-        <details className="monitor-details"><summary>Completed and failed tasks ({jobs.length-activeJobs.length})</summary>
-          {jobs.filter(j=>j.state!=='running').slice(0,25).map(j=><div className="job-row" key={j.id}><b>{j.agent} · {j.state||'Completed'}</b><p>{j.task_summary||'Task summary was not recorded'}</p><small className="muted">{j.provider} {j.model} · {j.kind} · {time(j.ts)} · {elapsed(j.ms)} · {fmt(Number(j.tokens_in)+Number(j.tokens_out))} estimated tokens</small>{j.error?<p className="small" role="alert">{j.error}</p>:null}</div>)}
-        </details>
-      </div>
-      <div className="card monitor-figure monitor-recent"><h4>Errors and recent calls</h4>
-        <details className="monitor-details"><summary>Errors ({data.errors.length} recent)</summary>
-          {data.errors.length?data.errors.map((e,i)=><div key={i} className="job-row"><b>{e.error_code||'ERROR'} · {e.action}</b><p>{e.error_message||'Request failed'}</p><small className="muted">{time(e.ts)}</small></div>):<p className="muted small">No recent recorded errors.</p>}
-        </details>
-        <details className="monitor-details"><summary>Recent API and agent calls</summary>{data.events.map((e,i)=><div className="monitor-breakdown" key={i}><span>{e.category}: {e.action}{e.detail?' · '+e.detail:''}</span><small>{time(e.ts)}</small></div>)}</details>
       </div>
     </>}
   </section>;

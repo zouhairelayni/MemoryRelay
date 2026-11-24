@@ -8,6 +8,7 @@ import { rateLimit } from "./limits.js";
 import { handleMcp } from "./mcp.js";
 import { meter } from "./metering.js";
 import { activity, pruneActivity } from "./monitor.js";
+import { recordUnexpectedError } from "./diagnostics.js";
 import { CORS, bearerChallenge, isOauthPath, oauth, serviceByBearer } from "./oauth.js";
 import { serviceBySecret } from "./services.js";
 import { InputError, json } from "./util.js";
@@ -85,11 +86,10 @@ export default {
         if (p.startsWith("/auth/")) return await auth(request, env, url);
         const response = await api(request, env, url);
         // Polled GETs (dashboard refresh) are not logged unless they fail: they used to add a D1 write per poll and grow the table without limit.
-        if(!p.startsWith('/api/monitor') && !p.startsWith('/api/build') && (request.method!=='GET' || response.status>=400)){
-          ctx.waitUntil((async()=>{
-            let msg='';if(response.status>=400){const data=await response.clone().json().catch(()=>({}));msg=String(data.error||'Request failed');}
-            await activity(env,{category:'api',action:request.method+' '+p.replace(/[a-f0-9]{12,}/ig,':id'),ok:response.status<400,code:response.status>=400?'HTTP_'+response.status:'',message:msg});
-          })().catch(()=>{}));
+        if(!p.startsWith('/api/monitor') && !p.startsWith('/api/errors') && !p.startsWith('/api/build') && (request.method!=='GET' || response.status>=400)){
+          // Record status and route category only. API error messages can contain
+          // user-controlled values and must never enter diagnostic exports.
+          ctx.waitUntil(activity(env,{category:'api',action:request.method+' '+p.replace(/[a-f0-9]{12,}/ig,':id'),ok:response.status<400,code:response.status>=400?'HTTP_'+response.status:''}).catch(()=>{}));
         }
         return response;
       }
@@ -97,7 +97,9 @@ export default {
       return new Response("not found", { status: 404 });
     } catch (e) {
       if (e instanceof InputError) return json({ error: e.message }, e.status);
-      console.error("request failed:", request.method, p.startsWith("/mcp/") ? "/mcp/[redacted]" : p, e && e.stack || e); // Secret-link tokens must not enter logs.
+      // Unexpected exceptions are recorded without stacks, credentials or route parameters.
+      console.error("request failed", request.method, "[path redacted]", e?.name || "Error");
+      if (env.DB) ctx.waitUntil(recordUnexpectedError(env).catch(()=>{}));
       return json({ error: "internal error, please try again" }, 500);
     }
   },

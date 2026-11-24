@@ -17,6 +17,7 @@ const PATHS = {
   up: "M12 19V6M6 12l6-6 6 6",
   down: "M12 5v13M6 12l6 6 6-6",
   x: "M6 6l12 12M18 6 6 18",
+  alert: "M12 9v4M12 17h.01M12 3l10 18H2L12 3Z",
   download: "M12 4v11M7 11l5 5 5-5M5 20h14",
   upload: "M12 16V5M7 9l5-5 5 5M5 20h14",
   broom: "M14 3l7 7-4 1-4-4 1-4ZM12 8l-8 8 3 3 8-8M7 19l-3 2 2-3",

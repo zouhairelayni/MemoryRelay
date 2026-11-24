@@ -127,8 +127,8 @@ test("an internal error never logs the secret MCP URL", async () => {
     assert.equal(r.status, 500);
   } finally { console.error = original; }
   assert.equal(lines.length, 1);
-  assert.ok(lines[0].includes("/mcp/[redacted]"));
-  assert.ok(!lines[0].includes(secret));
+  assert.ok(lines[0].includes("[path redacted]"), "request logs must omit the complete route");
+  assert.ok(!lines[0].includes(secret), "MCP secret must not appear in logs");
 });
 
 test("MCP housekeeping cannot self-approve deletions; owner dashboard can apply a reviewed proposal", async () => {

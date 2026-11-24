@@ -40,10 +40,10 @@ test('hour and day periods keep separate five-minute and hourly trend buckets', 
 test('skill selection limit persists and rejects invalid values',async()=>{
   resetSchemaCache();const {DB}=createD1(),env={DB};await ensureSchema(env);
   const {getSkillSettings,setSkillMax}=await import('../worker/skills.js');
-  assert.equal((await setSkillMax(env,8)).max,8);
-  assert.equal((await getSkillSettings(env)).max,8);
-  for(const value of [0,9,-1,'wrong',1.5])assert.match((await setSkillMax(env,value)).error,/1 to 8/);
-  assert.equal((await getSkillSettings(env)).max,8);
+  assert.equal((await setSkillMax(env,10)).max,10);
+  assert.equal((await getSkillSettings(env)).max,10);
+  for(const value of [0,11,-1,'wrong',1.5])assert.match((await setSkillMax(env,value)).error,/1 to 10/);
+  assert.equal((await getSkillSettings(env)).max,10);
   assert.equal((await setSkillMax(env,1)).max,1);
 });
 

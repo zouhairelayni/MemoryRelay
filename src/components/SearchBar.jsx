@@ -5,7 +5,7 @@ export default function SearchBar({ icon = "search", children, className = "", .
   return (
     <div className={"sbar " + className}>
       <Icon name={icon} size={18} />
-      <input className="sin" {...input} />
+      <input className="sin" aria-label={input["aria-label"] || input.placeholder || "Search"} {...input} />
       {children ? <div className="cluster">{children}</div> : null}
     </div>
   );

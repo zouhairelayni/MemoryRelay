@@ -1,3 +1,4 @@
+import ScreenSkeleton from "../../components/ScreenSkeleton.jsx";
 import {useEffect,useState} from "react";
 import {skillRepos} from "../../api/endpoints.js";
 import Switch from "../../components/Switch.jsx";
@@ -70,7 +71,9 @@ function RepoFiles({repoId,onChanged}){
     try{await skillRepos.restoreFile(repoId,key);setNote("Restored. Press Sync now to bring it back.");await load();onChanged&&onChanged();}catch(e){setError(e.message);}
   }
   if(error)return <p className="small" role="alert">{error}</p>;
-  if(!data)return <p className="muted small">Loading files…</p>;
+  if(!data)return <div className="stack repo-file-skeleton" role="status" aria-label="Loading repository files">
+    <ScreenSkeleton label="Loading repository files"/>
+  </div>;
   const needle=q.trim().toLowerCase();
   const rows=data.files.filter(f=>(kind==="all"||f.kind===kind)&&(!needle||(f.skill+"/"+f.path).toLowerCase().includes(needle)));
   const bySkill=new Map();
@@ -91,8 +94,8 @@ function RepoFiles({repoId,onChanged}){
         <div className="row" style={{gap:8,alignItems:"center",flexWrap:"wrap"}}>
           <code style={{wordBreak:"break-all"}}>{f.path}</code>
           <span className="muted">{f.kind} · {fmtBytes(f.bytes)}</span>
-          <button className="fld" type="button" onClick={()=>togglePreview(f)}>{shown===key?"Hide":"View"}</button>
-          <button className="fld" type="button" onClick={()=>setConfirmFile(confirmFile===key?"":key)}>Remove</button>
+          <button className="repo-file-action" title={`${shown===key?"Hide":"View"} ${f.path}`} aria-label={`${shown===key?"Hide":"View"} ${f.path}`} type="button" onClick={()=>togglePreview(f)}><Icon name={shown===key?"x":"eye"} size={16}/></button>
+          <button className="repo-file-action danger" title={`Exclude ${f.path}`} aria-label={`Exclude ${f.path}`} type="button" onClick={()=>setConfirmFile(confirmFile===key?"":key)}><Icon name="trash" size={16}/></button>
         </div>
         {confirmFile===key?<div className="repo-file-confirm" role="group" aria-label={`Confirm removal of ${f.path}`}>
           <span>Exclude this file from future syncs?</span>
@@ -105,13 +108,14 @@ function RepoFiles({repoId,onChanged}){
     {rows.length>200?<p className="muted small">Showing the first 200 of {rows.length} files. Use the search or type filter to narrow the list.</p>:null}
     {data.excluded?.length?<div>
       <div className="small"><b>Removed files</b> ({data.excluded.length}), left out of every sync</div>
-      {data.excluded.map(k=><div key={k} className="row small" style={{gap:8,alignItems:"center",marginLeft:10}}><code style={{wordBreak:"break-all"}}>{k}</code><button className="fld" type="button" onClick={()=>restore(k)}>Restore</button></div>)}
+      {data.excluded.map(k=><div key={k} className="row small" style={{gap:8,alignItems:"center",marginLeft:10}}><code style={{wordBreak:"break-all"}}>{k}</code><button className="repo-file-action" aria-label={`Restore ${k}`} title={`Restore ${k}`} type="button" onClick={()=>restore(k)}><Icon name="undo" size={16}/></button></div>)}
     </div>:null}
   </div>;
 }
 
 export default function GithubSources({active,onUpdated,onOpenRepo,focusRepo,onCloseRepo}) {
   const [rows,setRows]=useState([]);
+  const [loaded,setLoaded]=useState(false);
   const [tokenConfigured,setTokenConfigured]=useState(null);
   const [token,setToken]=useState("");
   const [tokenState,setTokenState]=useState({});
@@ -130,7 +134,7 @@ export default function GithubSources({active,onUpdated,onOpenRepo,focusRepo,onC
   const draftOf=(r)=>drafts[r.id]||{file_types:r.file_types||["script","test"],root:r.root||"",path_filter:r.path_filter||"",max_kb:r.max_kb!==undefined && r.max_kb!==null && r.max_kb!==""?r.max_kb:750,adopt:!!r.adopt,update_mode:r.update_mode||"safe"};
   const setDraft=(r,patch)=>setDrafts(d=>({...d,[r.id]:{...draftOf(r),...patch}}));
   const [message,setMessage]=useState("");
-  const load=()=>skillRepos.info().then(({repositories,token_configured,blocked_until,quota:q,...tokenInfo})=>{setTokenState(tokenInfo);setRows(repositories);setTokenConfigured(token_configured);setBlockedUntil(blocked_until||"");setQuota(q||null);return repositories;}).catch(e=>setMessage(e.message));
+  const load=()=>skillRepos.info().then(({repositories,token_configured,blocked_until,quota:q,...tokenInfo})=>{setTokenState(tokenInfo);setRows(repositories);setLoaded(true);setTokenConfigured(token_configured);setBlockedUntil(blocked_until||"");setQuota(q||null);return repositories;}).catch(e=>setMessage(e.message));
   // Refresh only while this screen is open AND the page is visible; a hidden tab must not keep calling the Worker.
   useEffect(()=>{
     if(!active)return undefined;
@@ -162,7 +166,8 @@ export default function GithubSources({active,onUpdated,onOpenRepo,focusRepo,onC
   if(focusRepo){
     if(!selected)return <section className="repo-workspace stack" aria-live="polite">
       <button type="button" className="repo-back" onClick={onCloseRepo}><Icon name="chev" size={17}/> Back to repositories</button>
-      <div className="card"><p className="muted">{rows.length ? "This repository is no longer tracked." : "Loading repository…"}</p></div>
+      <div className="card">{loaded ? <p className="muted">This repository is no longer tracked.</p> :
+      <div className="stack" role="status" aria-label="Loading repository details"><ScreenSkeleton label="Loading repository details"/></div>}</div>
     </section>;
     const filesTotal=Object.values(selected.file_counts||{}).reduce((n,v)=>n+Number(v||0),0);
     return <section className="repo-workspace stack" aria-label={`Repository ${selected.repo}`}>
@@ -183,7 +188,7 @@ export default function GithubSources({active,onUpdated,onOpenRepo,focusRepo,onC
         {selected.last_error?<p className="repo-inline-alert" role="alert">{selected.last_error}</p>:null}
         <div className="card repo-info-card"><h3>Sync activity</h3>
           <p className="muted small">{selected.last_checked?`Last checked ${selected.last_checked} UTC`:"Not checked yet"}</p>
-          {selected.sync_status==='running'&&selected.sync_total>0?<div className="repo-progress"><div className="row"><span>Checking files</span><b>{selected.sync_done}/{selected.sync_total}</b></div><progress max={selected.sync_total} value={selected.sync_done}/></div>:null}
+          {(selected.sync_status==='running'||busy===selected.id)?<div className="repo-progress" role="status" aria-label="Repository sync progress"><div className="row"><span>Checking files</span><b>{selected.sync_total>0?`${selected.sync_done||0}/${selected.sync_total}`:"Preparing…"}</b></div><progress aria-label="Files checked" max={Math.max(1,selected.sync_total||1)} value={selected.sync_total>0?selected.sync_done||0:undefined}/></div>:null}
           {selected.sync_note?<p className="muted small">{selected.sync_note.split(" | ").join(" · ")}</p>:null}
           {selected.summary?<SyncSummary s={selected.summary} when={selected.summary.at}/>:null}
           <div className="repo-actions"><button className="btn" disabled={!!busy} onClick={()=>perform(selected.id,()=>syncAll(selected.id))}>{busy===selected.id?"Syncing…":"Sync now"}</button>
@@ -214,7 +219,7 @@ export default function GithubSources({active,onUpdated,onOpenRepo,focusRepo,onC
     {quota?<p className="muted small" role="status">GitHub requests left this hour: <b>{quota.remaining}</b> of {quota.limit}{quota.reset?` · resets ${new Date(quota.reset).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}`:""}{quota.token?"":" · no token"}{quota.estimated?" (estimated)":""}
       {typeof quota.used_by_this_worker==="number"?<span> · this app sent {quota.used_by_this_worker} in the last hour{!quota.token&&quota.limit-quota.remaining-quota.used_by_this_worker>0?`, other apps sharing this address used ${quota.limit-quota.remaining-quota.used_by_this_worker}`:""}</span>:null}</p>:null}
     {blockedUntil?<p className="small" role="alert" style={{color:"var(--danger, #b92a44)"}}>GitHub is limiting requests. Syncing is paused until {new Date(blockedUntil).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}.{tokenConfigured?"":" Save a GitHub token below to use an authenticated quota."}</p>:null}
-    <details className="repo-guide"><summary>GitHub token</summary>
+    <details className="repo-guide"><summary><span>GitHub authentication</span><span className="repo-disclosure-icon" aria-hidden="true"><Icon name="plus" size={18}/></span></summary>
       <p className="muted small">{tokenState.token_saved ? (tokenState.token_encrypted ? "A token is saved encrypted in the database." : "A token is saved unencrypted in the database.") : tokenState.token_source === "worker" ? "Using the GITHUB_TOKEN Worker secret. A token saved here takes priority." : "Save a personal access token to increase your GitHub quota and sync private repositories."}</p>
       {tokenState.token_locked?<p className="small" role="alert">The saved token cannot be decrypted. Restore KEY_SECRET on the Worker, or replace the token.</p>:null}
       {!tokenState.token_encryption_enabled?<p className="small" role="status">Encryption is off. Tokens saved here will be stored unencrypted in the database. Set KEY_SECRET in your Worker secrets to enable encryption.</p>:null}
@@ -228,7 +233,15 @@ export default function GithubSources({active,onUpdated,onOpenRepo,focusRepo,onC
       <p className="muted small">Classic and fine-grained tokens are supported. For a fine-grained token, grant Contents: Read-only for the repositories you want to sync. The token is checked before saving. Encryption at rest is optional, as with the app’s other API keys. Removing it falls back to the Worker secret, if configured.</p>
       <p className="muted small"><a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer">Manage GitHub tokens</a></p>
     </details>
+    {rows.some(r=>r.sync_status==="running") ? <div className="repo-global-sync" role="status" aria-live="polite">
+      <div className="repo-global-heading"><Icon name="refresh" size={17}/><strong>Synchronizing libraries</strong><span>{rows.filter(r=>r.sync_status==="running").length} active</span></div>
+      {rows.filter(r=>r.sync_status==="running").map(r=><div className="repo-global-row" key={r.id}>
+        <div><span>{r.repo}</span><b>{r.sync_total ? `${r.sync_done||0} / ${r.sync_total}` : "Preparing"}</b></div>
+        <progress aria-label={`Sync progress for ${r.repo}`} max={Math.max(1,r.sync_total||1)} value={r.sync_total>0?r.sync_done||0:undefined}/>
+      </div>)}
+    </div> : null}
     <div className="repo-list-scroll" role="region" aria-label="Tracked skill repositories" tabIndex={0}>
+    {!loaded ? <ScreenSkeleton type="cards" label="Loading repositories"/> : null}
     {rows.map(r=><div key={r.id} className="repo-list-item stack">
       <div className="repo-card-heading">
         <div className="repo-card-icon" aria-hidden="true"><Icon name="skills" size={21}/></div>
@@ -240,13 +253,22 @@ export default function GithubSources({active,onUpdated,onOpenRepo,focusRepo,onC
         <span className="repo-pill">{r.skill_count} skills</span>
         <span className="repo-pill">{Object.values(r.file_counts||{}).reduce((n,v)=>n+Number(v||0),0)} files</span>
       </div>
-      <button className="repo-card-open" type="button" onClick={()=>onOpenRepo?.(r.id)}>
-        <span>Open repository</span><span aria-hidden="true">→</span>
-      </button>
+      {(r.sync_status === "running" || busy === r.id) ? <div className="repo-sync-progress" role="status" aria-label={`Syncing ${r.repo}`}>
+        <div><span>Syncing resources</span><b>{Number(r.sync_total) > 0 ? `${r.sync_done || 0} / ${r.sync_total}` : "Preparing…"}</b></div>
+        <progress aria-label={`Repository sync progress for ${r.repo}`} max={Math.max(1, Number(r.sync_total)||1)} value={Number(r.sync_total)>0?Number(r.sync_done)||0:undefined}/>
+      </div> : null}
+      <div className="repo-card-footer">
+        <button className="repo-quick-sync" type="button" disabled={!!busy} title={`Sync ${r.repo} now`} aria-label={`Sync ${r.repo} now`} onClick={()=>perform(r.id,()=>syncAll(r.id))}>
+          <Icon name="refresh" size={16}/><span>{busy===r.id ? "Syncing" : "Sync"}</span>
+        </button>
+        <button className="repo-card-open" type="button" title={`Manage ${r.repo}`} onClick={()=>onOpenRepo?.(r.id)}>
+          <span>Manage</span><span aria-hidden="true">→</span>
+        </button>
+      </div>
     </div>)}
     </div>
     {rows.length>3?<p className="repo-scroll-hint">↓ Scroll to explore all {rows.length} repositories</p>:null}
-    <details className="repo-add"><summary><strong>+ Connect another repository</strong></summary>
+    <details className="repo-add"><summary><strong>Connect another repository</strong><span className="repo-disclosure-icon" aria-hidden="true"><Icon name="plus" size={19}/></span></summary>
       <div className="stack" style={{marginTop:10,gap:8}}>
         <input className="fld" aria-label="GitHub repository" placeholder="owner/repo or GitHub URL" value={repo} onChange={e=>setRepo(e.target.value)}/>
         <div className="row" style={{gap:8}}>
@@ -255,7 +277,7 @@ export default function GithubSources({active,onUpdated,onOpenRepo,focusRepo,onC
         </div>
         <input className="fld" aria-label="Skill names (optional)" placeholder="Skill names, comma-separated (blank = all)" value={names} onChange={e=>setNames(e.target.value)}/>
         <FileOptions value={newOpts} onChange={patch=>setNewOpts(o=>({...o,...patch}))} disabled={!!busy}/>
-        <button className="fld" disabled={!!busy||!repo.trim()} onClick={()=>perform('add',()=>skillRepos.add(repo,root,branch,names,newOpts).then(r=>{if(!r.error)setRepo('');return r;}))}>Add repository</button>
+        <button className="btn" type="button" disabled={!!busy||!repo.trim()} onClick={()=>perform('add',()=>skillRepos.add(repo,root,branch,names,newOpts).then(r=>{if(!r.error)setRepo('');return r;}))}><Icon name="plus" size={17}/> Connect repository</button>
       </div>
     </details>
     {message?<p className="small" role="status">{message}</p>:null}

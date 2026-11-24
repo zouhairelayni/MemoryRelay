@@ -321,3 +321,107 @@ html[data-theme="light"] .memory-label-slate{color:#506479}
   html:not([data-theme="dark"]) .memory-label-rose{color:#9d3765}
   html:not([data-theme="dark"]) .memory-label-slate{color:#506479}
 }
+
+/* v3.5.1 — focused, accessible app-wide treatment. */
+.topbar{min-height:73px;gap:9px;padding-inline:18px 14px}
+.brand-mark{gap:12px}.brand-mark .logo-ribbon{box-shadow:0 3px 15px rgba(42,39,126,.21)}
+.topbar-page{display:grid;align-content:center;gap:1px;flex:1;min-width:0}
+.topbar-page h1{margin:0;color:var(--ink);font:770 18px/1.2 var(--display);letter-spacing:-.045em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.topbar-page span{font:540 11px/1.4 var(--sans);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.shell[data-active-tab]:not([data-active-tab="home"]) .phead{display:none}
+.shell[data-active-tab]:not([data-active-tab="home"]) .pane>.screen{padding-top:13px}
+@media(max-width:370px){.topbar-page h1{font-size:17px}.topbar-page span{font-size:10px}}
+
+/* Welcome: show real structure instead of waiting against a blank backdrop. */
+.welcome-loading{width:min(230px,70vw);display:grid;gap:9px;position:absolute;top:calc(50% + 200px)}
+.welcome-loading .skeleton-line{height:8px;border-radius:99px;background:linear-gradient(100deg,var(--paper2),var(--cobalt-soft),var(--paper2));background-size:250% 100%;animation:shimmer 1.75s ease-in-out infinite}
+.welcome-loading .skeleton-line:last-child{width:57%;margin-inline:auto}
+@media(prefers-reduced-motion:reduce){.welcome-loading .skeleton-line{animation:none}}
+
+/* Color follows the selected line: clearer fill, calmer surrounding chrome. */
+.monitor-figure-primary{border-color:color-mix(in srgb,var(--cobalt) 23%,var(--line));box-shadow:0 14px 45px -38px rgba(1,4,26,.85)}
+.monitor-plot-swatch{box-shadow:0 0 0 4px color-mix(in srgb,var(--plot-color) 15%,transparent)}
+.activity-chart:not(.activity-chart-bar){min-height:210px}
+
+/* Skills toolbar should not consume a whole card-height above content. */
+.skills-toolbar-card{padding:10px 12px!important;border-radius:16px!important}
+.skills-toolbar-card .filter{display:flex;flex-wrap:nowrap;gap:8px;justify-content:space-between;min-width:0}
+.skills-toolbar-card .filter>.app-select-trigger{min-width:0;flex:1;padding:9px 10px;max-width:min(50%,188px);font-size:12px}
+.skills-toolbar-card .filter .cluster{display:flex;min-width:0;gap:7px}
+.skills-toolbar-card .skill-cap{display:flex;align-items:center;gap:7px;min-width:0;padding:0;background:transparent;border:0}
+.skills-toolbar-card .skill-cap>span{font-size:11px;color:var(--muted);line-height:1.15;max-width:65px}
+.skills-toolbar-card .skill-cap .app-select-trigger{min-width:55px;min-height:42px;padding:7px 9px}
+.skills-toolbar-card .filter .app-select-trigger{min-height:42px}
+.expand-glyph{display:grid;place-items:center;width:29px;height:29px;border:1px solid var(--line);border-radius:9px;flex:none;color:var(--ink2);background:var(--paper2)}
+.dcard.open .expand-glyph{border-color:var(--cobalt);color:var(--cobalt);background:var(--cobalt-soft)}
+@media(max-width:400px){.skills-toolbar-card .skill-cap>span{max-width:49px;font-size:10px}.skills-toolbar-card .filter .cluster{flex:0 0 auto}.skills-toolbar-card .filter>.app-select-trigger{max-width:none}}
+
+/* Repositories expose sync as a first-class action, with real progress from Worker. */
+.repo-card-footer{display:flex;align-items:center;gap:8px;margin-top:auto}
+.repo-card-footer .repo-card-open{flex:1;min-width:0;margin:0;min-height:41px;border-radius:11px}
+.repo-quick-sync{display:flex;align-items:center;justify-content:center;gap:7px;flex:0 0 auto;min-height:41px;padding:8px 12px;border:1px solid color-mix(in srgb,var(--cobalt) 24%,var(--line));border-radius:11px;background:var(--cobalt-soft);color:var(--cobalt);font:690 12px var(--sans);cursor:pointer}
+.repo-quick-sync:hover,.repo-quick-sync:focus-visible{border-color:var(--cobalt)}
+.repo-quick-sync:disabled{opacity:.55;cursor:wait}
+.repo-sync-progress{display:grid;gap:7px;padding:9px 10px;background:var(--paper2);border-radius:11px}
+.repo-sync-progress>div,.repo-progress .row{display:flex;justify-content:space-between;gap:9px;font-size:11px;color:var(--muted)}
+.repo-sync-progress b,.repo-progress b{color:var(--ink);font-variant-numeric:tabular-nums}
+.repo-sync-progress progress,.repo-progress progress{display:block;width:100%;height:7px;overflow:hidden;border:0;border-radius:999px;accent-color:var(--cobalt);background:var(--line)}
+.repo-sync-progress progress::-webkit-progress-bar,.repo-progress progress::-webkit-progress-bar{background:var(--line);border-radius:99px}
+.repo-sync-progress progress::-webkit-progress-value,.repo-progress progress::-webkit-progress-value{background:linear-gradient(90deg,var(--cobalt),color-mix(in srgb,var(--cobalt) 65%,white));border-radius:99px}
+.repo-list-item{min-height:164px;height:auto}
+.repo-list-scroll{--repo-preview-row:174px}
+.repo-detail-tabs{padding:3px;background:var(--paper2);border:1px solid var(--line);border-radius:14px;gap:2px}
+.repo-detail-tabs button{border-radius:11px;min-height:44px}
+.repo-file-action{display:grid;place-items:center;min-height:38px;min-width:38px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink2);cursor:pointer}
+.repo-file-action.danger{color:var(--rose)}.repo-file-action:hover,.repo-file-action:focus-visible{border-color:currentColor}
+
+/* App-owned accordion + / × symbols always sit outside the heading text. */
+details>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;list-style:none}
+details>summary::marker{content:""}
+details>summary::-webkit-details-marker{display:none}
+details>summary::after{content:"+";display:grid;place-items:center;flex:none;width:29px;height:29px;border:1px solid var(--line);border-radius:9px;background:var(--card);color:var(--cobalt);font:650 23px/1 var(--sans)}
+details[open]>summary::after{content:"×"}
+.repo-guide>summary::after,.repo-add>summary::after{display:none}
+.repo-disclosure-icon{display:grid;place-items:center;width:30px;height:30px;flex:none;border-radius:9px;background:var(--cobalt-soft);color:var(--cobalt)}
+.repo-guide[open] .repo-disclosure-icon svg,.repo-add[open] .repo-disclosure-icon svg{transform:rotate(45deg)}
+.repo-guide .repo-disclosure-icon svg,.repo-add .repo-disclosure-icon svg{transition:transform .15s ease}
+.repo-guide,.repo-add{padding:13px;border:1px solid var(--line);border-radius:15px;background:var(--paper2)}
+.repo-guide>summary,.repo-add>summary{min-height:38px;font-weight:720;font-size:13px;color:var(--ink)}
+
+/* An actual settings screen, with a clear organizational rhythm. */
+.sheet-body{gap:19px;padding-bottom:calc(env(safe-area-inset-bottom) + 40px)}
+.settings-intro{padding:23px 22px;border:1px solid var(--line);border-radius:22px;background:radial-gradient(ellipse at 82% 0%,var(--ambient-violet),transparent 76%),var(--card)}
+.settings-intro h3{margin:9px 0 4px;font:770 26px/1.12 var(--display);letter-spacing:-.055em}
+.settings-intro p{margin:0;color:var(--muted);font-size:12px;line-height:1.5}
+.settings-group{display:grid;gap:10px;min-width:0}
+.settings-group-label{color:var(--cobalt);font:740 10px/1.2 var(--sans);letter-spacing:.13em;text-transform:uppercase;padding-left:5px}
+.settings-group .set-sec{display:grid;gap:7px}
+.settings-group .set-sec .card{padding:17px;border-radius:18px;background:var(--surface-glass)}
+.settings-group .set-title{font:720 14px/1.25 var(--display);letter-spacing:-.02em;margin:0 0 1px 5px}
+.housekeep-preview{max-height:260px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.55 var(--mono);color:var(--ink2);padding:11px;margin:9px 0;background:var(--card);border-radius:10px;border:1px solid var(--line)}
+.connection-health{display:flex;align-items:center;gap:12px;padding:14px!important}
+.connection-health-mark{display:grid;place-items:center;width:42px;height:42px;flex:none;border-radius:14px;background:var(--mint-soft);color:var(--mint)}
+.connection-health .grow{display:grid;gap:3px;min-width:0}.connection-health .grow>b{font-size:14px}.connection-health .grow>span{overflow-wrap:anywhere;font-size:11px}
+
+/* WCAG focus, comfortable mobile hit targets, hover descriptions via native title attributes. */
+:where(button,a,summary,input,textarea,select,[tabindex]):focus-visible{outline:2px solid var(--cobalt)!important;outline-offset:3px!important}
+:where(button,a,summary){touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+:where(.repo-card-footer button,.repo-detail-tabs button,.app-select-trigger,.ib,.tab,.repo-back){min-height:42px}
+:where(.repo-list-item,.card,.dcard){min-width:0}
+@media(hover:hover) and (pointer:fine){
+  .repo-card-footer button,.app-select-trigger,.overview-library-card,.ib{transition:transform .15s ease,background .15s ease,border-color .15s ease,box-shadow .15s ease}
+  .repo-card-footer button:hover,.overview-library-card:hover{transform:translateY(-1px)}
+}
+@media(prefers-reduced-motion:reduce){
+  .welcome-loading .skeleton-line{animation:none!important}
+  .repo-guide .repo-disclosure-icon svg,.repo-add .repo-disclosure-icon svg{transition:none}
+}
+.repo-global-sync{display:grid;gap:10px;padding:14px 15px;border-radius:16px;background:color-mix(in srgb,var(--cobalt) 9%,var(--card));border:1px solid color-mix(in srgb,var(--cobalt) 28%,var(--line))}
+.repo-global-heading{display:flex;align-items:center;gap:8px;color:var(--cobalt);font-size:12px}
+.repo-global-heading>span{margin-left:auto;color:var(--muted);font-size:11px}
+.repo-global-row{display:grid;gap:5px}.repo-global-row>div{display:flex;gap:9px;justify-content:space-between;font-size:11px}
+.repo-global-row span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.repo-global-row b{flex:none;font-variant-numeric:tabular-nums}
+.repo-global-row progress{width:100%;height:7px;accent-color:var(--cobalt);background:var(--paper2);border:0;border-radius:99px;overflow:hidden}
+.repo-global-row progress::-webkit-progress-bar{background:var(--paper2)}
+.repo-global-row progress::-webkit-progress-value{background:var(--cobalt);border-radius:99px}
+.repo-file-skeleton .skel{height:55px;border-radius:12px}

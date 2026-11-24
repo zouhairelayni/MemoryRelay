@@ -7,7 +7,7 @@ export default function MetricDropdown({ value, onChange, metrics, functions }) 
   const trigger = useRef(null);
   const options = [{ id: "all", label: "All recorded events", group: "Overview" },
     ...metrics.map(([id, label]) => ({ id, label, group: "Metrics" })),
-    ...functions.map(x => ({ id: `fn:${x.category}:${x.action}`, label: `${x.category} / ${x.action}`, group: "Functions" }))];
+    ...functions.map(x => ({ id: `fn:${x.category}:${x.action}`, label: x.displayLabel || `${x.category} operation`, group: "Functions" }))];
   const selected = options.find(o => o.id === value) || options[1];
   useEffect(() => {
     if (!open) return undefined;
@@ -30,7 +30,7 @@ export default function MetricDropdown({ value, onChange, metrics, functions }) 
     if (e.key === "End" && open) { e.preventDefault(); const buttons = root.current.querySelectorAll('[role="option"]'); buttons[buttons.length - 1]?.focus(); }
   };
   return <div ref={root} className="metric-dropdown" onKeyDown={keyboard}>
-    <button ref={trigger} type="button" className="metric-dropdown-trigger" aria-label={`Chart metric: ${selected.label}`} aria-expanded={open} aria-haspopup="listbox" onClick={() => setOpen(v => !v)}>
+    <button ref={trigger} type="button" className="metric-dropdown-trigger" title={`Choose chart metric: ${selected.label}`} aria-label={`Chart metric: ${selected.label}`} aria-expanded={open} aria-haspopup="listbox" onClick={() => setOpen(v => !v)}>
       <span>{selected.label}</span><span className="metric-dropdown-chevron" aria-hidden="true">⌄</span>
     </button>
     {open ? <div className="metric-dropdown-menu" role="listbox" aria-label="Chart metric">

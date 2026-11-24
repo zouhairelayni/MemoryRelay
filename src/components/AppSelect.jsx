@@ -73,7 +73,7 @@ export default function AppSelect({ value, onChange, options, label, disabled = 
 
   return <>
     <button id={id} ref={anchor} type="button" disabled={disabled}
-      className={`app-select-trigger ${className}`.trim()} aria-label={label}
+      className={`app-select-trigger ${className}`.trim()} aria-label={label} title={label}
       aria-haspopup="listbox" aria-expanded={open} aria-controls={open ? listId : undefined}
       onKeyDown={(event) => {
         if (event.key === "ArrowDown" || event.key === "ArrowUp") { event.preventDefault(); setOpen(true); }

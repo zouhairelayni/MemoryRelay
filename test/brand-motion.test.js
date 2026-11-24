@@ -13,13 +13,17 @@ test('PWA icons are opaque PNG assets at the declared resolutions',()=>{
     assert.ok([2,6].includes(buf[25]),'valid RGB/RGBA color type for '+name);
   }
 });
-test('One React logo image backs header, gate and welcome',()=>{
+test('Approved PNG supports a folding ribbon on Home and welcome',()=>{
   const logo=source('src/components/Logo.jsx');
-  assert.match(logo,/src="\/icons\/icon-192\.png"/);
+  assert.match(logo,/useAccent, iconFor/);
+  assert.match(logo,/const image = iconFor\(accent, 192\)/);
+  assert.match(logo,/ribbon-fold-left/);
+  assert.match(logo,/ribbon-fold-middle/);
+  assert.match(logo,/ribbon-fold-right/);
   assert.match(logo,/draggable="false"/);
   assert.match(source('src/shell/TopBar.jsx'),/import Logo/);
   assert.match(source('src/shell/AuthGate.jsx'),/import Logo/);
-  assert.match(source('src/components/WelcomeSplash.jsx'),/Logo size=\{128\}/);
+  assert.match(source('src/components/WelcomeSplash.jsx'),/Logo size=\{128\} animated/);
   const svg=source('public/icons/icon.svg');
   assert.doesNotMatch(svg,/<circle\b/);
   assert.match(svg,/<path/);
@@ -30,17 +34,18 @@ test('Welcome runs once on startup and respects reduced motion',()=>{
   const motion=source('src/styles/motion.css');
   assert.match(app,/useEffect\(/);
   assert.match(app,/prefers-reduced-motion: reduce/);
-  assert.match(app,/850/);
+  assert.match(app,/1250/);
   assert.match(app,/auth\.phase === "loading" \|\| !welcomeComplete/);
   assert.match(splash,/welcome-emblem/);
   assert.match(splash,/welcome-wordmark/);
   assert.doesNotMatch(splash,/<span className="pulse"|loading-dot|spinner/);
-  assert.match(motion,/@keyframes welcome-mark-in/);
+  assert.match(motion,/@keyframes ribbon-fold-left/);
+  assert.match(motion,/@keyframes ribbon-cycle-mark/);
   assert.match(motion,/@media\(prefers-reduced-motion:reduce\)/);
   assert.doesNotMatch(motion,/\.enter>\*\s*\{/);
 });
 test('CSS changes are source-scoped and cache is bumped',()=>{
   assert.match(source('src/styles/redesign.css'),/\.welcome-screen/);
-  assert.match(source('public/sw.js'),/memory-relay-v3\.5\.0/);
-  assert.match(source('package.json'),/"version": "3\.5\.0"/);
+  assert.match(source('public/sw.js'),/memory-relay-v3\.5\.1/);
+  assert.match(source('package.json'),/"version": "3\.5\.1"/);
 });

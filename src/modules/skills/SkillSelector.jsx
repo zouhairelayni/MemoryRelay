@@ -1,3 +1,4 @@
+import ScreenSkeleton from "../../components/ScreenSkeleton.jsx";
 import { useEffect, useMemo, useState } from "react";
 import { useSkills } from "../../hooks/useSkills.js";
 import { skills as api } from "../../api/endpoints.js";
@@ -62,7 +63,7 @@ export default function SkillSelector({ active, onDeleted }) {
         <IconButton id="sk-add-open" icon={adding ? "x" : "plus"} label={adding ? "Close" : "Add a skill"} variant="solid" size="lg" onClick={() => setAdding((a) => !a)} />
       </SearchBar>
 
-      <div className="card">
+      <div className="card skills-toolbar-card">
         <Collapse open={adding}>
           {adding ? (
             <div className="editor" style={{ marginTop: 12 }}>
@@ -89,11 +90,11 @@ export default function SkillSelector({ active, onDeleted }) {
             ]}/>
           <div className="cluster">
             {pendingCount ? <Badge tone="rule">{pendingCount} to review</Badge> : null}
-            <div className="skill-cap" title="Maximum skills sent for one agent request">
+            <div className="skill-cap" title="Maximum skills sent for one agent request (1–10)">
               <span>Skills per request</span>
               <AppSelect id="sk-max" label="Skills per request" className="app-select-compact" value={sk.max}
                 onChange={next=>sk.saveMax(Number(next))}
-                options={Array.from({length:8},(_,i)=>({value:i+1,label:String(i+1)}))}/>
+                options={Array.from({length:10},(_,i)=>({value:i+1,label:String(i+1)}))}/>
             </div>
           </div>
         </div>
@@ -101,7 +102,7 @@ export default function SkillSelector({ active, onDeleted }) {
       </div>
 
 <div id="sk-list" className="stack list">
-        {!sk.loaded ? [0, 1, 2].map((k) => <div className="skel" key={k} />) : null}
+        {!sk.loaded ? <ScreenSkeleton label="Loading skills"/> : null}
         {list.slice(0,q?list.length:shown).map((s) => {
           const key = s.name, isOpen = !!open[key];
           return (
@@ -110,7 +111,7 @@ export default function SkillSelector({ active, onDeleted }) {
                 <button type="button" className="dmain" aria-expanded={isOpen} onClick={() => setOpen((o) => ({ ...o, [key]: !o[key] }))}>
                   <span className={"ic " + (s.enabled ? "ok" : "lock")}><Icon name={s.enabled ? "skills" : "lock"} size={18} /></span>
                   <span className="tt"><span className="skill-card-name" title={s.name}>{s.name.replace(/[-_]/g," ")}</span><small className="skill-card-meta">{s.pending ? <b className="ok-amber">Needs review · </b> : null}{s.core ? "Prioritized · " : ""}{s.tokens} tokens · {humanSource(s.source)}</small></span>
-                  <span className="chev"><Icon name="chev" size={18} /></span>
+                  <span className="expand-glyph" aria-hidden="true"><Icon name={isOpen ? "x" : "plus"} size={19}/></span>
                 </button>
                 <Switch checked={s.enabled} onChange={(v) => sk.toggle(s.name, "enabled", v)} title={s.pending ? "Approve and enable" : "Enable or disable"} />
               </div>

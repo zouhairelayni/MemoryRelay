@@ -9,6 +9,7 @@ import "./styles/screens.css";
 import "./styles/motion.css";
 import "./styles/workspace.css";
 import "./styles/redesign.css";
+import "./styles/accent-and-polish.css";
 
 createRoot(document.getElementById("root")).render(<StrictMode><App /></StrictMode>);
 
