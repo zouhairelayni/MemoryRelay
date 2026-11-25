@@ -17,6 +17,7 @@ import { delegate, getDelegation, saveDelegation } from "./delegate.js";
 import { BRIEF_FORM, GUIDE } from "./delegateguide.js";
 import { monitor } from "./monitor.js";
 import { listErrors, recordClientError } from "./diagnostics.js";
+import { resolveCounters } from "./counters.js";
 import { addSkillRepo, githubTokenStatus, saveGitHubToken, removeGitHubToken, githubBlockedUntil, githubQuota, listRepoFiles, listSkillRepos, previewRepoFile, removeRepoFile, removeSkillRepo, restoreRepoFile, setSkillRepoFilter, setSkillRepoSync, syncSkillRepo } from "./githubSkills.js";
 
 // The dashboard can have several tabs open. Analytic aggregates cost far more reads
@@ -35,15 +36,20 @@ async function cachedMonitor(env, period) {
 }
 
 export async function settings(env) {
+  // One read for all four totals. The fallbacks only run on a database that has not
+  // been migrated to counters yet; on a healthy database they cost nothing.
+  const c = await resolveCounters(env, {
+    memories_total: { sql: "SELECT COUNT(*) AS n FROM memories" },
+    memories_rules: { sql: "SELECT COUNT(*) AS n FROM memories WHERE " + RULES_SQL },
+    services_active: { sql: "SELECT COUNT(*) AS n FROM services WHERE revoked = 0" },
+    api_keys_active: {
+      sql: "SELECT (SELECT COUNT(*) FROM gemini_keys WHERE enabled = 1) + (SELECT COUNT(*) FROM openrouter_keys WHERE enabled = 1) + (SELECT COUNT(*) FROM openai_keys WHERE enabled = 1) + (SELECT COUNT(*) FROM nvidia_keys WHERE enabled = 1) AS n",
+    },
+  });
   const last = await env.DB.prepare("SELECT MAX(last_seen) AS last FROM services").first();
-  const mem = await env.DB.prepare(
-    "SELECT COUNT(*) AS n, COALESCE(SUM(CASE WHEN " + RULES_SQL + " THEN 1 ELSE 0 END), 0) AS rules FROM memories"
-  ).first();
-  const svc = await env.DB.prepare("SELECT COUNT(*) AS n FROM services WHERE revoked = 0").first();
-  const keys = await env.DB.prepare("SELECT (SELECT COUNT(*) FROM gemini_keys WHERE enabled = 1) + (SELECT COUNT(*) FROM openrouter_keys WHERE enabled = 1) + (SELECT COUNT(*) FROM openai_keys WHERE enabled = 1) + (SELECT COUNT(*) FROM nvidia_keys WHERE enabled = 1) AS n").first();
   return {
     last_call: last && last.last ? last.last : "",
-    memories: mem.n, rules: mem.rules, connections: svc.n, keys: keys.n,
+    memories: c.memories_total, rules: c.memories_rules, connections: c.services_active, keys: c.api_keys_active,
     memory_max_tokens: await getMemoryLimit(env),
   };
 }

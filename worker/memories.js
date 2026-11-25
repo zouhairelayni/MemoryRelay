@@ -5,6 +5,7 @@ import { formatAgentMemory } from "./memoryFormat.js";
 import { memoryTextError } from "../shared/memoryBudget.js";
 import { NOT_RULES_SQL, clip, isProtected, newId, now, runAll, safeJson, similar } from "./util.js";
 import { cleanDescription, decodeMetadata, descriptionFromText, fullEntry, normalizeMetadata, queryMemoryIndex } from "./memoryIndex.js";
+import { counterOr } from "./counters.js";
 
 const HISTORY_KEEP = 20;
 const DUP_SCAN = 1000;
@@ -49,8 +50,8 @@ export async function remember(env, a, source = "agent") {
   let description, metadata;
   try { description = a.description === undefined ? "" : cleanDescription(a.description); metadata = normalizeMetadata(a.metadata); }
   catch (e) { return "not saved: " + e.message; }
-  const count = await env.DB.prepare("SELECT COUNT(*) AS n FROM memories").first();
-  if (count.n >= MAX_MEMORIES) return `not saved: the memory is full (${MAX_MEMORIES}). Ask the owner to clean it up`;
+  const total = await counterOr(env, "memories_total", "SELECT COUNT(*) AS n FROM memories");
+  if (total >= MAX_MEMORIES) return `not saved: the memory is full (${MAX_MEMORIES}). Ask the owner to clean it up`;
   const dup = await findDuplicate(env, text);
   if (dup) return `duplicate of ${dup.id}, not saved`;
   return `saved ${await insertMemory(env, text, t.tags, source, description, metadata)}`;
@@ -82,11 +83,11 @@ export async function getMemory(env, a) {
 
 export async function recent(env, a) {
   const n = Math.min(Math.max(Number(a.n) || 5, 1), 20);
-  const total = await env.DB.prepare("SELECT COUNT(*) AS n FROM memories").first();
+  const total = await counterOr(env, "memories_total", "SELECT COUNT(*) AS n FROM memories");
   const { results } = await env.DB.prepare(
     "SELECT * FROM memories ORDER BY created DESC, rowid DESC LIMIT ?"
   ).bind(n).all();
-  return { total: total.n, results: results.map(fullEntry) };
+  return { total, results: results.map(fullEntry) };
 }
 
 export async function updateMemory(env, a) {
@@ -150,8 +151,8 @@ export async function addMemory(env, b) {
   let description, metadata;
   try { description = b.description === undefined ? "" : cleanDescription(b.description); metadata = normalizeMetadata(b.metadata); }
   catch (e) { return { error: e.message }; }
-  const count = await env.DB.prepare("SELECT COUNT(*) AS n FROM memories").first();
-  if (count.n >= MAX_MEMORIES) return { error: `the memory is full (${MAX_MEMORIES}). Delete some first` };
+  const total = await counterOr(env, "memories_total", "SELECT COUNT(*) AS n FROM memories");
+  if (total >= MAX_MEMORIES) return { error: `the memory is full (${MAX_MEMORIES}). Delete some first` };
   const dup = await findDuplicate(env, text);
   if (dup) return { error: `a similar memory already exists (${dup.id})` };
   const id = await insertMemory(env, text, t.tags, rule ? "owner" : "dashboard", description, metadata);
@@ -243,6 +244,6 @@ export async function importMemories(env, incoming, mode) {
     ).bind(r.id, r.text, r.tags, r.source, r.created, r.updated, r.history, r.description, r.metadata));
   }
   await runAll(env, stmts);
-  const total = await env.DB.prepare("SELECT COUNT(*) AS n FROM memories").first();
-  return { imported: rows.length, total: total.n };
+  const total = await counterOr(env, "memories_total", "SELECT COUNT(*) AS n FROM memories");
+  return { imported: rows.length, total };
 }

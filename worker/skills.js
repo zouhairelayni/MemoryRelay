@@ -4,6 +4,7 @@
 import { complete } from "./llm.js";
 import { getConfig, setConfig } from "./db.js";
 import { extractJson, now } from "./util.js";
+import { counterOr } from "./counters.js";
 export { estimateTokens } from "../shared/skillTokens.js";
 import { estimateTokens } from "../shared/skillTokens.js";
 
@@ -116,7 +117,7 @@ export function scanSkill(body) {
 const LIST_HEAD = 30000;
 export async function listSkills(env) {
   const { results } = await env.DB.prepare(
-    `SELECT sk.name,sk.description,substr(sk.body,1,${LIST_HEAD}) body,length(sk.body) len,sk.enabled,sk.core,sk.source,sk.created,sk.updated,COALESCE(u.uses,0) uses FROM skills sk LEFT JOIN (SELECT detail,COUNT(*) uses FROM activity_events WHERE category='skill' AND action='selected' GROUP BY detail) u ON u.detail=sk.name ORDER BY sk.name`
+    `SELECT sk.name,sk.description,substr(sk.body,1,${LIST_HEAD}) body,length(sk.body) len,sk.enabled,sk.core,sk.source,sk.created,sk.updated,COALESCE(u.n,0) uses FROM skills sk LEFT JOIN skill_uses u ON u.skill=sk.name ORDER BY sk.name`
   ).all();
   return results.map((s) => ({ name: s.name, description: s.description, enabled: !!s.enabled, core: !!s.core,
     source: s.source, pending: !s.enabled && String(s.source).startsWith("agent"),
@@ -132,11 +133,11 @@ export async function addSkill(env, text, source = "paste") {
   const fromAgent = String(source).startsWith("agent");
   const full = toSkillMd(s);
   if (fromAgent && HIDDEN_RE.test(full)) return { error: "the skill contains hidden or invisible characters. Remove them and upload again." };
-  const count = await env.DB.prepare("SELECT COUNT(*) AS n FROM skills").first();
-  if (count.n >= MAX_SKILLS) return { error: "the library is full (" + MAX_SKILLS + " skills). Delete one first." };
+  const count = await counterOr(env, "skills_total", "SELECT COUNT(*) AS n FROM skills");
+  if (count >= MAX_SKILLS) return { error: "the library is full (" + MAX_SKILLS + " skills). Delete one first." };
   if (fromAgent) {
-    const pend = await env.DB.prepare("SELECT COUNT(*) AS n FROM skills WHERE enabled = 0 AND source LIKE 'agent%'").first();
-    if (pend.n >= MAX_PENDING) return { error: "too many agent skills are waiting for the owner (" + MAX_PENDING + "). Try again after they review them." };
+    const pend = await counterOr(env, "skills_pending", "SELECT COUNT(*) AS n FROM skills WHERE enabled = 0 AND source LIKE 'agent%'");
+    if (pend >= MAX_PENDING) return { error: "too many agent skills are waiting for the owner (" + MAX_PENDING + "). Try again after they review them." };
   }
   const exists = await env.DB.prepare("SELECT name FROM skills WHERE name = ?").bind(s.name).first();
   if (exists) return { error: "a skill named " + s.name + " already exists (delete it first to replace it)" };

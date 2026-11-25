@@ -1,6 +1,7 @@
 // Sanitized, owner-only diagnostics. Deliberately never serialize request bodies,
 // memory text, credentials, raw exception messages, or stacks.
 import { activity } from './monitor.js';
+import { counterOr } from './counters.js';
 
 const SAFE_CATEGORIES = new Set(['mcp','api','provider','skill','client','worker','system']);
 const PERIOD_MS = Object.freeze({ '1h': 3600000, '1d': 86400000, '7': 604800000 });
@@ -63,7 +64,12 @@ function filters(opts={}) {
 }
 export async function listErrors(env, opts={}) {
   const f=filters(opts);
-  const total=await env.DB.prepare(`SELECT COUNT(*) AS n FROM activity_events WHERE ${f.where}`).bind(...f.params).first();
+  // The default unfiltered 7-day view is a maintained counter: one read, no scan.
+  // Any filter or shorter period still needs a real count of matching rows.
+  const plain7 = f.period==='7' && !f.category && !f.code;
+  const total=plain7
+    ? { n: await counterOr(env,'errors_total_7d',`SELECT COUNT(*) AS n FROM activity_events WHERE ${f.where}`,f.params) }
+    : await env.DB.prepare(`SELECT COUNT(*) AS n FROM activity_events WHERE ${f.where}`).bind(...f.params).first();
   const rows=await env.DB.prepare(`SELECT id,ts,category,action,error_code FROM activity_events WHERE ${f.where} ORDER BY id DESC LIMIT ? OFFSET ?`).bind(...f.params,f.limit,f.offset).all();
   const count=Number(total?.n)||0;
   return {total:count,limit:f.limit,offset:f.offset,next_offset:f.offset+rows.results.length<count?f.offset+rows.results.length:null,

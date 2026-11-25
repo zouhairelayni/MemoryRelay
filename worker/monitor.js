@@ -1,4 +1,5 @@
 // Owner-only aggregated activity. Never log prompts, memory contents, or API keys.
+import { counterOr } from "./counters.js";
 // Raw events are kept briefly for the recent list; grouped tables keep the charts
 // cheap. The longest range is seven days, so the dashboard never scans deep history.
 const LIMIT = 240;
@@ -38,6 +39,9 @@ export async function pruneActivity(env, days = 7) {
     env.DB.prepare('DELETE FROM activity_daily WHERE day <= ?').bind(day),
     env.DB.prepare('DELETE FROM activity_hourly WHERE hour < ?').bind(hour),
     env.DB.prepare('DELETE FROM activity_heat WHERE day <= ?').bind(day),
+    // Whatever survived the deletes is exactly the retained window, so the 7-day
+    // error total can be refreshed from the grouped rows instead of raw events.
+    env.DB.prepare("INSERT INTO counters (key, value) VALUES ('errors_total_7d', (SELECT COALESCE(SUM(errors), 0) FROM activity_daily)) ON CONFLICT(key) DO UPDATE SET value = excluded.value"),
   ]);
 }
 
@@ -98,8 +102,8 @@ export async function monitor(env,period='7') {
   const daily=[...dailyMap.values()].sort((a,b)=>a.day<b.day?-1:a.day>b.day?1:0);
   const hourly=heatRows||[...hourlyMap.values()];
   const jobs=(await env.DB.prepare("SELECT d.id,d.service_id,COALESCE(s.name,'Dashboard') agent,d.task_summary,d.state,d.provider,d.model,d.kind,d.tokens_in,d.tokens_out,d.ms,d.ok,d.error,d.ts FROM delegations d LEFT JOIN services s ON s.id=d.service_id ORDER BY CASE WHEN d.state='running' THEN 0 ELSE 1 END, d.id DESC LIMIT 40").all()).results;
-  const activeCount=await env.DB.prepare("SELECT COUNT(*) n FROM delegations WHERE state='running'").first();
+  const activeCount=await counterOr(env,"delegations_running","SELECT COUNT(*) n FROM delegations WHERE state='running'");
   const recentErrors=events.filter(e=>!e.ok);
   return {period:key in PERIODS?key:'7',label,step,start,series,totals,daily,hourly,events:events.slice(0,35),errors:recentErrors.slice(0,15),jobs,
-    counts:{requests:totals.reduce((n,x)=>n+Number(x.n),0),tokens_in:totals.filter(x=>x.category==='provider').reduce((n,x)=>n+Number(x.tin),0),tokens_out:totals.filter(x=>x.category==='provider').reduce((n,x)=>n+Number(x.tout),0),skills:totals.filter(x=>x.category==='skill').reduce((n,x)=>n+Number(x.n),0),delegations:totals.filter(x=>x.category==='mcp'&&x.action==='delegate').reduce((n,x)=>n+Number(x.n),0),active:activeCount.n}};
+    counts:{requests:totals.reduce((n,x)=>n+Number(x.n),0),tokens_in:totals.filter(x=>x.category==='provider').reduce((n,x)=>n+Number(x.tin),0),tokens_out:totals.filter(x=>x.category==='provider').reduce((n,x)=>n+Number(x.tout),0),skills:totals.filter(x=>x.category==='skill').reduce((n,x)=>n+Number(x.n),0),delegations:totals.filter(x=>x.category==='mcp'&&x.action==='delegate').reduce((n,x)=>n+Number(x.n),0),active:Number(activeCount)||0}};
 }

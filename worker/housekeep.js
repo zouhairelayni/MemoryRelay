@@ -7,6 +7,7 @@ import { memoryTextError } from "../shared/memoryBudget.js";
 import { getConfig, setConfig } from "./db.js";
 import { complete } from "./llm.js";
 import { NOT_RULES_SQL, RULES_SQL, extractJson, now, randomHex, runAll, safeJson } from "./util.js";
+import { counterOr } from "./counters.js";
 
 const PROPOSAL_KEY = "hk_proposal";
 const PROPOSAL_MS = 10 * 60 * 1000;
@@ -42,8 +43,8 @@ export async function housekeep(env, a = {}) {
     `SELECT id, text, description, tags, metadata FROM memories WHERE ${NOT_RULES_SQL} ORDER BY created DESC, rowid DESC LIMIT 200`
   ).all();
   if (!results.length) {
-    const rules = await env.DB.prepare(`SELECT COUNT(*) AS n FROM memories WHERE ${RULES_SQL}`).first();
-    return { message: "no editable memories: housekeeping skips rules-tagged memories", rules_memories: rules.n };
+    const rules = await counterOr(env, "memories_rules", `SELECT COUNT(*) AS n FROM memories WHERE ${RULES_SQL}`);
+    return { message: "no editable memories: housekeeping skips rules-tagged memories", rules_memories: rules };
   }
   const byId = new Map(results.map((m) => [m.id, m]));
   let groups, model = "", keyLabel = "";

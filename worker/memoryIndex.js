@@ -1,6 +1,7 @@
 // Search-index fields are independent of legacy context tags and Markdown bodies.
 // Empty metadata means "unknown", never inferred from a project's name or content.
 import { safeJson } from "./util.js";
+import { counterOr } from "./counters.js";
 
 export const METADATA_FIELDS = ["app", "platforms", "feature", "version", "languages", "stack"];
 const SINGLE = ["app", "feature", "version"];
@@ -96,13 +97,16 @@ export function buildMemoryWhere(a = {}) {
 export async function queryMemoryIndex(env, filters = {}, opts = {}) {
   const { limit, offset } = paging(filters, opts.defaultLimit ?? 20);
   const { where, params } = buildMemoryWhere(filters);
-  const count = await env.DB.prepare(`SELECT COUNT(*) n FROM memories ${where}`).bind(...params).first();
+  // An unfiltered list needs only the maintained total. Any filter or query still
+  // needs a real COUNT because it has to know which rows match.
+  const total = where
+    ? Number((await env.DB.prepare(`SELECT COUNT(*) n FROM memories ${where}`).bind(...params).first())?.n) || 0
+    : await counterOr(env, "memories_total", "SELECT COUNT(*) n FROM memories");
   // Index paging avoids transferring full memory bodies from D1. The first 256
   // characters are fetched only to derive a faithful legacy description.
   const projection = opts.full ? "*" : "id, substr(text, 1, 256) AS text, tags, source, created, updated, description, metadata";
   const { results } = await env.DB.prepare(`SELECT ${projection} FROM memories ${where} ORDER BY created DESC, rowid DESC LIMIT ? OFFSET ?`)
     .bind(...params, limit, offset).all();
-  const total = Number(count?.n || 0);
   return { total, count: results.length, limit, offset, next_offset: offset + results.length < total ? offset + results.length : null,
     results: results.map(opts.full ? fullEntry : indexEntry) };
 }
