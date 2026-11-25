@@ -4,6 +4,15 @@ import { readFileSync } from 'node:fs';
 
 const read = path => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
 
+test('the errors screen scrolls and its back button leaves the errors route', () => {
+  const shell = read('src/shell/AppShell.jsx');
+  // The errors screen must render in the scrollable pane, not under overflow:hidden main.
+  assert.match(shell, /errorsOpen && ErrorsScreen\s*\?\s*<div className="pane errors-pane">/);
+  // Clicking the current tab while an overlay route is open must navigate, not just scroll.
+  assert.match(shell, /id === tabId && route === id/);
+  assert.match(read('src/modules/home/ErrorsScreen.jsx'), /go\("home"\)/);
+});
+
 test('all five navigation screens use the redesigned layout', () => {
   const files = {
     'src/modules/home/HomeScreen.jsx': 'home-screen',

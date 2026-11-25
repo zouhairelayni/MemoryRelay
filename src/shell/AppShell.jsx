@@ -30,13 +30,15 @@ export default function AppShell({ email, logout }) {
   const closeSettings = useCallback(() => { if (window.history.length > 1) back(); else go(lastTab.current, { replace: true }); }, [back, go]);
 
   const select = useCallback((id) => {
-    if (id === tabId) {
+    // Only re-scroll when that tab is the screen on display. While Settings or
+    // Errors is open the same tab still has to navigate back out of the overlay.
+    if (id === tabId && route === id) {
       const pane = document.querySelector('[data-pane="' + id + '"]');
       if (pane) pane.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
     go(id);
-  }, [go, tabId]);
+  }, [go, tabId, route]);
 
   // Logging out also forgets where you were, so the next login starts on Home.
   const doLogout = useCallback(async () => { window.history.replaceState(null, "", "#/home"); await logout(); }, [logout]);
@@ -54,7 +56,9 @@ export default function AppShell({ email, logout }) {
       <div className="shell" data-active-tab={tabId}>
         <TopBar onSettings={openSettings} tabId={tabId} />
         <main className="main">
-          {errorsOpen && ErrorsScreen ? <ErrorsScreen active /> : <Pager panes={panes} index={index} onChange={go} swipe={swipeTabs && !settingsOpen} />}
+          {errorsOpen && ErrorsScreen
+            ? <div className="pane errors-pane"><ErrorsScreen active /></div>
+            : <Pager panes={panes} index={index} onChange={go} swipe={swipeTabs && !settingsOpen} />}
         </main>
         <TabBar tabs={TABS} activeId={tabId} onSelect={select} />
         <SettingsSheet open={settingsOpen} onClose={closeSettings} />
